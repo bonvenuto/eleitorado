@@ -1,0 +1,43 @@
+[project]
+name = "eleitorado"
+version = "0.1.0"
+description = "Ingestão de dados públicos no BigQuery"
+requires-python = ">=3.12"
+dependencies = [
+    "google-cloud-bigquery>=3.46.1",
+    "google-cloud-storage>=3.16.0",
+    "httpx>=0.28.1",
+    "pyarrow>=25.0.1",
+    "pydantic>=2.13.5",
+    "pyyaml>=6.0.3",
+    "tzdata>=2026.5",
+]
+
+[project.scripts]
+coletor = "coletor.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["coletor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integracao: acessa GCP e fontes reais"]
+addopts = "-m 'not integracao'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "respx>=0.23.1",
+    "ruff>=0.16.10",
+]
