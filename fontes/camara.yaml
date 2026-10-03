@@ -1,0 +1,37 @@
+orgao: camara
+nome: Câmara dos Deputados
+portal: https://dadosabertos.camara.leg.br/
+recursos:
+  - id: deputados
+    descricao: Deputados de cada legislatura, da 53ª à atual
+    fonte_oficial: https://dadosabertos.camara.leg.br/swagger/api.html
+    condicoes_uso: >-
+      Serviço de Dados Abertos da Câmara dos Deputados: acesso livre, sem necessidade de
+      autorização (https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos).
+    adaptador: api_json
+    url: https://dadosabertos.camara.leg.br/api/v2/deputados
+    parametros: {itens: 100}
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: semanal}
+    formato: {tipo: json}
+    paginacao: links_next
+    iteracao: {parametro: idLegislatura, valores: legislaturas, inicio: 53}
+    registros: dados
+  - id: ceap
+    descricao: Despesas da Cota para o Exercício da Atividade Parlamentar (CEAP)
+    fonte_oficial: https://dadosabertos.camara.leg.br/
+    condicoes_uso: >-
+      Serviço de Dados Abertos da Câmara dos Deputados: acesso livre, sem necessidade de
+      autorização (https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos).
+    adaptador: arquivo
+    url: https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip
+    publicacao: por_competencia
+    competencia: {tipo: ano, inicio: 2008}
+    cadencia: {corrente: diaria, anteriores: semanal}
+    formato:
+      tipo: csv
+      compressao: zip
+      arquivo: Ano-{ano}.csv
+      encoding: utf-8-sig
+      delimitador: ";"

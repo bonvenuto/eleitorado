@@ -1,0 +1,32 @@
+orgao: cgu
+nome: Controladoria-Geral da União (Portal da Transparência)
+portal: https://portaldatransparencia.gov.br/
+recursos:
+  - id: ceis
+    descricao: Cadastro de Empresas Inidôneas e Suspensas (CEIS)
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/ceis
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/ceis/{data}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://portaldatransparencia.gov.br/download-de-dados/ceis
+    cadencia: {corrente: diaria}
+    formato: {tipo: csv, compressao: zip, encoding: cp1252, delimitador: ";"}
+  - id: cnep
+    descricao: Cadastro Nacional de Empresas Punidas (CNEP)
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/cnep
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/cnep/{data}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://portaldatransparencia.gov.br/download-de-dados/cnep
+    cadencia: {corrente: diaria}
+    formato: {tipo: csv, compressao: zip, encoding: cp1252, delimitador: ";"}

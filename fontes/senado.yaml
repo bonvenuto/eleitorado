@@ -1,0 +1,29 @@
+orgao: senado
+nome: Senado Federal
+portal: https://www12.senado.leg.br/dados-abertos
+recursos:
+  - id: senadores
+    descricao: Senadores com mandato da 53ª legislatura à atual
+    fonte_oficial: https://legis.senado.leg.br/dadosabertos/docs/
+    condicoes_uso: >-
+      Dados abertos do Senado Federal; condições de uso em
+      https://www12.senado.leg.br/dados-abertos.
+    adaptador: api_json
+    url: https://legis.senado.leg.br/dadosabertos/senador/lista/legislatura/53/{legislatura}.json
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: semanal}
+    formato: {tipo: json}
+    registros: ListaParlamentarLegislatura.Parlamentares.Parlamentar
+  - id: ceaps
+    descricao: Despesas da Cota para o Exercício da Atividade Parlamentar dos Senadores (CEAPS)
+    fonte_oficial: https://adm.senado.gov.br/adm-dadosabertos/swagger-ui/index.html?configUrl=/adm-dadosabertos/swagger-config.json
+    condicoes_uso: >-
+      Dados abertos do Senado Federal; condições de uso em
+      https://www12.senado.leg.br/dados-abertos.
+    adaptador: api_json
+    url: https://adm.senado.gov.br/adm-dadosabertos/api/v1/senadores/despesas_ceaps/{ano}
+    publicacao: por_competencia
+    competencia: {tipo: ano, inicio: 2008}
+    cadencia: {corrente: diaria, anteriores: semanal}
+    formato: {tipo: json}
