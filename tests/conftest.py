@@ -4,8 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from coletor.coleta import Dependencias
 from coletor.config import Config
 from coletor.http import ClienteHttp
+from tests.amostras import AGORA
 from tests.fakes import FakeArmazenamento, FakeWarehouse
 
 
@@ -36,3 +38,14 @@ def http() -> ClienteHttp:
     cliente = ClienteHttp(dormir=lambda segundos: None)
     yield cliente
     cliente.fechar()
+
+
+@pytest.fixture
+def deps(config, http, armazenamento, warehouse) -> Dependencias:
+    return Dependencias(
+        config=config,
+        http=http,
+        armazenamento=armazenamento,
+        warehouse=warehouse,
+        agora=lambda: AGORA,
+    )
