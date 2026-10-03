@@ -1,0 +1,1559 @@
+{
+  "titulo": "Mapeamento de fontes oficiais brasileiras de dados públicos",
+  "data_referencia": "2026-10-03",
+  "finalidade": "Integração de dados em sistema ou pipeline de coleta",
+  "escopo": "21 instituições, incluindo o MGI; CGU consolidada; Câmara e Senado separados. Principais bases, sem pretensão de inventariar todos os recursos existentes em cada portal.",
+  "metodologia": "Pesquisa de documentação e recursos oficiais. Algumas respostas públicas de serviço foram inspecionadas; nenhuma cobertura de testes autenticados ou SLA foi realizada. Uma falha na ferramenta de obtenção não prova indisponibilidade do serviço.",
+  "tipos_interface": {
+    "conteudo": "Retorna registros ou valores da base.",
+    "catalogo": "Retorna descrição do conjunto, metadados e URLs de recursos; não implica consulta de registros.",
+    "geoespacial_conteudo": "WFS ou outro serviço de feições; WMS de visualização não substitui vetores/microdados.",
+    "restrita": "Exige habilitação institucional ou credenciais vinculadas a uma entidade; não tratar como dado aberto anônimo.",
+    "contratacao": "Produto oficial sujeito a contratação; não tratar como API pública gratuita."
+  },
+  "nota_chaves": "Granularidades resumem o acervo; chaves_sugeridas são propostas de integração, não contratos universais de nomes de colunas nem autorização de cruzamento de registros pessoais.",
+  "abordagens": [
+    {
+      "nome": "Híbrida: APIs oficiais e arquivos em lote",
+      "recomendada": true,
+      "descricao": "APIs para consultas filtradas/atualizações e downloads para histórico ou conjuntos sem API. Descobrir recursos pelos catálogos e validar esquema, competência e condições de reutilização.",
+      "tradeoff": "Maior cobertura; requer adaptadores HTTP/REST/OData/WFS/FTP e parsers de formatos diferentes."
+    },
+    {
+      "nome": "Somente APIs de conteúdo",
+      "recomendada": false,
+      "descricao": "Começar pelas famílias de API de BCB, IBGE, IPEA, STN, CGU, MGI (Compras.gov.br, PNCP, Transferegov e SIORG), TCU, Ministério da Saúde, Legislativo e recursos CAPES.",
+      "tradeoff": "Menor variedade de parsers, mas cobre parcialmente órgãos que publicam predominantemente arquivos."
+    },
+    {
+      "nome": "Arquivos em lote como base principal",
+      "recomendada": false,
+      "descricao": "Carregar competências/edições publicadas e utilizar APIs apenas para enriquecimento/consultas pontuais.",
+      "tradeoff": "Boa reprodutibilidade de cargas históricas, com maior volume de armazenamento e maior defasagem em algumas bases."
+    }
+  ],
+  "prioridades_propostas": [
+    "Fundação: IBGE Localidades, SIORG/MGI e tabelas de correspondência de códigos territoriais e unidades administrativas.",
+    "Primeiros adaptadores de API: BCB, IBGE Agregados, IPEA, STN Siconfi e Câmara/Senado.",
+    "Transparência e gestão: CGU com token, TCU e MGI (Compras.gov.br, PNCP e Transferegov); usar downloads na carga completa e deduplicar compras publicadas em mais de uma fonte.",
+    "Saúde e educação: API MS e CAPES DataStore; depois arquivos DATASUS/INEP/ANS/ANVISA.",
+    "Cadastros e séries extensas: RFB CNPJ, MTE e INSS por competências; incorporar revisões.",
+    "Geografia e justiça: INPE com descoberta de camadas e CNJ condicionado às regras atuais de reutilização."
+  ],
+  "contrato_proposto_para_coleta": [
+    "Identificar órgão, conjunto, recurso, competência e fonte oficial.",
+    "Separar data de referência, atualização da fonte e data de coleta.",
+    "Registrar URL, método, parâmetros não secretos, versão do esquema, hash do arquivo e execução.",
+    "Preservar arquivos/respostas originais e normalizar em camada separada.",
+    "Tratar paginação, limites, retomada e reprocessamento de competências corrigidas.",
+    "Representar identificadores como texto; conservar códigos originais e tabelas de correspondência.",
+    "Validar granularidade e cardinalidade antes de somar ou cruzar bases.",
+    "Registrar licença/condições de reutilização por conjunto e distinguir acesso público de acesso restrito."
+  ],
+  "fontes": [
+    {
+      "id": "bcb",
+      "orgao": "Banco Central do Brasil (BCB)",
+      "portal": "https://dadosabertos.bcb.gov.br/",
+      "bases": [
+        "SGS: Selic, crédito, inflação, atividade e outras séries econômicas",
+        "PTAX: taxas de câmbio",
+        "Expectativas de Mercado / Focus",
+        "IFData: dados selecionados de instituições financeiras"
+      ],
+      "meio_principal": "APIs de conteúdo REST (SGS) e OData (Olinda).",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "SGS",
+          "metodo": "GET",
+          "url": "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados",
+          "documentacao": "https://dadosabertos.bcb.gov.br/dataset/11-taxa-de-juros---selic",
+          "autenticacao": "Consulta pública sem chave.",
+          "parametros": "formato=json ou csv; dataInicial e dataFinal. Séries diárias exigem filtros e janelas de até 10 anos.",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "PTAX",
+          "metodo": "GET",
+          "url": "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/",
+          "documentacao": "https://www.bcb.gov.br/conteudo/dadosabertos/BCBDepin/gnastportal-dados-abertostaxas-de-cambio---todos-os-boletins-diarios.pdf",
+          "autenticacao": "Consulta pública sem chave.",
+          "parametros": "Recursos de cotação por data/período e moedas; filtros e paginação OData.",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Expectativas de Mercado",
+          "metodo": "GET",
+          "url": "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/",
+          "documentacao": "https://dadosabertos.bcb.gov.br/dataset/expectativas-mercado",
+          "autenticacao": "Consulta pública sem chave.",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "IFData",
+          "metodo": "GET",
+          "url": "https://olinda.bcb.gov.br/olinda/servico/IFDATA/versao/v1/odata/",
+          "documentacao": "https://dadosabertos.bcb.gov.br/dataset/ifdata---dados-selecionados-de-instituies-financeiras",
+          "autenticacao": "Consulta pública sem chave.",
+          "verificacao": "documentada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dadosabertos.bcb.gov.br/",
+          "formatos": [
+            "CSV",
+            "JSON"
+          ],
+          "nota": "Formatos e recursos variam por conjunto; várias exportações são fornecidas pelas próprias APIs."
+        }
+      ],
+      "atualizacao": "Por série; SGS possui séries diárias e mensais. IFData é trimestral, com defasagem de publicação de 60 ou 90 dias conforme a data-base.",
+      "observacoes": [
+        "Preservar código, unidade e periodicidade de cada série.",
+        "O limite de 10 anos refere-se às consultas JSON/CSV de séries históricas diárias; não aplicar esse limite indiscriminadamente a toda API do BCB."
+      ],
+      "fontes": [
+        "https://dadosabertos.bcb.gov.br/dataset/11-taxa-de-juros---selic",
+        "https://dadosabertos.bcb.gov.br/dataset/expectativas-mercado",
+        "https://dadosabertos.bcb.gov.br/dataset/ifdata---dados-selecionados-de-instituies-financeiras"
+      ],
+      "granularidade": "Série/data; moeda/boletim; instituição financeira/data-base, conforme o recurso.",
+      "chaves_sugeridas": [
+        "código de série SGS",
+        "data de referência",
+        "moeda",
+        "identificador da instituição"
+      ],
+      "formatos_api": [
+        "JSON",
+        "CSV (SGS)",
+        "OData"
+      ]
+    },
+    {
+      "id": "rfb",
+      "orgao": "Receita Federal do Brasil (RFB)",
+      "portal": "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos",
+      "bases": [
+        "CNPJ: empresas, estabelecimentos, sócios, Simples/MEI e tabelas auxiliares",
+        "Cadastros CNO e CAFIR",
+        "Arrecadação e benefícios/renúncias fiscais",
+        "Grandes Números do IRPF e distribuição de renda"
+      ],
+      "meio_principal": "Para uma base aberta local de CNPJ: arquivos em lote. APIs oficiais de consulta individual exigem habilitação governamental ou contratação.",
+      "apis": [
+        {
+          "tipo": "restrita",
+          "nome": "Consulta CNPJ via Conecta gov.br",
+          "metodo": "GET",
+          "url": "https://apigateway.conectagov.estaleiro.serpro.gov.br/api-cnpj-basica/v2/basica/",
+          "documentacao": "https://www.gov.br/conecta/catalogo/apis/consulta-cnpj",
+          "autenticacao": "Adesão de órgão público elegível, chaves de acesso e cadastro de IP conforme Conecta; não é uma API pública anônima.",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "contratacao",
+          "nome": "Consulta CNPJ Serpro",
+          "metodo": "Consultar documentação do produto contratado.",
+          "url": null,
+          "documentacao": "https://loja.serpro.gov.br/es/pin/biblioteca/index.html",
+          "autenticacao": "Contratação e credenciais do produto.",
+          "verificacao": "produto_oficial_documentado"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj",
+          "formatos": [
+            "CSV",
+            "ZIP"
+          ],
+          "nota": "Página oficial atual de descoberta do CNPJ; obter os links de recursos publicados, sem depender de um diretório histórico fixo."
+        },
+        {
+          "url": "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados",
+          "formatos": [
+            "CSV",
+            "JSON",
+            "XML",
+            "ODS"
+          ],
+          "nota": "Repositório de arquivos da RFB; disponibilidade e formato por conjunto."
+        }
+      ],
+      "atualizacao": "CNPJ publicado por competências; verificar competência efetivamente disponível em cada recurso. Outras bases possuem calendários próprios.",
+      "observacoes": [
+        "Nenhuma API pública anônima de consulta individual ao CNPJ foi confirmada nesta pesquisa.",
+        "APIs de terceiros não substituem a fonte oficial e podem ter defasagens próprias.",
+        "CPF de sócio mascarado não é identificador seguro para vinculação individual.",
+        "Manter identificadores CNPJ como texto e respeitar o dicionário/layout publicado."
+      ],
+      "fontes": [
+        "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos",
+        "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos/cadastros",
+        "https://www.gov.br/conecta/catalogo/apis/consulta-cnpj",
+        "https://loja.serpro.gov.br/es/pin/biblioteca/index.html"
+      ],
+      "granularidade": "Empresa, estabelecimento e sócio no CNPJ; agregados e cadastros conforme o conjunto.",
+      "chaves_sugeridas": [
+        "CNPJ como texto",
+        "CNPJ básico e estabelecimento conforme layout",
+        "competência do arquivo",
+        "CNAE",
+        "códigos territoriais com tabela de correspondência"
+      ],
+      "formatos_api": [
+        "Conforme serviço contratado/habilitado"
+      ]
+    },
+    {
+      "id": "cvm",
+      "orgao": "Comissão de Valores Mobiliários (CVM)",
+      "portal": "https://dados.cvm.gov.br/",
+      "bases": [
+        "Companhias abertas: cadastro, DFP, ITR, FRE e documentos periódicos/eventuais",
+        "Fundos de investimento: cadastro, Informe Diário e composição de carteiras (CDA)",
+        "Fundos estruturados: informes FII/FIP e outros conjuntos publicados",
+        "Ofertas públicas e processos sancionadores"
+      ],
+      "meio_principal": "API CKAN para descobrir conjuntos e recursos; baixar os arquivos CSV/ZIP para consumir os registros.",
+      "apis": [
+        {
+          "tipo": "catalogo",
+          "nome": "CKAN Action API",
+          "metodo": "GET",
+          "url": "https://dados.cvm.gov.br/api/3/action/",
+          "documentacao": "https://dados.cvm.gov.br/api/3/action/help_show?name=package_show",
+          "autenticacao": "Leitura pública sem chave.",
+          "parametros": "package_search e package_show; exemplo package_show?id=fi-doc-inf_diario.",
+          "verificacao": "resposta_json_verificada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dados.cvm.gov.br/dados/",
+          "formatos": [
+            "CSV",
+            "ZIP",
+            "TXT"
+          ],
+          "nota": "Repositório de arquivos; dicionários de dados disponíveis nos conjuntos."
+        },
+        {
+          "url": "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/",
+          "formatos": [
+            "CSV",
+            "ZIP"
+          ],
+          "nota": "Histórico de DFP desde 2010 conforme a página do conjunto."
+        }
+      ],
+      "atualizacao": "DFP: semanal, com reapresentações. Informe Diário: meses corrente e anterior atualizados diariamente; demais meses da janela recente, semanalmente.",
+      "observacoes": [
+        "A API de catálogo não equivale a uma API de consultas financeiras por linha.",
+        "Guardar competência e versão do documento; reapresentações podem alterar dados já coletados.",
+        "Não tratar planos futuros de abertura como bases disponíveis hoje."
+      ],
+      "fontes": [
+        "https://dados.cvm.gov.br/",
+        "https://dados.cvm.gov.br/dataset/cia_aberta-doc-dfp",
+        "https://dados.cvm.gov.br/dataset/fi-doc-inf_diario",
+        "https://dados.cvm.gov.br/api/3/action/package_show?id=fi-doc-inf_diario"
+      ],
+      "granularidade": "Regulado/fundo/companhia, documento, conta financeira e competência, conforme a base.",
+      "chaves_sugeridas": [
+        "CNPJ",
+        "código CVM",
+        "data de competência",
+        "versão do documento",
+        "código de conta"
+      ],
+      "formatos_api": [
+        "JSON (catálogo)"
+      ]
+    },
+    {
+      "id": "stn",
+      "orgao": "Secretaria do Tesouro Nacional (STN)",
+      "portal": "https://www.tesourotransparente.gov.br/ckan/",
+      "bases": [
+        "Siconfi: DCA, RREO, RGF e Matriz de Saldos Contábeis (MSC)",
+        "Entes da Federação e extrato de entregas",
+        "Transferências constitucionais e legais: FPM, FPE, Fundeb e outras modalidades",
+        "Tesouro Direto, dívida pública e Resultado do Tesouro Nacional"
+      ],
+      "meio_principal": "APIs Siconfi e de transferências para conjuntos cobertos; catálogo e arquivos para demais séries.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "Siconfi",
+          "metodo": "GET",
+          "url": "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/",
+          "documentacao": "https://apidatalake.tesouro.gov.br/docs/siconfi/",
+          "autenticacao": "Sem identificação ou remuneração para consulta pública.",
+          "parametros": "Consultar recursos, filtros e paginação na documentação; padrão institucional publicado de 5.000 itens por página.",
+          "verificacao": "documentacao_institucional_verificada_endpoint_nao_testado"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Transferências constitucionais",
+          "metodo": "GET",
+          "url": "https://apiapex.tesouro.gov.br/aria/v1/transferencias_constitucionais/custom/",
+          "documentacao": "https://www.tesourotransparente.gov.br/ckan/dataset/api-de-transferencias-constitucionais",
+          "autenticacao": "Rotas de consulta marcadas como públicas na documentação do Tesouro; confirmar exigências na rota escolhida.",
+          "parametros": "transferencias, estados, municipios, por_estados, por_estados_detalhe, por_estado_municipio e por_estado_municipio_detalhe.",
+          "verificacao": "documentada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://www.tesourotransparente.gov.br/ckan/dataset",
+          "formatos": [
+            "CSV",
+            "XLSX",
+            "ZIP",
+            "GZ"
+          ],
+          "nota": "Disponibilidade por conjunto. Siconfi possui recursos específicos de API; não pressupor CSV em todas as bases."
+        }
+      ],
+      "atualizacao": "Por demonstrativo e competência: anual, bimestral, quadrimestral/semestral ou mensal conforme a base; transferências podem ter agregação mensal/decendial.",
+      "observacoes": [
+        "Tratar retificações e extrato de entregas na coleta.",
+        "Não somar níveis de conta ou colunas contábeis sem verificar anexo, consolidação e regime.",
+        "STN possui várias famílias de APIs; uma URL não cobre todo o Tesouro Transparente."
+      ],
+      "fontes": [
+        "https://www.tesourotransparente.gov.br/consultas/consultas-siconfi/siconfi-api-de-dados-abertos",
+        "https://www.tesourotransparente.gov.br/ckan/dataset/api-de-transferencias-constitucionais",
+        "https://sisweb.tesouro.gov.br/apex/f?p=10250:7:0::NO:7:P7_ID_PROJETO:1586"
+      ],
+      "granularidade": "Ente/exercício/período/anexo/conta para demonstrativos; ente/transferência/mês/decêndio para repasses.",
+      "chaves_sugeridas": [
+        "código IBGE do ente",
+        "exercício",
+        "período",
+        "anexo",
+        "conta",
+        "coluna e consolidação"
+      ],
+      "formatos_api": [
+        "JSON"
+      ]
+    },
+    {
+      "id": "cgu",
+      "orgao": "Controladoria-Geral da União (CGU)",
+      "portal": "https://portaldatransparencia.gov.br/",
+      "bases": [
+        "Despesas, receitas, contratos, licitações e transferências do Executivo federal",
+        "Emendas parlamentares",
+        "Servidores, viagens e cartões de pagamento",
+        "Benefícios sociais publicados no Portal",
+        "Sanções: CEIS, CNEP, CEPIM e CEAF"
+      ],
+      "meio_principal": "API REST para consultas filtradas; downloads para carga completa e grandes volumes.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "API do Portal da Transparência",
+          "metodo": "GET",
+          "url": "https://api.portaldatransparencia.gov.br/api-de-dados/",
+          "documentacao": "https://api.portaldatransparencia.gov.br/swagger-ui/index.html",
+          "autenticacao": "Token obtido pelo cadastro indicado no Portal; header chave-api-dados.",
+          "parametros": "Recursos, filtros e parâmetro pagina conforme endpoint. A página oficial consultada informa 400 requisições/minuto de 06:00 a 23:59 e 700 de 00:00 a 05:59.",
+          "verificacao": "documentada_autenticacao_nao_testada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://portaldatransparencia.gov.br/download-de-dados",
+          "formatos": [
+            "CSV",
+            "ZIP"
+          ],
+          "nota": "O Portal recomenda planilhas/download para o conjunto completo; periodicidade por base."
+        }
+      ],
+      "atualizacao": "Varia por base e sistema de origem; verificar página de origem/atualização e competência publicada.",
+      "observacoes": [
+        "O Portal não reúne todas as despesas de todos os poderes, estados e municípios.",
+        "API e arquivos podem ter escopos e granularidades diferentes; verificar cobertura em cada recurso.",
+        "Limites de requisição são configuração mutável: confirmar antes de produção."
+      ],
+      "fontes": [
+        "https://portaldatransparencia.gov.br/api-de-dados",
+        "https://portaldatransparencia.gov.br/pagina-interna/603579-api-de-dados-exemplos-de-uso",
+        "https://portaldatransparencia.gov.br/download-de-dados"
+      ],
+      "granularidade": "Documento, contrato, licitação, sanção, beneficiário ou agregado territorial, conforme endpoint.",
+      "chaves_sugeridas": [
+        "identificador do documento/contrato/sanção",
+        "CNPJ",
+        "código IBGE",
+        "código SIAFI",
+        "competência"
+      ],
+      "formatos_api": [
+        "JSON"
+      ]
+    },
+    {
+      "id": "mgi",
+      "orgao": "Ministério da Gestão e da Inovação em Serviços Públicos (MGI)",
+      "portal": "https://www.gov.br/gestao/pt-br",
+      "bases": [
+        "Compras.gov.br: licitações, contratações, itens, resultados e compras sem licitação",
+        "Compras.gov.br: CATMAT, CATSER, fornecedores, pesquisa de preços e planejamento PGC",
+        "Compras.gov.br: contratos, itens de contratos e atas de registro de preços",
+        "PNCP: contratações, contratos, atas e planos anuais de contratação publicados pelos entes",
+        "Transferegov: Transferências Especiais e Gestão de Parcerias",
+        "Transferegov: Transferências Fundo a Fundo e Termos de Execução Descentralizada (TED)",
+        "Transferegov: Transferências Discricionárias e Legais — programas, propostas e instrumentos",
+        "SIORG: órgãos, entidades, unidades, hierarquia, histórico e cargos/funções",
+        "PEP / Observatório de Pessoal: quantitativos, perfil, despesas, ingressos e saídas",
+        "Gestão de Pessoas: bases abertas de afastamentos/licenças e gratificações",
+        "SPU: imóveis da União, utilizações, responsáveis e localização geocodificada"
+      ],
+      "meio_principal": "APIs oficiais de Compras.gov.br, PNCP, módulos públicos do Transferegov e SIORG; CSV e exportações de painéis para demais bases.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "Dados Abertos Compras.gov.br",
+          "metodo": "GET",
+          "url": "https://dadosabertos.compras.gov.br/",
+          "documentacao": "https://www.gov.br/compras/pt-br/acesso-a-informacao/manuais/manual-dados-abertos/manual-api-compras.pdf",
+          "autenticacao": "Os exemplos de consultas GET do manual não usam chave/token; chamadas de conteúdo não testadas nesta pesquisa.",
+          "parametros": "Manual versão 2.0, fevereiro/2026. Exemplos: /modulo-contratacoes/1_consultarContratacoes_PNCP_14133; /modulo-contratacoes/2_consultarItensContratacoes_PNCP_14133; /modulo-contratos/1_consultarContratos; /modulo-fornecedor/1_consultarFornecedor. Filtros, pagina e tamanhoPagina conforme cada recurso; confirmar campos e limites no Swagger.",
+          "verificacao": "manual_oficial_e_swagger_confirmados_conteudo_nao_testado"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "PNCP — API de Consultas",
+          "metodo": "GET",
+          "url": "https://pncp.gov.br/api/consulta/v1/",
+          "documentacao": "https://pncp.gov.br/api/consulta/swagger-ui/index.html",
+          "autenticacao": "Consulta pública; credenciamento/JWT das APIs de manutenção/publicação não deve ser aplicado automaticamente à API de Consultas.",
+          "parametros": "Recursos de consulta e filtros por período, órgão e modalidade conforme Swagger; pagina e tamanhoPagina conforme serviço. Não confundir a API de Consultas com a API de Integração para inserir/alterar/excluir publicações.",
+          "verificacao": "documentacao_oficial_localizada_conteudo_nao_testado"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Transferegov — Transferências Especiais",
+          "metodo": "Conforme documentação do módulo",
+          "url": null,
+          "documentacao": "https://api-publica.transferegov.gestao.gov.br/especiais/docs",
+          "autenticacao": "O hub apresenta estes módulos como APIs de dados abertos disponíveis para todos; configuração de segurança por rota não inspecionada.",
+          "parametros": "Emendas, pagamentos e execução; filtros de localidade, parlamentar, ano e situação anunciados pelo hub. Caminhos de conteúdo, formatos de resposta e paginação devem ser extraídos da documentação do módulo; não foram inspecionados nesta pesquisa.",
+          "verificacao": "hub_oficial_e_links_de_documentacao_confirmados_rotas_nao_inspecionadas"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Transferegov — Gestão de Parcerias",
+          "metodo": "Conforme documentação do módulo",
+          "url": null,
+          "documentacao": "https://api-publica.transferegov.gestao.gov.br/parcerias/docs",
+          "autenticacao": "O hub apresenta estes módulos como APIs de dados abertos disponíveis para todos; configuração de segurança por rota não inspecionada.",
+          "parametros": "Programas, parcerias e gestão financeira; filtros de localidade, instrumento, órgão e período anunciados pelo hub. Caminhos de conteúdo, formatos de resposta e paginação devem ser extraídos da documentação do módulo; não foram inspecionados nesta pesquisa.",
+          "verificacao": "hub_oficial_e_links_de_documentacao_confirmados_rotas_nao_inspecionadas"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Transferegov — Transferências Fundo a Fundo",
+          "metodo": "Conforme documentação do módulo",
+          "url": null,
+          "documentacao": "https://api-publica.transferegov.gestao.gov.br/fundoafundo/docs",
+          "autenticacao": "O hub apresenta estes módulos como APIs de dados abertos disponíveis para todos; configuração de segurança por rota não inspecionada.",
+          "parametros": "Repasses, valores, programas e execução; filtros de localidade, plano de ação e período anunciados pelo hub. Caminhos de conteúdo, formatos de resposta e paginação devem ser extraídos da documentação do módulo; não foram inspecionados nesta pesquisa.",
+          "verificacao": "hub_oficial_e_links_de_documentacao_confirmados_rotas_nao_inspecionadas"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Transferegov — Termo de Execução Descentralizada (TED)",
+          "metodo": "Conforme documentação do módulo",
+          "url": null,
+          "documentacao": "https://api-publica.transferegov.gestao.gov.br/ted/docs",
+          "autenticacao": "O hub apresenta estes módulos como APIs de dados abertos disponíveis para todos; configuração de segurança por rota não inspecionada.",
+          "parametros": "Termos, valores, órgãos e execução; filtros de órgão, situação e período anunciados pelo hub. Caminhos de conteúdo, formatos de resposta e paginação devem ser extraídos da documentação do módulo; não foram inspecionados nesta pesquisa.",
+          "verificacao": "hub_oficial_e_links_de_documentacao_confirmados_rotas_nao_inspecionadas"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "SIORG — serviços web de estrutura organizacional",
+          "metodo": "GET (REST); SOAP conforme WSDL",
+          "url": "https://estruturaorganizacional.dados.gov.br/",
+          "documentacao": "https://siorg.gov.br/manuais/manual-webservices/html/demo_3.html",
+          "autenticacao": "Serviços disponíveis de forma livre e aberta segundo o manual oficial.",
+          "parametros": "REST e SOAP; JSON/XML conforme recurso. O manual documenta /doc/orgao-entidade/resumida e /doc/estrutura-organizacional/alteracoes. Consultar parâmetros por serviço. https://api.siorg.economia.gov.br/ é endereço de documentação, não presumir que seja a base de conteúdo.",
+          "verificacao": "documentada_sem_teste_http_bem_sucedido"
+        },
+        {
+          "tipo": "restrita",
+          "nome": "SIAPE Consultas / Conecta",
+          "metodo": "Conforme manual; autenticação por token",
+          "url": "https://apigateway.conectagov.estaleiro.serpro.gov.br/api-consulta-siape/v1/consulta-siape",
+          "documentacao": "https://www.gov.br/conecta/catalogo/apis/consulta-siape",
+          "autenticacao": "Adesão/habilitação de órgão federal, sistemas autorizados, cadastramento de IPs e credenciais/chaves para token conforme manual. Não é API aberta para coleta pública.",
+          "verificacao": "documentada_acesso_institucional_nao_testado"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dados.gov.br/dados/conjuntos-dados/compras-publicas-do-governo-federal",
+          "formatos": [
+            "CSV"
+          ],
+          "nota": "Catálogo indicado pelo manual oficial de acesso aos arquivos. Contratações, itens e resultados por período diário, mensal e anual; recursos históricos em diretórios por ano. Descobrir URLs dos recursos no catálogo, não fixar arquivos latest sem registrar competência/hash."
+        },
+        {
+          "url": "https://api-publica.transferegov.gestao.gov.br/downloads",
+          "formatos": [
+            "CSV"
+          ],
+          "nota": "Repositório atual indicado pelo hub para Transferências Discricionárias e Legais. API REST desse módulo consta em cronograma de implantação; não foi confirmada como entregue em 03/10/2026."
+        },
+        {
+          "url": "https://www.gov.br/gestao/pt-br/assuntos/gestaoeinovacao/modelos-organizacionais/estruturas-organizacionais/Sistema-informatizado-siorg/sistema-informatizado-siorg/",
+          "formatos": [
+            "JSON"
+          ],
+          "nota": "Página oficial de acesso ao SIORG também anuncia arquivos de estruturas em JSON; verificar recurso e data de geração."
+        },
+        {
+          "url": "https://www.gov.br/servidor/pt-br/observatorio-de-pessoal-govbr/painel-estatistico-de-pessoal/",
+          "formatos": [
+            "CSV",
+            "Excel"
+          ],
+          "nota": "PEP: exportação no painel, inclusive Faça você mesmo. API pública documentada do painel e URL direta estável de exportação automatizada não confirmadas."
+        },
+        {
+          "url": "https://www.gov.br/servidor/pt-br/observatorio-de-pessoal-govbr/gestao-de-pessoas-executivo-federal-gratificacoes",
+          "formatos": [
+            "CSV"
+          ],
+          "nota": "Página de publicação encaminha aos conjuntos de gratificações GAEG/GIAPU/GSISP/GSISTE. URLs diretas dos arquivos e competência mais recente não confirmadas."
+        },
+        {
+          "url": "https://www.gov.br/gestao/pt-br/acesso-a-informacao/dados-abertos/planos-de-dados-abertos-pda-vigente-e-anteriores-bem-como-comunicados-de-eventuais-alteracoes-em-seus-conteudos/anexo-mgi/anexo-i-inventario-de-bases-do-mgi-v4.pdf",
+          "formatos": [
+            "CSV conforme dicionário; inventário em PDF"
+          ],
+          "nota": "Referência de descoberta, não arquivo de dados: inventário confirma a base aberta Afastamentos e Licenças. O dicionário indica CSV e CPF mascarado; URL direta atual e competência do recurso não confirmadas."
+        },
+        {
+          "url": "https://qlik-publico.paineis.gov.br/extensions/transparencia-ativa/transparencia-ativa.html",
+          "formatos": [
+            "CSV",
+            "Excel",
+            "GeoJSON indicado pela página"
+          ],
+          "nota": "SPU: painel com exportação e link de vetores. Em 03/10/2026 informa atualização 06/03/2026, referência março/2026 e adaptação ao SPUnet; disponibilidade atual dos vetores não testada. Coordenadas geocodificadas; considerar nível de precisão e EPSG 4674."
+        }
+      ],
+      "atualizacao": "Por família: arquivos Compras.gov.br com cortes diários/mensais/anuais; PNCP depende das publicações e retificações dos entes; frequência uniforme do Transferegov não confirmada; SIORG oferece consulta à estrutura vigente, sem SLA confirmado; PEP mensal; Afastamentos/Licenças mensal segundo inventário; SPU exibe referência março/2026 e aviso de migração.",
+      "observacoes": [
+        "Compras.gov.br reúne dados dos sistemas de compras; PNCP reúne publicações de entes de diferentes esferas. Coberturas não são equivalentes. Há sobreposição: deduplicar por identificadores da contratação/PNCP antes de agregar valores.",
+        "Priorizar a API atual https://dadosabertos.compras.gov.br/. O antigo material de dados abertos Compras apresenta corte até março/2023 e não deve ser usado como evidência de atualização corrente.",
+        "O hub público Transferegov atualmente lista quatro módulos de API; Discricionárias e Legais aparece como CSV. Não tratar cronograma de entrega da API como disponibilidade comprovada nem confundir APIs operacionais institucionais com APIs abertas.",
+        "No Transferegov, documentações /docs foram localizadas, mas rotas de conteúdo não inspecionadas: URL de API permanece nula para evitar fornecer uma rota executável não validada.",
+        "PEP é agregado e tem cobertura/períodos por tema; dados de servidores e ingressos provêm do SIAPE e o painel ressalva exclusão do BCB. API institucional SIAPE não substitui uma API pública do PEP.",
+        "Pessoal: preservar competência e dimensões de órgão/carreira/vínculo; CPF mascarado não é chave confiável para cruzar pessoas. Dicionário de afastamentos: https://repositorio.dados.gov.br/segrt/3.20180928-DadosRecursos-Afastamento.pdf.",
+        "SPU: registrar a defasagem publicada e o aviso de transição ao SPUnet. Não presumir atualização mensal efetiva durante a migração nem tratar coordenadas estimadas como limites cadastrais de imóveis.",
+        "A API de catálogo do Portal Brasileiro de Dados Abertos não foi atribuída ao MGI: localizar um conjunto em dados.gov.br não define a titularidade de sua base."
+      ],
+      "fontes": [
+        "https://www.gov.br/compras/pt-br/acesso-a-informacao/manuais/manual-dados-abertos/manual-api-compras.pdf",
+        "https://www.gov.br/compras/pt-br/acesso-a-informacao/manuais/manual-dados-abertos/ManualdeAcessoaosArquivosdeComprasPblicasGovernoFederal.pdf",
+        "https://www.gov.br/pncp/pt-br/pncp/manuais",
+        "https://www.gov.br/pncp/pt-br/pncp/manuais/versoes-anteriores/ManualPNCPAPIConsultasVerso1.0.pdf",
+        "https://pncp.gov.br/manual/pt-br/latest/acesso_ao_pncp/index.html",
+        "https://api-publica.transferegov.gestao.gov.br/",
+        "https://www.gov.br/transferegov/pt-br/ferramentas-gestao/api-de-dados-abertos-transferegov.br",
+        "https://siorg.gov.br/manuais/manual-webservices/html/demo_3.html",
+        "https://siorg.gov.br/manuais/manual-webservices/html/demo_6.html",
+        "https://siorg.gov.br/manuais/manual-webservices/html/demo_18.html",
+        "https://www.gov.br/servidor/pt-br/observatorio-de-pessoal-govbr/painel-estatistico-de-pessoal/",
+        "https://www.gov.br/servidor/pt-br/observatorio-de-pessoal-govbr/temas-govbr/perfil-de-servidores/tema-perfil-de-servidores",
+        "https://www.gov.br/conecta/catalogo/apis/consulta-siape",
+        "https://www.gov.br/conecta/catalogo/apis/consulta-siape/ws_siape_consultas-pdf",
+        "https://www.gov.br/gestao/pt-br/acesso-a-informacao/dados-abertos/planos-de-dados-abertos-pda-vigente-e-anteriores-bem-como-comunicados-de-eventuais-alteracoes-em-seus-conteudos/anexo-mgi/anexo-i-inventario-de-bases-do-mgi-v4.pdf",
+        "https://repositorio.dados.gov.br/segrt/3.20180928-DadosRecursos-Afastamento.pdf",
+        "https://www.gov.br/servidor/pt-br/observatorio-de-pessoal-govbr/gestao-de-pessoas-executivo-federal-gratificacoes",
+        "https://qlik-publico.paineis.gov.br/extensions/transparencia-ativa/transparencia-ativa.html",
+        "https://www.gov.br/gestao/pt-br/assuntos/patrimonio-da-uniao/transformacao-digital/desligamento-spiunet"
+      ],
+      "granularidade": "Compra/item/resultado/contrato/ata e fornecedor; plano de contratação; programa/proposta/instrumento/transferência e execução; unidade e hierarquia SIORG; estatística de pessoal por competência/dimensão; ocorrência/gratificação conforme layout; imóvel e utilização patrimonial.",
+      "chaves_sugeridas": [
+        "número de controle PNCP e identificadores de contrato/ata/PCA conforme recurso",
+        "UASG e identificador da compra + número do item",
+        "CNPJ do órgão/fornecedor como texto e códigos CATMAT/CATSER",
+        "identificador de programa/proposta/instrumento/plano de ação no respectivo módulo Transferegov",
+        "código da unidade SIORG + vigência/versão da estrutura",
+        "competência + órgão/carreira/vínculo nas estatísticas de pessoal",
+        "RIP imóvel e RIP utilização nas bases SPU"
+      ],
+      "formatos_api": [
+        "JSON (Compras.gov.br, PNCP e SIORG)",
+        "XML (SIORG)",
+        "Formatos dos módulos Transferegov a confirmar na documentação"
+      ]
+    },
+    {
+      "id": "tcu",
+      "orgao": "Tribunal de Contas da União (TCU)",
+      "portal": "https://sites.tcu.gov.br/dados-abertos/",
+      "bases": [
+        "Acórdãos e jurisprudência",
+        "Termos contratuais e aditivos do próprio TCU",
+        "Responsáveis inabilitados e licitantes inidôneos",
+        "Contas julgadas irregulares e responsáveis para fins eleitorais"
+      ],
+      "meio_principal": "Webservices públicos para decisões, contratos do TCU e listas de responsáveis.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "Acórdãos",
+          "metodo": "GET",
+          "url": "https://dados-abertos.apps.tcu.gov.br/api/acordao/recupera-acordaos",
+          "documentacao": "https://sites.tcu.gov.br/dados-abertos/webservices-tcu/",
+          "autenticacao": "Documentação pública consultada não prescreve chave para esses exemplos.",
+          "parametros": "inicio e quantidade; paginação por índice.",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Termos contratuais",
+          "metodo": "GET",
+          "url": "https://contas.tcu.gov.br/contrata2RS/api/publico/termos-contratuais",
+          "documentacao": "https://sites.tcu.gov.br/dados-abertos/webservices-tcu/",
+          "autenticacao": "Documentação pública consultada não prescreve chave para esses exemplos.",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Responsáveis / sanções",
+          "metodo": "POST",
+          "url": "https://certidoes.apps.tcu.gov.br/api/publico/",
+          "documentacao": "https://sites.tcu.gov.br/dados-abertos/webservices-tcu/",
+          "autenticacao": "Documentação pública consultada não prescreve chave para esses exemplos.",
+          "parametros": "responsaveis-inabilitados; responsaveis-inidoneos; responsaveis-contas-irregulares; responsaveis-fins-eleitorais. Filtros no corpo JSON conforme rota.",
+          "verificacao": "documentada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://sites.tcu.gov.br/dados-abertos/jurisprudencia/",
+          "formatos": [
+            "CSV",
+            "PDF",
+            "DOC"
+          ],
+          "nota": "CSV de acórdãos em conjuntos de anos; API fornece links de documentos."
+        }
+      ],
+      "atualizacao": "Periodicidade não confirmada para todas as bases.",
+      "observacoes": [
+        "A API de termos contratuais cobre contratos do próprio TCU, não todo o universo fiscalizado.",
+        "A documentação avisa sobre possível indisponibilidade entre 20h e 21h.",
+        "Usar identificadores de documento, processo e responsável conforme base."
+      ],
+      "fontes": [
+        "https://sites.tcu.gov.br/dados-abertos/",
+        "https://sites.tcu.gov.br/dados-abertos/webservices-tcu/",
+        "https://sites.tcu.gov.br/dados-abertos/jurisprudencia/"
+      ],
+      "granularidade": "Acórdão, processo, termo contratual/aditivo ou responsável/sanção.",
+      "chaves_sugeridas": [
+        "chave do acórdão",
+        "número de processo",
+        "CNPJ/identificador do responsável conforme publicação"
+      ],
+      "formatos_api": [
+        "JSON"
+      ]
+    },
+    {
+      "id": "ibge",
+      "orgao": "Instituto Brasileiro de Geografia e Estatística (IBGE)",
+      "portal": "https://servicodados.ibge.gov.br/api/docs/",
+      "bases": [
+        "SIDRA / agregados de pesquisas e censos: população, PIB, preços, trabalho e outros indicadores",
+        "Localidades e códigos territoriais",
+        "Microdados PNAD Contínua e Censo Demográfico",
+        "Malhas geográficas"
+      ],
+      "meio_principal": "APIs de agregados/localidades para consultas; repositórios de arquivos para microdados e geografia.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "Agregados v3",
+          "metodo": "GET",
+          "url": "https://servicodados.ibge.gov.br/api/v3/agregados",
+          "documentacao": "https://servicodados.ibge.gov.br/api/docs/agregados?versao=3",
+          "autenticacao": "Leitura pública; sem token indicado.",
+          "parametros": "/{agregado}/metadados; /{agregado}/periodos; /{agregado}/periodos/{periodos}/variaveis/{variavel}?localidades=...",
+          "verificacao": "documentada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "Localidades",
+          "metodo": "GET",
+          "url": "https://servicodados.ibge.gov.br/api/v1/localidades",
+          "documentacao": "https://servicodados.ibge.gov.br/api/docs/",
+          "autenticacao": "Leitura pública; sem token indicado.",
+          "parametros": "/estados e /municipios, entre outros níveis.",
+          "verificacao": "resposta_estados_verificada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://ftp.ibge.gov.br/",
+          "formatos": [
+            "ZIP",
+            "TXT",
+            "ASCII"
+          ],
+          "nota": "Microdados e dicionários por pesquisa/edição."
+        },
+        {
+          "url": "https://geoftp.ibge.gov.br/",
+          "formatos": [
+            "ZIP",
+            "Shapefile"
+          ],
+          "nota": "Formatos de malhas conforme produto."
+        }
+      ],
+      "atualizacao": "Varia por pesquisa, tabela e produto. PNAD Contínua trimestral; descobrir períodos disponíveis nos agregados.",
+      "observacoes": [
+        "A API de agregados não fornece automaticamente todos os microdados.",
+        "Localidades são registros/códigos; polígonos exigem malhas.",
+        "Censo 2022: microdados públicos lançados em 2026 têm UF como nível mais desagregado; acesso até área de ponderação é controlado, com Gov.BR e termo.",
+        "Arquivos do Censo 2022 foram corrigidos em setembro/2026; detectar substituições e versões.",
+        "Usar códigos territoriais e ano da divisão territorial; não cruzar somente nomes."
+      ],
+      "fontes": [
+        "https://servicodados.ibge.gov.br/api/docs/",
+        "https://servicodados.ibge.gov.br/api/docs/agregados?versao=3",
+        "https://www.ibge.gov.br/estatisticas/sociais/habitacao/22827-censo-2020-censo4.html",
+        "https://ftp.ibge.gov.br/"
+      ],
+      "granularidade": "Tabela/variável/período/nível territorial; registro amostral nos microdados liberados.",
+      "chaves_sugeridas": [
+        "código IBGE e nível territorial",
+        "identificador de agregado",
+        "variável",
+        "classificações",
+        "período e ano da divisão territorial"
+      ],
+      "formatos_api": [
+        "JSON",
+        "XML/formatos geográficos conforme produto"
+      ]
+    },
+    {
+      "id": "ipea",
+      "orgao": "Instituto de Pesquisa Econômica Aplicada (IPEA)",
+      "portal": "https://www.ipeadata.gov.br/",
+      "bases": [
+        "Ipeadata Macroeconômico",
+        "Ipeadata Regional",
+        "Ipeadata Social"
+      ],
+      "meio_principal": "API REST/OData v4 do Ipeadata.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "Ipeadata OData v4",
+          "metodo": "GET",
+          "url": "https://www.ipeadata.gov.br/api/odata4/",
+          "documentacao": "https://www.ipeadata.gov.br/api/",
+          "autenticacao": "Consulta pública sem credenciais na inspeção.",
+          "parametros": "Metadados, Temas, Territorios, Paises; Metadados('{SERCODIGO}')/Valores ou ValoresSerie(SERCODIGO='{SERCODIGO}'); $metadata em XML. Respeitar capitalização das entidades.",
+          "verificacao": "documento_servico_json_verificado"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://www.ipeadata.gov.br/",
+          "formatos": [
+            "Planilhas: extensão atual não confirmada"
+          ],
+          "nota": "Extração pelo portal descrita em guia institucional; preferir API para automação."
+        }
+      ],
+      "atualizacao": "Por série: consultar PERNOME e SERATUALIZACAO; não há frequência única.",
+      "observacoes": [
+        "Preservar código da série, unidade, multiplicador, comentários e fonte original.",
+        "Séries regionais/sociais podem exigir nível e código territorial, além de data.",
+        "SERSTATUS identifica séries macroeconômicas ativas/inativas."
+      ],
+      "fontes": [
+        "https://www.ipeadata.gov.br/api/",
+        "https://www.ipeadata.gov.br/api/odata4/",
+        "https://repositorio.ipea.gov.br/bitstream/11058/14491/1/RI_Guia_de_orientacoes_gerais_Ipea.pdf"
+      ],
+      "granularidade": "Série/data e, nas bases territoriais, nível e código territorial.",
+      "chaves_sugeridas": [
+        "SERCODIGO",
+        "data",
+        "nível territorial",
+        "código territorial"
+      ],
+      "formatos_api": [
+        "JSON",
+        "XML ($metadata)"
+      ]
+    },
+    {
+      "id": "datasus",
+      "orgao": "Ministério da Saúde / DATASUS",
+      "portal": "https://dadosabertos.saude.gov.br/",
+      "bases": [
+        "CNES: estabelecimentos de saúde",
+        "SIM: mortalidade",
+        "SINASC: nascidos vivos",
+        "SRAG / SIVEP-Gripe",
+        "PNI: doses de vacinação",
+        "SIA/SIH: produção ambulatorial e internações"
+      ],
+      "meio_principal": "API de conteúdo do Ministério da Saúde para bases cobertas; arquivos DATASUS para séries históricas e conjuntos não cobertos.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "API Dados Abertos SUS",
+          "metodo": "GET",
+          "url": "https://apidadosabertos.saude.gov.br/",
+          "documentacao": "https://apidadosabertos.saude.gov.br/static/swagger.json",
+          "autenticacao": "CNES explicitamente gratuito sem login/autenticação. Especificação examinada não declara esquema global; autenticação operacional das demais rotas não confirmada.",
+          "parametros": "cnes/estabelecimentos; cnes/estabelecimentos/{codigo_cnes}; vigilancia-e-meio-ambiente/sistema-de-informacao-sobre-mortalidade; vigilancia-e-meio-ambiente/sistema-de-informacao-sobre-nascidos-vivos; vigilancia-e-meio-ambiente/srag-2019-2026; vacinacao/doses-aplicadas-pni-2026. limit padrão 100 e máximo 1000; offset descrito como número de página iniciado em zero.",
+          "verificacao": "openapi_verificado_versao_1.8.32"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dadosabertos.saude.gov.br/",
+          "formatos": [
+            "CSV",
+            "JSON",
+            "XML",
+            "Parquet conforme recurso"
+          ],
+          "nota": "Catálogo atual; antigo OpenDataSUS redireciona para este portal."
+        },
+        {
+          "url": "https://datasus.saude.gov.br/transferencia-de-arquivos/",
+          "formatos": [
+            "DBC",
+            "DBF"
+          ],
+          "nota": "DBC é DBF compactado; descobrir recursos/competências na página oficial."
+        },
+        {
+          "url": "https://datasus.saude.gov.br/informacoes-de-saude-tabnet/",
+          "formatos": [
+            "CSV",
+            "TabWin"
+          ],
+          "nota": "TABNET é tabulação agregada/exportação; não tratar como API REST."
+        }
+      ],
+      "atualizacao": "CNES diário; SINASC anual com prévias; SRAG do ano corrente e PNI 2026 semanais conforme metadados. SIM possui calendário de preliminares/definitivos. Outras bases e competências têm regras próprias.",
+      "granularidade": "Estabelecimento CNES; registros públicos anonimizados de óbito/nascimento/notificação/dose e produção assistencial conforme conjunto.",
+      "chaves_sugeridas": [
+        "código CNES",
+        "código IBGE com correspondência de versões",
+        "competência",
+        "identificadores públicos do layout"
+      ],
+      "formatos_api": [
+        "JSON",
+        "CSV"
+      ],
+      "observacoes": [
+        "Distinguir API de conteúdo de catálogo CKAN; CKAN/DataStore não foi validado nesta pesquisa.",
+        "offset tem semântica de página na documentação examinada; não presumir deslocamento de linhas.",
+        "Separar dado prévio, preliminar, definitivo e congelado; reprocessar versões corrigidas.",
+        "Rotas que contêm ano e versão devem ser redescobertas periodicamente no OpenAPI.",
+        "Não pressupor que todas as tabelas históricas DATASUS estão disponíveis na API nova."
+      ],
+      "fontes": [
+        "https://dadosabertos.saude.gov.br/",
+        "https://apidadosabertos.saude.gov.br/static/swagger.json",
+        "https://www.gov.br/saude/pt-br/acesso-a-informacao/sic/dados-em-transparencia-ativa/seidigi",
+        "https://datasus.saude.gov.br/transferencia-de-arquivos/",
+        "https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026"
+      ]
+    },
+    {
+      "id": "anvisa",
+      "orgao": "Agência Nacional de Vigilância Sanitária (ANVISA)",
+      "portal": "https://www.gov.br/anvisa/pt-br/acessoainformacao/dadosabertos",
+      "bases": [
+        "Medicamentos registrados",
+        "Produtos para saúde e modelos",
+        "VigiMed e notificações de vigilância",
+        "SNGPC: vendas de medicamentos controlados",
+        "CMED: preços máximos de medicamentos"
+      ],
+      "meio_principal": "Downloads HTTP de arquivos e dicionários; API pública de conteúdo com contrato estável dessas bases não confirmada.",
+      "apis": [],
+      "downloads": [
+        {
+          "url": "https://dados.anvisa.gov.br/dados/",
+          "formatos": [
+            "CSV",
+            "XLS",
+            "PDF (dicionários)"
+          ],
+          "nota": "Recursos por conjunto: DADOS_ABERTOS_MEDICAMENTOS.csv, TA_PRODUTO_SAUDE_SITE.csv, VigiMed_Notificacoes.csv e arquivos relacionados."
+        },
+        {
+          "url": "https://dados.anvisa.gov.br/dados/SNGPC/",
+          "formatos": [
+            "Arquivos tabulares por conjunto/competência"
+          ],
+          "nota": "Consultar dicionário; revisões podem decorrer de transmissões tardias."
+        },
+        {
+          "url": "https://www.gov.br/anvisa/pt-br/assuntos/medicamentos/cmed/precos",
+          "formatos": [
+            "XLS",
+            "CSV conforme recurso"
+          ],
+          "nota": "Planilhas de PMC/PMVG e respectivas apresentações."
+        }
+      ],
+      "atualizacao": "Medicamentos registrados: mensal conforme dicionário. SNGPC possui arquivos mensais; frequência das demais bases deve ser confirmada por recurso.",
+      "granularidade": "Registro/apresentação de medicamento, produto/modelo, notificação ou venda agregada por dimensões do dicionário.",
+      "chaves_sugeridas": [
+        "registro Anvisa",
+        "número de processo",
+        "CNPJ",
+        "código/apresentação do produto",
+        "chaves de relacionamento VigiMed",
+        "competência"
+      ],
+      "formatos_api": [],
+      "observacoes": [
+        "Seguir separador, codificação e tipos do dicionário de cada base.",
+        "Data de modificação HTTP/metadados não comprova competência dos registros.",
+        "Alguns arquivos são muito grandes; download em fluxo e carga particionada são propostas de implementação."
+      ],
+      "fontes": [
+        "https://www.gov.br/anvisa/pt-br/acessoainformacao/dadosabertos",
+        "https://dados.anvisa.gov.br/dados/",
+        "https://dados.anvisa.gov.br/dados/Documentacao_e_Dicionario_de_Dados_Registros_Validos_Medicamento_V1.pdf",
+        "https://dados.anvisa.gov.br/dados/SNGPC/",
+        "https://www.gov.br/anvisa/pt-br/assuntos/medicamentos/cmed/precos"
+      ]
+    },
+    {
+      "id": "ans",
+      "orgao": "Agência Nacional de Saúde Suplementar (ANS)",
+      "portal": "https://www.gov.br/ans/pt-br/acesso-a-informacao/perfil-do-setor/dados-abertos-1",
+      "bases": [
+        "Operadoras ativas / CADOP",
+        "Beneficiários por operadora / SIB",
+        "Demonstrações contábeis / DIOPS",
+        "Produtos e prestadores hospitalares",
+        "Demandas/reclamações de consumidores"
+      ],
+      "meio_principal": "Downloads HTTP públicos de arquivos; endpoint público atual da API de operadoras não confirmado.",
+      "apis": [
+        {
+          "tipo": "restrita",
+          "nome": "APIs do Portal Operadoras",
+          "metodo": "Conforme rota do serviço.",
+          "url": null,
+          "documentacao": "https://www.gov.br/ans/pt-br/centrais-de-conteudo/manuais-do-portal-operadoras/area-do-desenvolvedor/oauth-2.0",
+          "autenticacao": "OAuth2 client credentials, client ID/secret e Bearer; acesso aos dados próprios da operadora.",
+          "parametros": "Não substitui download público de dados setoriais.",
+          "verificacao": "autenticacao_documentada_nao_testada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dadosabertos.ans.gov.br/FTP/PDA/",
+          "formatos": [
+            "CSV",
+            "ZIP",
+            "ODS (dicionários)"
+          ],
+          "nota": "Diretório HTTP; o segmento FTP na URL não é uma API CKAN."
+        },
+        {
+          "url": "https://dadosabertos.ans.gov.br/FTP/PDA/operadoras_de_plano_de_saude_ativas/Relatorio_cadop.csv",
+          "formatos": [
+            "CSV"
+          ],
+          "nota": "Cadastro de operadoras ativas."
+        },
+        {
+          "url": "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/",
+          "formatos": [
+            "ZIP",
+            "ODS"
+          ],
+          "nota": "Partições por ano/trimestre; 1T e 2T/2026 observados na pesquisa."
+        }
+      ],
+      "atualizacao": "Beneficiários por competência mensal; DIOPS contábil trimestral. Frequência atual formal dos demais recursos deve ser conferida.",
+      "granularidade": "Operadora, vínculo/contagem de beneficiários, conta contábil/período, relação produto/prestador e demanda conforme base.",
+      "chaves_sugeridas": [
+        "registro ANS da operadora",
+        "CNPJ",
+        "conta contábil",
+        "competência",
+        "identificador de produto/prestador conforme layout"
+      ],
+      "formatos_api": [
+        "Conforme serviços restritos"
+      ],
+      "observacoes": [
+        "API JSON de operadoras apareceu em PDA histórico; endpoint público atual não foi confirmado.",
+        "Número de vínculos não equivale necessariamente a número de pessoas únicas.",
+        "Arquivos de beneficiários e produtos podem ter vários gigabytes; observar formatos internos e dicionários."
+      ],
+      "fontes": [
+        "https://www.gov.br/ans/pt-br/acesso-a-informacao/perfil-do-setor/dados-abertos-1",
+        "https://dadosabertos.ans.gov.br/FTP/PDA/",
+        "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/",
+        "https://www.gov.br/ans/pt-br/centrais-de-conteudo/manuais-do-portal-operadoras/area-do-desenvolvedor/oauth-2.0"
+      ]
+    },
+    {
+      "id": "inep",
+      "orgao": "Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira (INEP)",
+      "portal": "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/microdados-1",
+      "bases": [
+        "Censo Escolar",
+        "Censo da Educação Superior",
+        "Enem",
+        "Saeb"
+      ],
+      "meio_principal": "Downloads de microdados por edição; API pública de conteúdo dessas quatro bases não confirmada nesta pesquisa.",
+      "apis": [],
+      "downloads": [
+        {
+          "url": "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/microdados-1",
+          "formatos": [
+            "ZIP",
+            "CSV",
+            "TXT"
+          ],
+          "nota": "Pacotes em download.inep.gov.br com dicionários, leia-me e documentação por edição."
+        }
+      ],
+      "atualizacao": "Censos e Enem por edição anual; Saeb por edição. Páginas consultadas publicam Censo Escolar 2025, Enem 2025, Superior 2024 e Saeb 2023; isso não é uma promessa de calendário futuro.",
+      "observacoes": [
+        "Granularidade e disponibilidade de registros mudam com anonimização/supressões; ler o dicionário de cada edição.",
+        "Detectar revisões de arquivos e documentação; não presumir registro identificável de aluno/docente.",
+        "SEDAP+ é acesso controlado e não foi confirmado como API pública de microdados."
+      ],
+      "fontes": [
+        "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/microdados-1",
+        "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar",
+        "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/enem",
+        "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-da-educacao-superior",
+        "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/saeb"
+      ],
+      "granularidade": "Escola, IES/curso, participante ou agregado, conforme edição e dados efetivamente liberados.",
+      "chaves_sugeridas": [
+        "código de escola ou IES/curso",
+        "ano/edição",
+        "identificadores presentes no layout público"
+      ],
+      "formatos_api": []
+    },
+    {
+      "id": "capes",
+      "orgao": "Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (CAPES)",
+      "portal": "https://dadosabertos.capes.gov.br/dataset/",
+      "bases": [
+        "Programas de pós-graduação stricto sensu",
+        "Docentes e discentes",
+        "Produção intelectual",
+        "Concessão de bolsas a instituições de ensino superior"
+      ],
+      "meio_principal": "CKAN DataStore nos recursos habilitados; downloads para demais recursos.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "CKAN DataStore",
+          "metodo": "GET",
+          "url": "https://dadosabertos.capes.gov.br/api/3/action/datastore_search",
+          "documentacao": "https://dadosabertos.capes.gov.br/api/1/util/snippet/api_info.html?resource_id=8afca354-18d5-4b6c-9158-2695fb26ad86",
+          "autenticacao": "Consulta pública sem credenciais na inspeção.",
+          "parametros": "resource_id, limit e offset; exemplo resource_id=8afca354-18d5-4b6c-9158-2695fb26ad86 (Discentes 2024).",
+          "verificacao": "resposta_registros_json_verificada"
+        },
+        {
+          "tipo": "catalogo",
+          "nome": "CKAN catálogo",
+          "metodo": "GET",
+          "url": "https://dadosabertos.capes.gov.br/api/3/action/",
+          "documentacao": "https://dadosabertos.capes.gov.br/dataset/",
+          "autenticacao": "Consulta pública; funcionamento não confirmado nesta inspeção.",
+          "parametros": "package_search/package_show; distinguir dos registros DataStore.",
+          "verificacao": "funcionamento_nao_confirmado"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dadosabertos.capes.gov.br/dataset/",
+          "formatos": [
+            "CSV",
+            "XLSX"
+          ],
+          "nota": "Documentação PDF/HTML e metadados por conjunto."
+        }
+      ],
+      "atualizacao": "Por conjunto/edição; calendários próprios. Recursos consultados incluem discentes 2021–2024 e bolsas 2022–2025.",
+      "observacoes": [
+        "DataStore depende do recurso: não presumir que todo arquivo pode ser consultado por registros via API.",
+        "CPF mascarado não fornece uma chave individual completa.",
+        "Preservar código de programa, IES, ano e modalidade quando presentes."
+      ],
+      "fontes": [
+        "https://dadosabertos.capes.gov.br/dataset/",
+        "https://dadosabertos.capes.gov.br/api/1/util/snippet/api_info.html?resource_id=8afca354-18d5-4b6c-9158-2695fb26ad86",
+        "https://dadosabertos.capes.gov.br/api/3/action/datastore_search?limit=5&resource_id=8afca354-18d5-4b6c-9158-2695fb26ad86",
+        "https://dadosabertos.capes.gov.br/dataset/2022-a-2025-concessao-de-bolsas-a-instituicoes-de-ensino-superior-apoiadas-pela-capes"
+      ],
+      "granularidade": "Programa/IES/ano; registros de docentes/discentes/produção; bolsas por IES/modalidade/ano, conforme recurso.",
+      "chaves_sugeridas": [
+        "código do programa",
+        "IES",
+        "ano",
+        "modalidade"
+      ],
+      "formatos_api": [
+        "JSON"
+      ]
+    },
+    {
+      "id": "mte",
+      "orgao": "Ministério do Trabalho e Emprego (MTE)",
+      "portal": "https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/estatisticas-trabalho/microdados-rais-e-caged",
+      "bases": [
+        "RAIS Trabalhador/Vínculos",
+        "RAIS Estabelecimentos",
+        "CAGED Estatístico histórico",
+        "Novo Caged: admissões, desligamentos e saldo de empregos"
+      ],
+      "meio_principal": "Microdados não identificados por FTP/arquivos; API REST pública dessas bases não confirmada.",
+      "apis": [],
+      "downloads": [
+        {
+          "url": "ftp://ftp.mtps.gov.br/pdet/microdados/",
+          "formatos": [
+            "TXT",
+            "Arquivos compactados conforme partição"
+          ],
+          "nota": "URL publicada pelo MTE; operação FTP não testada. Delimitador ';'; UTF-8 informado para Novo Caged."
+        }
+      ],
+      "atualizacao": "RAIS anual; Novo Caged mensal desde janeiro/2020. As séries históricas podem ser revistas.",
+      "observacoes": [
+        "Cliente FTP pode ser necessário; navegadores modernos frequentemente não abrem ftp://.",
+        "RAIS 2025 tem divulgação oficial; disponibilidade de cada partição no FTP não foi inspecionada.",
+        "Comunicado Estoque de Referência 2026 registra revisão do estoque Novo Caged desde janeiro/2020.",
+        "Acesso a dados identificados segue autorização/acordo próprio; não confundir com microdados públicos."
+      ],
+      "fontes": [
+        "https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/estatisticas-trabalho/microdados-rais-e-caged",
+        "https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/acoes-e-programas/programas-projetos-acoes-obras-e-atividades/estatisticas-trabalho/rais/rais-2025/rais-2025",
+        "https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/acoes-e-programas/programas-projetos-acoes-obras-e-atividades/estatisticas-trabalho/comunicados/comunicado-estoque-de-referencia-de-2026"
+      ],
+      "granularidade": "Vínculo ou estabelecimento na RAIS; movimentação de admissão/desligamento no CAGED.",
+      "chaves_sugeridas": [
+        "competência",
+        "código territorial com versão",
+        "CNAE",
+        "CBO",
+        "identificadores públicos do layout"
+      ],
+      "formatos_api": []
+    },
+    {
+      "id": "inss",
+      "orgao": "Instituto Nacional do Seguro Social (INSS)",
+      "portal": "https://dadosabertos.inss.gov.br/",
+      "bases": [
+        "Benefícios concedidos",
+        "Benefícios emitidos e mantidos",
+        "Dados agregados da folha de pagamento",
+        "Requerimentos administrativos solicitados e pendentes"
+      ],
+      "meio_principal": "Downloads de recursos recentes do catálogo institucional; API pública de catálogo/linhas não confirmada.",
+      "apis": [
+        {
+          "tipo": "restrita",
+          "nome": "Benefícios Previdenciários via Conecta",
+          "metodo": "GET",
+          "url": "https://apigateway.conectagov.estaleiro.serpro.gov.br/api-beneficios-previdenciarios/v3/beneficios",
+          "documentacao": "https://www.gov.br/conecta/catalogo/apis/api-beneficios-previdenciarios",
+          "autenticacao": "Adesão institucional, credenciais Conecta e liberação de IP no gateway Serpro.",
+          "parametros": "Consulta individual por CPF conforme documentação; não é API aberta para beneficiários identificados.",
+          "verificacao": "documentada_autenticacao_nao_testada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dadosabertos.inss.gov.br/",
+          "formatos": [
+            "CSV",
+            "XLSX",
+            "ZIP"
+          ],
+          "nota": "Recursos mensais de benefícios e requerimentos. Slugs antigos podem conter anos encerrados apesar de recursos atuais."
+        }
+      ],
+      "atualizacao": "Mensal por base/competência; conferir o mês publicado no recurso. Recursos consultados incluem concessões e requerimentos até agosto/2026, emitidos até julho/2026 e mantidos até junho/2026.",
+      "granularidade": "Microdados públicos sem identificação nominal de benefícios e séries agregadas da folha/requerimentos; não classificar todo o acervo como agregado.",
+      "chaves_sugeridas": [
+        "competência",
+        "espécie de benefício",
+        "código territorial com correspondência",
+        "unidade administrativa",
+        "identificadores públicos do layout"
+      ],
+      "formatos_api": [
+        "JSON do serviço restrito"
+      ],
+      "observacoes": [
+        "Preferir catálogo recente a páginas antigas limitadas a 2018–2021.",
+        "Microdados sem identificação nominal não autorizam inferência de cadastro individual identificado.",
+        "Não foi confirmada API CKAN de catálogo/consulta de linhas; não usar rota presumida como contrato verificado."
+      ],
+      "fontes": [
+        "https://www.gov.br/inss/pt-br/acesso-a-informacao/dados-abertos/dados-abertos",
+        "https://dadosabertos.inss.gov.br/",
+        "https://dadosabertos.inss.gov.br/pt_BR/dataset/beneficios-concedidos-plano-de-dados-abertos-jun-2023-a-jun-2025",
+        "https://dadosabertos.inss.gov.br/dataset/dados-agregados-da-folha-de-pagamento-beneficios-emitidos-plano-de-dados-abertos-jun-2023-a-jun-2027",
+        "https://www.gov.br/conecta/catalogo/apis/api-beneficios-previdenciarios"
+      ]
+    },
+    {
+      "id": "inpe",
+      "orgao": "Instituto Nacional de Pesquisas Espaciais (INPE)",
+      "portal": "https://terrabrasilis.dpi.inpe.br/",
+      "bases": [
+        "PRODES: desmatamento",
+        "DETER: alertas de desmatamento",
+        "Queimadas: focos de fogo ativo",
+        "Área queimada, eventos de fogo e risco de fogo"
+      ],
+      "meio_principal": "WFS para feições vetoriais publicadas; downloads de arquivos geoespaciais e tabelas conforme produto.",
+      "apis": [
+        {
+          "tipo": "geoespacial_conteudo",
+          "nome": "TerraBrasilis WFS",
+          "metodo": "GET",
+          "url": "https://terrabrasilis.dpi.inpe.br/geoserver/ows",
+          "documentacao": "https://terrabrasilis.dpi.inpe.br/faq/",
+          "autenticacao": "Produtos publicados são públicos; acesso antecipado DETER é restrito.",
+          "parametros": "GetCapabilities para descobrir camadas; DescribeFeatureType para atributos; GetFeature para feições. Verificar count/startIndex/sortBy, CRS e limite anunciado pelo serviço.",
+          "verificacao": "documentada_capabilities_nao_inspecionado"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://terrabrasilis.dpi.inpe.br/geonetwork/srv/search?type=dataset",
+          "formatos": [
+            "Shapefile",
+            "GeoPackage",
+            "GeoTIFF"
+          ],
+          "nota": "GeoNetwork é catálogo de metadados; formatos por produto."
+        },
+        {
+          "url": "https://terrabrasilis.dpi.inpe.br/queimadas/portal/dados-abertos/",
+          "formatos": [
+            "CSV",
+            "KML",
+            "TIFF",
+            "Shapefile",
+            "GeoPackage"
+          ],
+          "nota": "Produtos de focos, área queimada e eventos têm formatos e maturidade próprios."
+        }
+      ],
+      "atualizacao": "PRODES anual; DETER diário conforme FAQ. Queimadas tem produtos em intervalos de minutos, horários, diários e mensais.",
+      "observacoes": [
+        "WMS fornece mapas para visualização; WFS fornece feições vetoriais.",
+        "Nomes atuais de camadas não confirmados; descobri-los no serviço e não fixar um exemplo antigo.",
+        "Não substituir PRODES consolidado por soma de alertas DETER.",
+        "Registrar satélite, data, resolução, CRS e maturidade/revisão do produto."
+      ],
+      "fontes": [
+        "https://terrabrasilis.dpi.inpe.br/faq/",
+        "https://terrabrasilis.dpi.inpe.br/geonetwork/srv/search?type=dataset",
+        "https://terrabrasilis.dpi.inpe.br/queimadas/portal/dados-abertos/"
+      ],
+      "granularidade": "Polígono/feição, pixel ou foco de fogo, com referência temporal e produto.",
+      "chaves_sugeridas": [
+        "identificador da feição",
+        "data",
+        "produto/satélite",
+        "geometria e CRS"
+      ],
+      "formatos_api": [
+        "WFS: formato suportado pela camada",
+        "WMS: imagem de mapa"
+      ]
+    },
+    {
+      "id": "mjsp",
+      "orgao": "Ministério da Justiça e Segurança Pública (MJSP / SINESP)",
+      "portal": "https://www.gov.br/mj/pt-br/acesso-a-informacao/dados-abertos",
+      "bases": [
+        "Dados Nacionais de Segurança Pública / SINESP VDE",
+        "Pesquisa Perfil das Instituições de Segurança Pública"
+      ],
+      "meio_principal": "Downloads de bases e notas metodológicas; API pública de conteúdo VDE/Perfil não confirmada.",
+      "apis": [],
+      "downloads": [
+        {
+          "url": "https://dados.mj.gov.br/",
+          "formatos": [
+            "XLSX",
+            "ZIP",
+            "PDF (dicionários e notas)"
+          ],
+          "nota": "Catálogo apresentou erro de obtenção nesta pesquisa; isso não prova indisponibilidade permanente."
+        },
+        {
+          "url": "https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/estatistica/dados-nacionais-1/base-de-dados-e-notas-metodologicas-dos-gestores-estaduais-sinesp-vde-2022-e-2023",
+          "formatos": [
+            "XLSX",
+            "ZIP conforme recurso"
+          ],
+          "nota": "Página vigente com bases/notas 2015–2026; título/slug antigo não determina a cobertura atual."
+        },
+        {
+          "url": "https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/estatistica/pesquisaperfil/base-de-dados-pesquisa-perfil",
+          "formatos": [
+            "ZIP"
+          ],
+          "nota": "Download histórico 2004–2019 observado; base estruturada recente não confirmada."
+        }
+      ],
+      "atualizacao": "VDE alimentado mensalmente pelos estados, sujeito a validação e retificação. Pesquisa Perfil anual, mas a atualização anual de seu ZIP público não foi confirmada.",
+      "granularidade": "UF/município/mês/indicador no VDE; UF/instituição/ano na Pesquisa Perfil.",
+      "chaves_sugeridas": [
+        "território e código conforme layout",
+        "mês/ano",
+        "indicador",
+        "unidade de medida",
+        "instituição"
+      ],
+      "formatos_api": [],
+      "observacoes": [
+        "Guardar notas estaduais e critérios de consolidação.",
+        "A página atual alerta para linhas de tentativas de homicídio/estupro que devem ser somadas; não eliminá-las automaticamente como duplicadas.",
+        "SINESP Infoseg é serviço operacional de acesso credenciado; não integra dados abertos nem autoriza coleta pública de registros individuais."
+      ],
+      "fontes": [
+        "https://www.gov.br/mj/pt-br/acesso-a-informacao/dados-abertos",
+        "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica",
+        "https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/estatistica/dados-nacionais-1/base-de-dados-e-notas-metodologicas-dos-gestores-estaduais-sinesp-vde-2022-e-2023",
+        "https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/estatistica/pesquisaperfil/base-de-dados-pesquisa-perfil",
+        "https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/sinesp-1/sinesp-infoseg"
+      ]
+    },
+    {
+      "id": "camara",
+      "orgao": "Câmara dos Deputados",
+      "portal": "https://dadosabertos.camara.leg.br/",
+      "bases": [
+        "Deputados e histórico parlamentar",
+        "Proposições e tramitações",
+        "Votações e votos individuais",
+        "Despesas da Cota para o Exercício da Atividade Parlamentar (CEAP)"
+      ],
+      "meio_principal": "API REST v2 para consultas; arquivos históricos por conjunto/ano/legislatura.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "Dados Abertos v2",
+          "metodo": "GET",
+          "url": "https://dadosabertos.camara.leg.br/api/v2/",
+          "documentacao": "https://dadosabertos.camara.leg.br/swagger/api.html",
+          "autenticacao": "Documentação de leitura não exige chave.",
+          "parametros": "deputados; deputados/{id}/despesas; proposicoes; proposicoes/{id}/tramitacoes; votacoes; votacoes/{id}/votos. Paginação padrão 15 e máximo 100 itens conforme documentação consultada.",
+          "verificacao": "openapi_verificado_payload_dados_nao_inspecionado"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://dadosabertos.camara.leg.br/arquivos/",
+          "formatos": [
+            "CSV",
+            "JSON",
+            "XML",
+            "XLSX",
+            "ODS",
+            "ZIP"
+          ],
+          "nota": "Disponibilidade por conjunto; CEAP usa também www.camara.leg.br/cotas/Ano-{ano}.{formato}[.zip]."
+        }
+      ],
+      "atualizacao": "Principais arquivos possuem atualização diária documentada; dados da API conforme sistemas de origem.",
+      "observacoes": [
+        "Sem filtro temporal, deputados tende a cobrir exercício atual e despesas a janela recente; explicitar datas.",
+        "Coletores precisam seguir paginação e links retornados.",
+        "O esquema CEAP difere entre API e arquivos; comparar chaves antes de mesclar.",
+        "Documentação informa API incompleta e sujeita a mudanças."
+      ],
+      "fontes": [
+        "https://dadosabertos.camara.leg.br/swagger/api.html",
+        "https://dadosabertos.camara.leg.br/api/v2/api-docs",
+        "https://dadosabertos.camara.leg.br/arquivos/"
+      ],
+      "granularidade": "Parlamentar, proposição, tramitação, votação, voto e documento de despesa.",
+      "chaves_sugeridas": [
+        "id do deputado",
+        "id da proposição",
+        "id da votação",
+        "identificador do documento de despesa"
+      ],
+      "formatos_api": [
+        "JSON",
+        "XML"
+      ]
+    },
+    {
+      "id": "senado",
+      "orgao": "Senado Federal",
+      "portal": "https://www12.senado.leg.br/dados-abertos",
+      "bases": [
+        "Senadores, mandatos e filiações",
+        "Matérias legislativas e tramitações",
+        "Votações nominais",
+        "CEAPS: cota parlamentar",
+        "Contratos e licitações administrativas"
+      ],
+      "meio_principal": "API legislativa e API administrativa separadas; arquivos conforme conjunto.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "API legislativa",
+          "metodo": "GET",
+          "url": "https://legis.senado.leg.br/dadosabertos/",
+          "documentacao": "https://legis.senado.leg.br/dadosabertos/docs/",
+          "autenticacao": "Consulta de lista de senadores realizada sem credenciais.",
+          "parametros": "Exemplo senador/lista/atual.json; formatos e filtros variam por serviço.",
+          "verificacao": "resposta_registros_json_verificada"
+        },
+        {
+          "tipo": "conteudo",
+          "nome": "API administrativa",
+          "metodo": "GET",
+          "url": "https://adm.senado.gov.br/adm-dadosabertos/api/v1/",
+          "documentacao": "https://adm.senado.gov.br/adm-dadosabertos/swagger-ui/index.html?configUrl=/adm-dadosabertos/swagger-config.json",
+          "autenticacao": "Consultar documentação de cada rota pública; teste autenticado não realizado.",
+          "parametros": "CEAPS e outros conjuntos administrativos: localizar rota detalhada no Swagger; rota específica de documentos de despesa não confirmada nesta pesquisa.",
+          "verificacao": "documentada_rota_despesa_nao_confirmada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://www12.senado.leg.br/dados-abertos",
+          "formatos": [
+            "CSV",
+            "JSON",
+            "XML"
+          ],
+          "nota": "Formatos e disponibilidade por conjunto; CEAPS catalogado em CSV e Web Service."
+        }
+      ],
+      "atualizacao": "Legislativo informa atualização online; CEAPS e contratos, diária.",
+      "observacoes": [
+        "CEAPS é administrativo e não deve ser atribuído à API legislativa.",
+        "Um relatório consolidado de recursos utilizados não equivale ao detalhamento de documentos CEAPS.",
+        "O CSV de votações de senador tem janela de 12 meses; verificar serviço/filtro para histórico completo."
+      ],
+      "fontes": [
+        "https://www12.senado.leg.br/dados-abertos",
+        "https://legis.senado.leg.br/dadosabertos/docs/",
+        "https://legis.senado.leg.br/dadosabertos/senador/lista/atual.json",
+        "https://adm.senado.gov.br/adm-dadosabertos/swagger-ui/index.html?configUrl=/adm-dadosabertos/swagger-config.json"
+      ],
+      "granularidade": "Senador, matéria, votação e registro administrativo conforme serviço.",
+      "chaves_sugeridas": [
+        "código de senador",
+        "código de matéria",
+        "identificador de votação",
+        "ano/documento CEAPS conforme layout"
+      ],
+      "formatos_api": [
+        "JSON",
+        "XML",
+        "CSV conforme serviço"
+      ]
+    },
+    {
+      "id": "cnj",
+      "orgao": "Conselho Nacional de Justiça (CNJ)",
+      "portal": "https://www.cnj.jus.br/sistemas/datajud/api-publica/",
+      "bases": [
+        "DataJud: processos, classes, assuntos, órgãos julgadores e movimentos",
+        "Justiça em Números / SIESPJ: indicadores e séries estatísticas"
+      ],
+      "meio_principal": "API DataJud por tribunal; arquivos estatísticos publicados pelo CNJ para Justiça em Números.",
+      "apis": [
+        {
+          "tipo": "conteudo",
+          "nome": "DataJud",
+          "metodo": "POST",
+          "url": "https://api-publica.datajud.cnj.jus.br/",
+          "documentacao": "https://datajud-wiki.cnj.jus.br/api-publica/endpoints/",
+          "autenticacao": "Authorization: APIKey {chave pública vigente}; a chave pode ser substituída pelo CNJ.",
+          "parametros": "Alias por tribunal; exemplo api_publica_trf1/_search. Query DSL em JSON; paginação search_after conforme documentação.",
+          "verificacao": "documentada_autenticacao_nao_testada"
+        }
+      ],
+      "downloads": [
+        {
+          "url": "https://www.cnj.jus.br/base-de-dados/",
+          "formatos": [
+            "CSV"
+          ],
+          "nota": "Bases estatísticas por ramo/tribunal/ano; não foi confirmado dump nacional atualizado do DataJud."
+        }
+      ],
+      "atualizacao": "A remessa diária foi determinada em agosto/2026 com prazo de 180 dias para adequação; em 03/10/2026 não comprova atualização diária efetiva de todos os tribunais.",
+      "observacoes": [
+        "DataJud não inclui integralmente conteúdo de processos sigilosos; dados podem ser excluídos/anonimizados.",
+        "A Portaria 374/2026 restringe uso a fins legais, não comerciais e autorizados; veda modificação, distribuição, venda ou exploração comercial e exige citar CNJ/DataJud. Registrar e avaliar essas condições antes de integrar/redistribuir.",
+        "Precisão, integridade e atualidade dependem das remessas dos tribunais.",
+        "Não confundir os registros processuais chamados metadados com uma API de catálogo."
+      ],
+      "fontes": [
+        "https://datajud-wiki.cnj.jus.br/api-publica/endpoints/",
+        "https://datajud-wiki.cnj.jus.br/api-publica/acesso/",
+        "https://atos.cnj.jus.br/atos/detalhar/6972",
+        "https://www.cnj.jus.br/base-de-dados/"
+      ],
+      "granularidade": "Processo e movimentos; indicadores por ramo/tribunal/ano nas bases estatísticas.",
+      "chaves_sugeridas": [
+        "identificador do processo",
+        "tribunal",
+        "grau",
+        "órgão julgador",
+        "classe e assuntos TPU"
+      ],
+      "formatos_api": [
+        "JSON"
+      ]
+    }
+  ]
+}
