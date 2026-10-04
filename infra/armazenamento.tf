@@ -53,6 +53,14 @@ resource "google_bigquery_dataset" "dev" {
   depends_on                  = [google_project_service.apis]
 }
 
+resource "google_bigquery_dataset" "ci" {
+  dataset_id                  = "ci"
+  location                    = var.regiao
+  description                 = "Eleitorado: relacoes temporarias dos testes unitarios do dbt"
+  default_table_expiration_ms = 86400000 # 1 dia
+  depends_on                  = [google_project_service.apis]
+}
+
 output "bucket_dados" {
   value = google_storage_bucket.dados.name
 }
