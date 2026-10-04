@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: int_cgu__sancoes_eventos
+    columns:
+      - name: evento_id
+        data_tests: [unique, not_null]
+  - name: int_parlamentares__eventos
+    columns:
+      - name: evento_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: eventos_de_snapshots_carga_inicial
+    description: >
+      Sem histórico: inclusão na primeira aparição, alteração quando o hash muda, exclusão
+      quando some (com os últimos atributos) e nova inclusão quando reaparece.
+    model: int_cgu__sancoes_eventos
+    overrides:
+      macros: {is_incremental: false}
+    given:
+      - input: ref('stg_cgu__sancoes')
+        rows:
+          - {sancao_id: 'ceis:A', data_referencia: '2026-10-01', hash_atributos: h1, nome_sancionado: A1, _coleta_id: c1}
+          - {sancao_id: 'ceis:B', data_referencia: '2026-10-01', hash_atributos: h1, nome_sancionado: B1, _coleta_id: c1}
+          - {sancao_id: 'ceis:A', data_referencia: '2026-10-02', hash_atributos: h2, nome_sancionado: A2, _coleta_id: c2}
+          - {sancao_id: 'ceis:A', data_referencia: '2026-10-03', hash_atributos: h2, nome_sancionado: A2, _coleta_id: c3}
+          - {sancao_id: 'ceis:B', data_referencia: '2026-10-03', hash_atributos: h1, nome_sancionado: B1, _coleta_id: c3}
+    expect:
+      rows:
+        - {sancao_id: 'ceis:A', data_evento: '2026-10-01', evento: inclusao, nome_sancionado: A1}
+        - {sancao_id: 'ceis:B', data_evento: '2026-10-01', evento: inclusao, nome_sancionado: B1}
+        - {sancao_id: 'ceis:A', data_evento: '2026-10-02', evento: alteracao, nome_sancionado: A2}
+        - {sancao_id: 'ceis:B', data_evento: '2026-10-02', evento: exclusao, nome_sancionado: B1}
+        - {sancao_id: 'ceis:B', data_evento: '2026-10-03', evento: inclusao, nome_sancionado: B1}
+
+  - name: eventos_de_snapshots_incremental
+    description: >
+      Com histórico: só datas novas são lidas; o estado vigente vale como snapshot anterior.
+      Sem mudança não gera evento; chave cuja última versão é exclusão volta como inclusão.
+    model: int_cgu__sancoes_eventos
+    overrides:
+      macros: {is_incremental: true}
+    given:
+      - input: this
+        rows:
+          - {sancao_id: 'ceis:A', data_evento: '2026-10-01', evento: inclusao, hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'ceis:B', data_evento: '2026-10-01', evento: inclusao, hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'ceis:C', data_evento: '2026-09-30', evento: inclusao, hash_atributos: h1, _coleta_id: c0}
+          - {sancao_id: 'ceis:C', data_evento: '2026-10-01', evento: exclusao, hash_atributos: h1, _coleta_id: c0}
+      - input: ref('stg_cgu__sancoes')
+        rows:
+          - {sancao_id: 'ceis:A', data_referencia: '2026-10-01', hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'ceis:B', data_referencia: '2026-10-01', hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'ceis:A', data_referencia: '2026-10-02', hash_atributos: h1, _coleta_id: c2}
+          - {sancao_id: 'ceis:C', data_referencia: '2026-10-02', hash_atributos: h1, _coleta_id: c2}
+    expect:
+      rows:
+        - {sancao_id: 'ceis:B', data_evento: '2026-10-02', evento: exclusao, _coleta_id: c1}
+        - {sancao_id: 'ceis:C', data_evento: '2026-10-02', evento: inclusao, _coleta_id: c2}
