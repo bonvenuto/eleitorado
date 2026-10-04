@@ -15,7 +15,8 @@ infra/.terraform/
 *.tfstate
 *.tfstate.*
 
-# dbt (planos seguintes)
+# dbt
+dbt/.user.yml
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/

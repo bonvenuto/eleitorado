@@ -45,7 +45,11 @@ def _schemas(projeto, target: str) -> dict[str, str]:
         env={**__import__("os").environ, "ELEITORADO_PROJETO": "projeto-teste"},
     )
     linhas = [json.loads(linha) for linha in saida.stdout.splitlines() if linha.startswith("{")]
-    return {linha["name"]: linha["schema"] for linha in linhas}
+    return {
+        linha["name"]: linha["schema"]
+        for linha in linhas
+        if linha["name"] in ("com_schema", "sem_schema")
+    }
 
 
 def test_schemas_em_producao_sao_os_configurados(projeto):
@@ -58,3 +62,7 @@ def test_schemas_em_dev_levam_o_prefixo_do_usuario(projeto, monkeypatch):
         "com_schema": "dev_angelo_staging",
         "sem_schema": "dev_angelo",
     }
+
+
+def test_schemas_em_ci_ficam_todos_no_dataset_do_ci(projeto):
+    assert _schemas(projeto, "ci") == {"com_schema": "ci", "sem_schema": "ci"}
