@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: int_cota__despesas
+    columns:
+      - name: despesa_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: despesa_camara_linhas_identicas
+    description: >
+      A CEAP não tem chave: linhas idênticas recebem ids distintos e estáveis (ordem por
+      competência e linha); sem deputado, a despesa é da liderança.
+    model: int_cota__despesas
+    given:
+      - input: ref('stg_camara__ceap')
+        rows:
+          - {hash_linha: x, id_deputado: '1', _competencia: '2026', _linha: 7}
+          - {hash_linha: x, id_deputado: '1', _competencia: '2026', _linha: 3}
+          - {hash_linha: y, _competencia: '2026', _linha: 1}
+      - input: ref('stg_senado__ceaps')
+        rows: []
+      - input: ref('stg_senado__senadores')
+        rows: []
+    expect:
+      rows:
+        - {despesa_id: 'camara:x-1', parlamentar_id: 'camara:1', tipo_beneficiario: parlamentar}
+        - {despesa_id: 'camara:x-2', parlamentar_id: 'camara:1', tipo_beneficiario: parlamentar}
+        - {despesa_id: 'camara:y-1', parlamentar_id: null, tipo_beneficiario: lideranca}
+
+  - name: despesa_documentos_especiais_e_uf
+    description: >
+      Códigos internos da Câmara (`000000000000NN`) e CPFs que o Senado já publica mascarados
+      não são documentos inválidos nem viram raiz de CNPJ; o CNPJ real do Banco do Brasil
+      (`00000000000191`) continua CNPJ. A UF `NA` das lideranças vira nula, e a UF do Senado
+      vem do snapshot mais recente do cadastro.
+    model: int_cota__despesas
+    given:
+      - input: ref('stg_camara__ceap')
+        rows:
+          - {hash_linha: a, fornecedor_documento: '00000000000007', uf_sigla: NA, _competencia: '2026', _linha: 1}
+          - {hash_linha: b, fornecedor_documento: '00000000000191', uf_sigla: DF, id_deputado: '1', _competencia: '2026', _linha: 2}
+      - input: ref('stg_senado__ceaps')
+        rows:
+          - {id_despesa: '9', id_senador: '5', fornecedor_documento_mascarado: '240.***.***-04'}
+          - {id_despesa: '10', id_senador: '5', fornecedor_documento: '123'}
+      - input: ref('stg_senado__senadores')
+        rows:
+          - {id_senador: '5', uf_sigla: RJ, data_referencia: '2026-09-01'}
+          - {id_senador: '5', uf_sigla: SP, data_referencia: '2026-10-01'}
+    expect:
+      rows:
+        - {despesa_id: 'camara:a-1', fornecedor_documento: '00000000000007', fornecedor_tipo_documento: CODIGO_CAMARA, fornecedor_documento_valido: null, fornecedor_cnpj_raiz: null, uf_sigla: null}
+        - {despesa_id: 'camara:b-1', fornecedor_documento: '00000000000191', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '00000000', uf_sigla: DF}
+        - {despesa_id: 'senado:9', fornecedor_documento: '240.***.***-04', fornecedor_tipo_documento: CPF_MASCARADO, fornecedor_documento_valido: null, fornecedor_cnpj_raiz: null, uf_sigla: SP}
+        - {despesa_id: 'senado:10', fornecedor_documento: '123', fornecedor_tipo_documento: INVALIDO, fornecedor_documento_valido: false, fornecedor_cnpj_raiz: null, uf_sigla: SP}
