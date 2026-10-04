@@ -1,0 +1,16 @@
+orgao: ibge
+nome: Instituto Brasileiro de Geografia e Estatística
+portal: https://servicodados.ibge.gov.br/api/docs/
+recursos:
+  - id: municipios
+    descricao: Municípios com a hierarquia territorial (API de Localidades)
+    fonte_oficial: https://servicodados.ibge.gov.br/api/docs/localidades
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (IBGE).
+    adaptador: api_json
+    url: https://servicodados.ibge.gov.br/api/v1/localidades/municipios
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: mensal}
+    formato: {tipo: json}

@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Configuração local e credenciais
+.env*
+!.env.exemplo
+.gcloud/
+
+# Terraform
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+
+# dbt (planos seguintes)
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+.superpowers/
