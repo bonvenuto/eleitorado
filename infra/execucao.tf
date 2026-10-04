@@ -52,6 +52,13 @@ resource "google_project_iam_member" "pipeline_job_user" {
   member  = "serviceAccount:${google_service_account.pipeline.email}"
 }
 
+# coletor e dbt usam o próprio projeto como quota project (x-goog-user-project)
+resource "google_project_iam_member" "pipeline_service_usage" {
+  project = var.projeto
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:${google_service_account.pipeline.email}"
+}
+
 resource "google_bigquery_dataset_iam_member" "pipeline_editor" {
   for_each   = toset(local.datasets)
   dataset_id = google_bigquery_dataset.prod[each.key].dataset_id

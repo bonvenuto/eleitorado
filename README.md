@@ -57,4 +57,6 @@ terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO"
   execução agendada com sucesso no dia, o workflow falha e o GitHub avisa por e-mail.
 - **Travas de custo:** orçamento de R$ 30/mês com alertas em 50/90/100% (sem créditos), cota de
   30 GiB consultados por dia no BigQuery e `maximum_bytes_billed` de 10 GiB no dbt.
+- **Primeiro dia após um deploy feito depois das 07:30:** o vigia das 10:00 reprova porque ainda não
+  houve execução agendada da imagem nova; rode o job à mão logo após o deploy.
 - **Rodar o job à mão:** `gcloud run jobs execute pipeline --region southamerica-east1 --wait`.

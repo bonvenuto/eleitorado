@@ -61,6 +61,12 @@ resource "google_project_iam_member" "ci_job_user" {
   member  = "serviceAccount:${google_service_account.ci.email}"
 }
 
+resource "google_project_iam_member" "ci_service_usage" {
+  project = var.projeto
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
 resource "google_bigquery_dataset_iam_member" "ci_le_meta" {
   dataset_id = google_bigquery_dataset.prod["meta"].dataset_id
   role       = "roles/bigquery.dataViewer"
