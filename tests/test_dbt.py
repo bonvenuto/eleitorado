@@ -43,3 +43,11 @@ def test_resultado_antigo_nao_e_reaproveitado(tmp_path):
     antigo.write_text(json.dumps({"results": [{"unique_id": "test.x", "status": "fail"}]}))
     resultado = rodar_dbt(tmp_path, "prod", lambda comando: 2)
     assert resultado == ResultadoDbt("falha", None)
+
+
+def test_build_do_pipeline_nao_roda_testes_unitarios(tmp_path):
+    # unit tests são do CI: em produção, o de um incremental exige a tabela já existir
+    chamadas: list[list[str]] = []
+    rodar_dbt(tmp_path, "prod", _executor_que_grava([], 0, chamadas))
+    comando = chamadas[0]
+    assert comando[comando.index("--exclude-resource-type") + 1] == "unit_test"

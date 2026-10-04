@@ -46,6 +46,9 @@ def rodar_dbt(
             str(diretorio),
             "--profiles-dir",
             str(diretorio),
+            # testes unitários rodam no CI; o de um incremental exige a tabela já existir
+            "--exclude-resource-type",
+            "unit_test",
             "--target",
             target,
         ]
