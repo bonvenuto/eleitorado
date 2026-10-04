@@ -88,3 +88,52 @@ def test_sem_configuracao_sai_com_codigo_2(capsys):
 )
 def test_coletar_por_competencia_sem_anos_e_erro_de_uso(deps, argumentos):
     assert _rodar(argumentos, deps) == 2
+
+
+COLETA_ID = "6f1c2a3b-0000-4000-8000-000000000001"
+
+
+def test_recarregar_coleta_de_outra_competencia_e_recusado(deps, warehouse, capsys):
+    warehouse.resposta_consulta = [
+        {
+            "orgao": "cgu",
+            "recurso": "cnep",
+            "competencia": "2026-10-01",
+            "arquivo_original": "gs://bucket-teste/x.zip",
+            "status": "carregada",
+        }
+    ]
+    argumentos = ["recarregar", "cgu.cnep", "--competencia", "2026-10-02", "--coleta-id", COLETA_ID]
+    assert _rodar(argumentos, deps) == 2
+    assert "2026-10-01" in capsys.readouterr().err
+
+
+def test_recarregar_coleta_sem_original_explica_o_motivo(deps, warehouse, capsys):
+    warehouse.resposta_consulta = [
+        {
+            "orgao": "cgu",
+            "recurso": "cnep",
+            "competencia": "2026-10-02",
+            "arquivo_original": None,
+            "status": "falha",
+        }
+    ]
+    argumentos = ["recarregar", "cgu.cnep", "--competencia", "2026-10-02", "--coleta-id", COLETA_ID]
+    assert _rodar(argumentos, deps) == 2
+    assert "sem original" in capsys.readouterr().err
+
+
+def test_falha_ao_gravar_meta_nao_interrompe_as_demais_coletas(respx_mock, deps, warehouse):
+    for ano in (2025, 2026):
+        respx_mock.get(f"https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip").mock(
+            return_value=httpx.Response(200, content=zip_com({f"Ano-{ano}.csv": CEAP_CSV.encode()}))
+        )
+    warehouse.falhas_ao_anexar["meta_dev.coletas"] = 2  # a gravação da 1ª coleta falha duas vezes
+    assert _rodar(["coletar", "camara.ceap", "--de", "2025"], deps) == 1
+    assert [linha["competencia"] for linha in warehouse.linhas["meta_dev.coletas"]] == ["2026"]
+    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    assert (execucao["status"], execucao["coletas_carregadas"], execucao["coletas_falha"]) == (
+        "falha",
+        1,
+        1,
+    )

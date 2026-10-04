@@ -14,7 +14,7 @@ from coletor.agenda import Tarefa, tarefa_snapshot, tarefas_pendentes
 from coletor.coleta import EXPIRACAO_SNAPSHOT_DIAS, Dependencias, recarregar
 from coletor.competencias import Competencia, data_brasilia
 from coletor.config import Config, ErroConfig, carregar_config
-from coletor.execucao import registro_execucao, rodar
+from coletor.execucao import ResumoColetas, registro_execucao, rodar
 from coletor.manifesto import ErroManifesto, Manifesto, carregar_manifesto
 from coletor.meta import HistoricoColetas, RepositorioMeta
 
@@ -65,10 +65,16 @@ def _rodar_tarefas(
     forcar: bool,
 ) -> int:
     execucao_id = str(uuid.uuid4())
-    resumo = rodar(tarefas, historico, deps, repo, execucao_id, forcar)
-    repo.registrar_execucao(
-        registro_execucao(execucao_id, deps.config.origem, deps, inicio, resumo)
-    )
+    resumo = ResumoColetas()
+    try:
+        resumo = rodar(tarefas, historico, deps, repo, execucao_id, forcar)
+    except Exception:
+        log.exception("execução interrompida")
+        resumo.contar("falha")
+    finally:
+        repo.registrar_execucao(
+            registro_execucao(execucao_id, deps.config.origem, deps, inicio, resumo)
+        )
     log.info("resumo: %s", resumo)
     return 0 if resumo.sucesso else 1
 
@@ -139,9 +145,18 @@ def _recarregar(
             "use --destino replay"
         )
     if args.coleta_id:
-        uri = repo.buscar_arquivo_original(args.coleta_id)
-        if uri is None:
+        coleta = repo.buscar_coleta(args.coleta_id)
+        if coleta is None:
             raise ErroUso(f"coleta {args.coleta_id} não encontrada")
+        origem = (f"{coleta['orgao']}.{coleta['recurso']}", coleta["competencia"])
+        if origem != (rc.id, competencia.rotulo):
+            raise ErroUso(
+                f"coleta {args.coleta_id} é de {origem[0]} competência {origem[1]}, "
+                f"não de {rc.id} competência {competencia.rotulo}"
+            )
+        if not coleta["arquivo_original"]:
+            raise ErroUso(f"coleta {args.coleta_id} ({coleta['status']}) está sem original no GCS")
+        uri = coleta["arquivo_original"]
     else:
         prefixo = (
             f"{deps.config.prefixo_gcs}originais/{rc.orgao}/{rc.recurso.id}/"

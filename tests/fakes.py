@@ -46,6 +46,7 @@ class FakeWarehouse:
         self.tabelas: set[str] = set()
         self.falha_na_carga: Exception | None = None
         self.resposta_consulta: list[dict[str, Any]] = []
+        self.falhas_ao_anexar: dict[str, int] = {}
 
     def carregar_parquet(
         self, tabela: str, uri: str, particionamento: Particionamento, dia: date
@@ -65,6 +66,9 @@ class FakeWarehouse:
     def anexar_linhas(
         self, tabela: str, linhas: list[dict[str, Any]], colunas: list[Coluna]
     ) -> None:
+        if self.falhas_ao_anexar.get(tabela, 0) > 0:
+            self.falhas_ao_anexar[tabela] -= 1
+            raise RuntimeError(f"BigQuery indisponível ao gravar {tabela}")
         self.linhas[tabela].extend(linhas)
 
     def substituir_linhas(

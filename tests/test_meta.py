@@ -5,7 +5,13 @@ import pytest
 
 from coletor.competencias import Competencia
 from coletor.manifesto import RecursoCompleto
-from coletor.meta import HistoricoColetas, RegistroColeta, RepositorioMeta, Sucesso
+from coletor.meta import (
+    SQL_HISTORICO,
+    HistoricoColetas,
+    RegistroColeta,
+    RepositorioMeta,
+    Sucesso,
+)
 from tests.amostras import recurso
 
 HOJE = date(2026, 10, 3)
@@ -89,6 +95,29 @@ def test_historico_e_montado_a_partir_da_consulta(warehouse, config):
     assert historico.ultima_data_sucesso("camara.ceap") == HOJE
 
 
-def test_buscar_arquivo_original_exige_uuid(warehouse, config):
+def test_buscar_coleta_exige_uuid(warehouse, config):
     with pytest.raises(ValueError):
-        RepositorioMeta(warehouse, config).buscar_arquivo_original("1' OR '1'='1")
+        RepositorioMeta(warehouse, config).buscar_coleta("1' OR '1'='1")
+
+
+def test_recarga_no_raw_passa_a_ser_a_referencia_de_deduplicacao():
+    historico = HistoricoColetas()
+    historico.registrar(_registro("carregada", [["A", "a"]]))
+    recarga = RegistroColeta.novo(
+        "exec", _ceap(), Competencia.de_ano(2026), _instante(HOJE), "teste", destino="raw"
+    )
+    recarga.sha256_conteudo = "antigo"
+    historico.registrar(recarga.finalizar("recarregada", _instante(HOJE)))
+    assert historico.ultimo_sha("camara.ceap", "2026") == "antigo"
+    assert "'recarregada'" in SQL_HISTORICO
+
+
+def test_recarga_no_replay_nao_afeta_a_deduplicacao():
+    historico = HistoricoColetas()
+    historico.registrar(_registro("carregada"))
+    recarga = RegistroColeta.novo(
+        "exec", _ceap(), Competencia.de_ano(2026), _instante(HOJE), "teste", destino="replay"
+    )
+    recarga.sha256_conteudo = "antigo"
+    historico.registrar(recarga.finalizar("recarregada", _instante(HOJE)))
+    assert historico.ultimo_sha("camara.ceap", "2026") == "novo"

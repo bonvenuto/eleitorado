@@ -221,11 +221,14 @@ class HistoricoColetas:
         return max(anteriores, key=lambda s: (s.competencia_data, s.finalizada_em)).colunas
 
     def registrar(self, registro: RegistroColeta) -> None:
-        if registro.status not in STATUS_SUCESSO or registro.competencia is None:
+        recarga_no_raw = registro.status == "recarregada" and registro.destino == "raw"
+        if registro.status not in STATUS_SUCESSO and not recarga_no_raw:
+            return
+        if registro.competencia is None:
             return
         chave = (registro.recurso_id, registro.competencia)
         anterior = self._sucessos.get(chave)
-        colunas = registro.colunas if registro.status == "carregada" else None
+        colunas = registro.colunas if registro.status in ("carregada", "recarregada") else None
         if colunas is None and anterior is not None:
             colunas = anterior.colunas
         assert registro.finalizada_em is not None
@@ -240,14 +243,14 @@ WITH sucesso AS (
          ROW_NUMBER() OVER (
            PARTITION BY orgao, recurso, competencia ORDER BY finalizada_em DESC) AS ordem
   FROM `{tabela}`
-  WHERE status IN ('carregada', 'sem_alteracao') AND destino = 'raw'
+  WHERE status IN ('carregada', 'sem_alteracao', 'recarregada') AND destino = 'raw'
 ),
 carga AS (
   SELECT orgao, recurso, competencia, colunas,
          ROW_NUMBER() OVER (
            PARTITION BY orgao, recurso, competencia ORDER BY finalizada_em DESC) AS ordem
   FROM `{tabela}`
-  WHERE status = 'carregada' AND destino = 'raw'
+  WHERE status IN ('carregada', 'recarregada') AND destino = 'raw'
 )
 SELECT s.orgao, s.recurso, s.competencia, s.competencia_data, s.finalizada_em,
        s.sha256_conteudo, c.colunas
@@ -312,11 +315,13 @@ class RepositorioMeta:
         ]
         self._warehouse.substituir_linhas(self.tabela_fontes, linhas, COLUNAS_FONTES)
 
-    def buscar_arquivo_original(self, coleta_id: str) -> str | None:
+    def buscar_coleta(self, coleta_id: str) -> dict[str, Any] | None:
+        """Identificação e original de uma coleta: orgao, recurso, competencia, status."""
         coleta_id = str(uuid.UUID(coleta_id))  # valida o formato antes de montar o SQL
         sql = (
-            f"SELECT arquivo_original FROM `{self._config.projeto}.{self.tabela_coletas}` "
+            "SELECT orgao, recurso, competencia, arquivo_original, status "
+            f"FROM `{self._config.projeto}.{self.tabela_coletas}` "
             f"WHERE coleta_id = '{coleta_id}' LIMIT 1"
         )
         linhas = self._warehouse.consultar(sql)
-        return linhas[0]["arquivo_original"] if linhas else None
+        return linhas[0] if linhas else None
