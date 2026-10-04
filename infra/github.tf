@@ -90,3 +90,11 @@ output "sa_deployer" {
 output "sa_ci" {
   value = google_service_account.ci.email
 }
+
+# ci: lê o raw para criar as views vazias do staging (dbt run --empty) antes dos testes unitários
+resource "google_bigquery_dataset_iam_member" "ci_le_raw" {
+  for_each   = toset(["raw_camara", "raw_senado", "raw_cgu", "raw_ibge"])
+  dataset_id = google_bigquery_dataset.prod[each.key].dataset_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.ci.email}"
+}

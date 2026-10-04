@@ -1,0 +1,69 @@
+version: 2
+
+# Todos os marts passam pelo `sem_cpf_completo` (seção 7.6 da spec).
+models:
+  - name: alerta_cota_fornecedor_sancionado
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+      - name: despesa_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('fct_despesa_cota_parlamentar'), field: despesa_id}
+      - name: tipo_correspondencia
+        data_tests:
+          - accepted_values:
+              arguments: {values: [cpf, cnpj, cnpj_raiz]}
+
+  - name: alerta_cota_documento_invalido
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+      - name: motivo
+        data_tests:
+          - accepted_values:
+              arguments: {values: [tamanho, digito_verificador]}
+
+unit_tests:
+  - name: alerta_sancionado_por_documento_raiz_e_vigencia
+    description: >
+      CNPJ completo e raiz (filial) dentro da vigência geram alerta; fora da vigência e
+      versões de exclusão não; CPF com sanção sem data de fim gera.
+    model: alerta_cota_fornecedor_sancionado
+    given:
+      - input: ref('int_cota__despesas')
+        rows:
+          - {despesa_id: d1, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_emissao: '2024-05-10'}
+          - {despesa_id: d2, fornecedor_documento: '11222333000262', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_emissao: '2024-05-10'}
+          - {despesa_id: d3, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_emissao: '2025-01-05'}
+          - {despesa_id: d4, fornecedor_documento: '11144477735', fornecedor_tipo_documento: CPF, fornecedor_documento_valido: true, data_emissao: '2024-06-01'}
+          - {despesa_id: d5, fornecedor_documento: '11444777000161', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11444777', data_emissao: '2024-06-01'}
+      - input: ref('int_cgu__sancoes_eventos')
+        rows:
+          - {sancao_id: 'ceis:1', evento: inclusao, documento: '11222333000181', data_inicio: '2024-01-01', data_fim: '2024-12-31', _coleta_id: c1}
+          - {sancao_id: 'ceis:2', evento: inclusao, documento: '11144477735', data_inicio: '2024-01-01', _coleta_id: c1}
+          - {sancao_id: 'ceis:3', evento: exclusao, documento: '11444777000161', data_inicio: '2024-01-01', _coleta_id: c1}
+    expect:
+      rows:
+        - {despesa_id: d1, sancao_id: 'ceis:1', tipo_correspondencia: cnpj, fornecedor_documento: '11222333000181'}
+        - {despesa_id: d2, sancao_id: 'ceis:1', tipo_correspondencia: cnpj_raiz, fornecedor_documento: '11222333000262'}
+        - {despesa_id: d4, sancao_id: 'ceis:2', tipo_correspondencia: cpf, fornecedor_documento: '***.444.777-**'}
+
+  - name: alerta_mostra_a_versao_mais_recente_da_sancao
+    description: >
+      Duas versões da mesma sanção cobrem a despesa: o alerta sai uma vez, com as datas da
+      versão mais recente.
+    model: alerta_cota_fornecedor_sancionado
+    given:
+      - input: ref('int_cota__despesas')
+        rows:
+          - {despesa_id: d1, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_emissao: '2024-05-10'}
+      - input: ref('int_cgu__sancoes_eventos')
+        rows:
+          - {sancao_id: 'ceis:1', evento: inclusao, data_evento: '2026-10-02', documento: '11222333000181', data_inicio: '2024-01-01', data_fim: '2026-12-31', _coleta_id: c1}
+          - {sancao_id: 'ceis:1', evento: alteracao, data_evento: '2026-10-03', documento: '11222333000181', data_inicio: '2024-01-01', data_fim: '2025-06-30', _coleta_id: c9}
+    expect:
+      rows:
+        - {despesa_id: d1, sancao_id: 'ceis:1', sancao_data_fim: '2025-06-30'}

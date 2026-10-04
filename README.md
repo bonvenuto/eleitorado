@@ -47,6 +47,26 @@ terraform -chdir=infra init "-backend-config=bucket=$($env:ELEITORADO_PROJETO)-t
 terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO"
 ```
 
+## Modelagem (dbt)
+
+- Camadas: `staging` (views sobre o raw), `intermediate` (cota unificada e históricos por eventos)
+  e `marts` (dimensões, fatos, alertas e `monitor_fontes`). Em dev, os datasets são
+  `dev_<ELEITORADO_USUARIO_DBT>_<camada>`; raw e meta são sempre os de produção.
+- Rodar um modelo: `uv run --env-file .env dbt build --project-dir dbt --profiles-dir dbt --target dev --select <modelo>`.
+  O projeto inteiro processa cerca de 7,7 GiB; a cota é de 30 GiB por dia.
+- LGPD: CPF completo só até `intermediate`. Nos marts, todo CPF sai mascarado (`***.456.789-**`),
+  inclusive dentro de nomes; o teste `sem_cpf_completo` roda em todos os marts.
+- Históricos (`int_cgu__sancoes_eventos`, `int_parlamentares__eventos`) são permanentes: o raw só
+  guarda 60 dias de snapshots, e um `--full-refresh` comum é ignorado nesses modelos. Datas
+  carregadas fora de ordem (anteriores à última já processada de cada cadastro ou casa) também
+  só entram por reconstrução. Para reconstruir a partir dos originais: recarregue cada data no
+  replay (`coletor recarregar <recurso> --competencia <data> --destino replay`) e rode
+  `dbt build --full-refresh --vars "{fonte_historico: replay}" --select +int_cgu__sancoes_eventos+ +int_parlamentares__eventos+`.
+  O `+` inicial reconstrói as views de staging apontando para o replay; o build diário seguinte
+  as devolve ao raw.
+- Alertas são indícios para investigar, não constatações: a cota reembolsa gastos do parlamentar
+  (não é contratação pública) e só aparecem sanções vistas desde a primeira coleta.
+
 ## Operação
 
 - **Execução diária:** Cloud Scheduler `pipeline-diario` às 07:30 (Brasília) dispara o Cloud Run Job

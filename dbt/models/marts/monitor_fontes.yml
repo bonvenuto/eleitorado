@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: monitor_fontes
+    columns:
+      - name: recurso_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: monitor_sem_alteracao_conta_como_sucesso
+    description: >
+      `sem_alteracao` é sucesso (o raw não recebe carga, mas a fonte foi conferida); uma falha
+      depois não apaga o último sucesso; recargas no replay não contam; recurso sem coleta
+      aparece com último sucesso nulo.
+    model: monitor_fontes
+    given:
+      - input: source('meta', 'coletas')
+        rows:
+          - {orgao: cgu, recurso: ceis, destino: raw, status: sem_alteracao, iniciada_em: '2026-10-03 10:00:00', finalizada_em: '2026-10-03 10:01:00'}
+          - {orgao: cgu, recurso: ceis, destino: raw, status: falha, iniciada_em: '2026-10-04 10:00:00', finalizada_em: '2026-10-04 10:01:00'}
+          - {orgao: cgu, recurso: ceis, destino: replay, status: recarregada, iniciada_em: '2026-10-04 11:00:00', finalizada_em: '2026-10-04 11:01:00'}
+      - input: source('meta', 'fontes')
+        rows:
+          - {recurso_id: cgu.ceis, cadencia_corrente: diaria}
+          - {recurso_id: cgu.cnep, cadencia_corrente: semanal}
+    expect:
+      rows:
+        - {recurso_id: cgu.ceis, ultima_coleta: '2026-10-04 10:00:00', ultimo_sucesso: '2026-10-03 10:01:00', status_ultima_coleta: falha, limite_aviso_horas: 30, limite_erro_horas: 54}
+        - {recurso_id: cgu.cnep, ultima_coleta: null, ultimo_sucesso: null, status_ultima_coleta: null, limite_aviso_horas: 192, limite_erro_horas: 240}

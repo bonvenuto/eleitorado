@@ -1,0 +1,27 @@
+-- Histórico SCD2 das sanções: cada evento abre uma versão que vale até o próximo evento.
+select
+    evento_id,
+    sancao_id,
+    cadastro,
+    evento,
+    data_evento as valido_de,
+    lead(data_evento) over (partition by sancao_id order by data_evento) as valido_ate,
+    tipo_pessoa,
+    {{ documento_publico('documento') }} as sancionado_documento,
+    {{ cnpj_raiz('documento') }} as sancionado_cnpj_raiz,
+    {{ mascarar_cpfs_em_texto('nome_sancionado') }} as sancionado_nome,
+    {{ mascarar_cpfs_em_texto('razao_social_receita') }} as razao_social_receita,
+    categoria,
+    valor_multa,
+    abrangencia,
+    fundamentacao_legal,
+    numero_processo,
+    data_inicio,
+    data_fim,
+    data_publicacao,
+    data_transito_julgado,
+    orgao_sancionador,
+    uf_orgao_sancionador,
+    esfera_orgao_sancionador,
+    _coleta_id
+from {{ ref('int_cgu__sancoes_eventos') }}

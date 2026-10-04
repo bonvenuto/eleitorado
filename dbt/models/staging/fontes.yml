@@ -1,0 +1,42 @@
+version: 2
+
+# O raw e o meta são sempre os de produção, também em dev (seção 5.3 da spec).
+sources:
+  - name: raw_camara
+    database: "{{ env_var('ELEITORADO_PROJETO') }}"
+    schema: raw_camara
+    tables:
+      - name: ceap
+      - name: deputados
+  - name: raw_senado
+    database: "{{ env_var('ELEITORADO_PROJETO') }}"
+    schema: raw_senado
+    tables:
+      - name: ceaps
+      - name: senadores
+  - name: raw_cgu
+    database: "{{ env_var('ELEITORADO_PROJETO') }}"
+    schema: raw_cgu
+    tables:
+      - name: ceis
+      - name: cnep
+  - name: raw_ibge
+    database: "{{ env_var('ELEITORADO_PROJETO') }}"
+    schema: raw_ibge
+    tables:
+      - name: municipios
+  # snapshots recarregados dos originais para reconstruir os históricos (seção 7.4)
+  - name: replay
+    database: "{{ env_var('ELEITORADO_PROJETO') }}"
+    schema: replay
+    tables:
+      - name: cgu__ceis
+      - name: cgu__cnep
+      - name: camara__deputados
+      - name: senado__senadores
+  - name: meta
+    database: "{{ env_var('ELEITORADO_PROJETO') }}"
+    schema: meta
+    tables:
+      - name: coletas
+      - name: fontes

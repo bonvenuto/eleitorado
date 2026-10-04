@@ -45,7 +45,11 @@ def _schemas(projeto, target: str) -> dict[str, str]:
         env={**__import__("os").environ, "ELEITORADO_PROJETO": "projeto-teste"},
     )
     linhas = [json.loads(linha) for linha in saida.stdout.splitlines() if linha.startswith("{")]
-    return {linha["name"]: linha["schema"] for linha in linhas}
+    return {
+        linha["name"]: linha["schema"]
+        for linha in linhas
+        if linha["name"] in ("com_schema", "sem_schema")
+    }
 
 
 def test_schemas_em_producao_sao_os_configurados(projeto):
@@ -58,3 +62,16 @@ def test_schemas_em_dev_levam_o_prefixo_do_usuario(projeto, monkeypatch):
         "com_schema": "dev_angelo_staging",
         "sem_schema": "dev_angelo",
     }
+
+
+def test_schemas_em_ci_ficam_todos_no_dataset_do_ci(projeto):
+    assert _schemas(projeto, "ci") == {"com_schema": "ci", "sem_schema": "ci"}
+
+
+def test_target_ci_nao_define_quota_project():
+    # No CI a credencial é federada (WIF): com quota_project, a troca de credenciais exige
+    # serviceusage da identidade federada e falha com 403 (mesmo caso do coletor, PR #4).
+    import yaml
+
+    perfil = yaml.safe_load((RAIZ / "dbt" / "profiles.yml").read_text(encoding="utf-8"))
+    assert "quota_project" not in perfil["eleitorado"]["outputs"]["ci"]

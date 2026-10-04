@@ -61,6 +61,19 @@ resource "google_bigquery_dataset" "ci" {
   depends_on                  = [google_project_service.apis]
 }
 
+# Camadas do dbt em produção (em dev, o dbt cria dev_<usuario>_* com a conta de quem roda)
+locals {
+  datasets_dbt = ["staging", "intermediate", "marts"]
+}
+
+resource "google_bigquery_dataset" "dbt" {
+  for_each    = toset(local.datasets_dbt)
+  dataset_id  = each.value
+  location    = var.regiao
+  description = "Eleitorado (dbt): ${each.value}"
+  depends_on  = [google_project_service.apis]
+}
+
 output "bucket_dados" {
   value = google_storage_bucket.dados.name
 }

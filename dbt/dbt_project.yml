@@ -7,3 +7,18 @@ model-paths: ["models"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
 clean-targets: ["target", "dbt_packages"]
+
+models:
+  eleitorado:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: table
+    marts:
+      +schema: marts
+      +materialized: table
+
+flags:
+  send_anonymous_usage_stats: false

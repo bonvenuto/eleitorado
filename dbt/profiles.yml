@@ -22,11 +22,11 @@ eleitorado:
       threads: 4
       maximum_bytes_billed: 10737418240
       job_execution_timeout_seconds: 900
+    # ci: só no GitHub, com credencial federada (WIF), que não aceita quota_project
     ci:
       type: bigquery
       method: oauth
       project: "{{ env_var('ELEITORADO_PROJETO') }}"
-      quota_project: "{{ env_var('ELEITORADO_PROJETO') }}"
       dataset: ci
       location: southamerica-east1
       threads: 4

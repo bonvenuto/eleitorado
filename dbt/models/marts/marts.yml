@@ -1,0 +1,94 @@
+version: 2
+
+# Todos os marts passam pelo `sem_cpf_completo` (seção 7.6 da spec).
+models:
+  - name: dim_uf
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: uf_sigla
+        data_tests: [unique, not_null]
+
+  - name: dim_municipio
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: municipio_id
+        data_tests: [unique, not_null]
+      - name: uf_sigla
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_uf'), field: uf_sigla}
+
+  - name: dim_parlamentar
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [url_foto]}
+    columns:
+      - name: parlamentar_id
+        data_tests: [unique, not_null]
+      - name: casa
+        data_tests:
+          - accepted_values:
+              arguments: {values: [camara, senado]}
+      - name: uf_sigla
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_uf'), field: uf_sigla}
+
+  - name: fct_despesa_cota_parlamentar
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [numero_documento, url_documento]}
+    columns:
+      - name: despesa_id
+        data_tests: [unique, not_null]
+      - name: casa
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [camara, senado]}
+      - name: parlamentar_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_parlamentar'), field: parlamentar_id}
+              config: {severity: warn}
+      - name: uf_sigla
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_uf'), field: uf_sigla}
+      - name: tipo_beneficiario
+        data_tests:
+          - accepted_values:
+              arguments: {values: [parlamentar, lideranca]}
+      - name: fornecedor_tipo_documento
+        data_tests:
+          - accepted_values:
+              arguments: {values: [CPF, CNPJ, CPF_MASCARADO, CODIGO_CAMARA, INVALIDO]}
+
+  - name: fct_sancao
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [numero_processo]}
+    columns:
+      - name: sancao_id
+        data_tests: [unique, not_null]
+      - name: cadastro
+        data_tests:
+          - accepted_values:
+              arguments: {values: [CEIS, CNEP]}
+      - name: tipo_pessoa
+        data_tests:
+          - accepted_values:
+              arguments: {values: [F, J]}
+
+  - name: fct_sancao_historico
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [numero_processo]}
+    columns:
+      - name: evento_id
+        data_tests: [unique, not_null]
+      - name: evento
+        data_tests:
+          - accepted_values:
+              arguments: {values: [inclusao, alteracao, exclusao]}
