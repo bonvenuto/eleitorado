@@ -14,6 +14,7 @@ from coletor.agenda import Tarefa, tarefa_snapshot, tarefas_pendentes
 from coletor.coleta import EXPIRACAO_SNAPSHOT_DIAS, Dependencias, recarregar
 from coletor.competencias import Competencia, data_brasilia
 from coletor.config import Config, ErroConfig, carregar_config
+from coletor.dbt import ResultadoDbt, rodar_dbt
 from coletor.execucao import ResumoColetas, registro_execucao, rodar
 from coletor.manifesto import ErroManifesto, Manifesto, carregar_manifesto
 from coletor.meta import HistoricoColetas, RepositorioMeta
@@ -21,6 +22,7 @@ from coletor.meta import HistoricoColetas, RepositorioMeta
 log = logging.getLogger("coletor")
 
 Fabrica = Callable[[Config], Dependencias]
+RodarDbt = Callable[[Path, str], ResultadoDbt]
 
 
 class ErroUso(Exception):
@@ -48,6 +50,13 @@ def _parser() -> argparse.ArgumentParser:
     coletar.add_argument("--ate", type=int, help="último ano do intervalo (padrão: ano atual)")
     coletar.add_argument("--forcar", action="store_true")
 
+    pipeline = sub.add_parser("pipeline", help="coleta o que está vencido e roda o dbt build")
+    pipeline.add_argument("--recursos", help="ids separados por vírgula (padrão: todos)")
+    pipeline.add_argument("--dbt-dir", type=Path, default=Path("dbt"), help="projeto dbt")
+    pipeline.add_argument("--target", default="prod", help="target do dbt")
+
+    sub.add_parser("vigia", help="falha se a execução agendada de hoje não teve sucesso")
+
     recarga = sub.add_parser("recarregar", help="refaz a carga a partir do original no GCS")
     recarga.add_argument("recurso")
     recarga.add_argument("--competencia", required=True)
@@ -63,20 +72,30 @@ def _rodar_tarefas(
     repo: RepositorioMeta,
     inicio: datetime,
     forcar: bool,
+    dbt: Callable[[], ResultadoDbt] | None = None,
 ) -> int:
+    """Roda as coletas e, se pedido, o dbt; a execução é sempre registrada."""
     execucao_id = str(uuid.uuid4())
     resumo = ResumoColetas()
+    resultado_dbt: ResultadoDbt | None = None
     try:
         resumo = rodar(tarefas, historico, deps, repo, execucao_id, forcar)
     except Exception:
-        log.exception("execução interrompida")
+        log.exception("coletas interrompidas")
         resumo.contar("falha")
+    try:
+        if dbt is not None:
+            resultado_dbt = ResultadoDbt("falha", None)
+            resultado_dbt = dbt()
+    except Exception:
+        log.exception("dbt interrompido")
     finally:
         repo.registrar_execucao(
-            registro_execucao(execucao_id, deps.config.origem, deps, inicio, resumo)
+            registro_execucao(execucao_id, deps.config.origem, deps, inicio, resumo, resultado_dbt)
         )
-    log.info("resumo: %s", resumo)
-    return 0 if resumo.sucesso else 1
+    log.info("resumo: %s dbt: %s", resumo, resultado_dbt)
+    dbt_ok = resultado_dbt is None or resultado_dbt.status == "sucesso"
+    return 0 if resumo.sucesso and dbt_ok else 1
 
 
 def _fontes(manifesto: Manifesto, repo: RepositorioMeta) -> int:
@@ -101,6 +120,42 @@ def _executar(
     tarefas = tarefas_pendentes(recursos, historico, data_brasilia(inicio))
     log.info("%d tarefa(s) pendente(s)", len(tarefas))
     return _rodar_tarefas(tarefas, historico, deps, repo, inicio, args.forcar)
+
+
+def _pipeline(
+    args: argparse.Namespace,
+    manifesto: Manifesto,
+    deps: Dependencias,
+    repo: RepositorioMeta,
+    rodar_dbt_: RodarDbt,
+) -> int:
+    if args.recursos:
+        recursos = [manifesto.obter(item.strip()) for item in args.recursos.split(",")]
+    else:
+        recursos = manifesto.todos()
+    inicio = deps.agora()
+    repo.publicar_fontes(manifesto, inicio)
+    historico = repo.carregar_historico()
+    tarefas = tarefas_pendentes(recursos, historico, data_brasilia(inicio))
+    log.info("%d tarefa(s) pendente(s)", len(tarefas))
+    return _rodar_tarefas(
+        tarefas,
+        historico,
+        deps,
+        repo,
+        inicio,
+        False,
+        dbt=lambda: rodar_dbt_(args.dbt_dir, args.target),
+    )
+
+
+def _vigia(deps: Dependencias, repo: RepositorioMeta) -> int:
+    hoje = data_brasilia(deps.agora())
+    if repo.execucao_agendada_com_sucesso(hoje):
+        log.info("execução agendada de %s terminou com sucesso", hoje.isoformat())
+        return 0
+    print(f"erro: nenhuma execução agendada com sucesso em {hoje.isoformat()}", file=sys.stderr)
+    return 1
 
 
 def _coletar(
@@ -181,6 +236,7 @@ def main(
     argv: list[str] | None = None,
     fabrica: Fabrica | None = None,
     env: Mapping[str, str] | None = None,
+    dbt: RodarDbt | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -195,7 +251,11 @@ def main(
             fabrica = montar_dependencias
         deps = fabrica(config)
         repo = RepositorioMeta(deps.warehouse, config)
+        if args.comando == "vigia":
+            return _vigia(deps, repo)  # conta do vigia só lê: não cria tabelas
         repo.preparar()
+        if args.comando == "pipeline":
+            return _pipeline(args, manifesto, deps, repo, dbt or rodar_dbt)
         if args.comando == "fontes":
             return _fontes(manifesto, repo)
         if args.comando == "executar":
