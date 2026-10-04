@@ -43,7 +43,12 @@ concat('***.', substr({{ doc }}, 4, 3), '.', substr({{ doc }}, 7, 3), '-**')
 
 {#- documento que pode ir para os marts: CPF sempre mascarado -#}
 {% macro documento_publico(doc) -%}
-if({{ tipo_documento(doc) }} = 'CPF', {{ mascarar_cpf(doc) }}, {{ doc }})
+case
+    when {{ tipo_documento(doc) }} = 'CPF' then {{ mascarar_cpf(doc) }}
+    -- 9 ou 10 dígitos: provável CPF que perdeu os zeros à esquerda
+    when regexp_contains({{ doc }}, r'^[0-9]{9,10}$') then {{ mascarar_cpf("lpad(" ~ doc ~ ", 11, '0')") }}
+    else {{ doc }}
+end
 {%- endmacro %}
 
 {% macro cnpj_raiz(doc) -%}

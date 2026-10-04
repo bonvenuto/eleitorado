@@ -13,18 +13,29 @@
 
     origem: relação com uma linha por (chave, data_referencia), as colunas de `atributos`,
             `hash_atributos` e `_coleta_id`.
+    particao: coluna (também em `atributos`) que separa recursos coletados de forma independente,
+            como o cadastro (CEIS/CNEP) ou a casa (Câmara/Senado). Cada partição tem a própria
+            sequência de datas: um dia em que só uma delas foi carregada não gera exclusões na outra.
 -#}
-{% macro eventos_de_snapshots(origem, chave, atributos) -%}
+{% macro eventos_de_snapshots(origem, chave, atributos, particao) -%}
 
 with novos as (
-    select * from {{ origem }}
+    select o.*
+    from {{ origem }} as o
     {% if is_incremental() %}
-    where data_referencia > (select coalesce(max(data_evento), date '1900-01-01') from {{ this }})
+    left join (
+        select {{ particao }} as _particao, max(data_evento) as _ultima_data
+        from {{ this }}
+        group by 1
+    ) as processadas
+        on processadas._particao is not distinct from o.{{ particao }}
+    where o.data_referencia > coalesce(processadas._ultima_data, date '1900-01-01')
     {% endif %}
 ),
 
 presencas as (
     select
+        {{ particao }} as _particao,
         {{ chave }},
         data_referencia,
         struct(
@@ -37,6 +48,7 @@ presencas as (
     -- estado vigente já gravado, como se fosse um snapshot anterior a todas as datas novas;
     -- uma chave cuja última versão é exclusão conta como ausente
     select
+        {{ particao }} as _particao,
         {{ chave }},
         date '0001-01-01' as data_referencia,
         struct(
@@ -51,17 +63,19 @@ presencas as (
 ),
 
 datas as (
-    select distinct data_referencia from presencas
+    select distinct _particao, data_referencia from presencas
 ),
 
 chaves as (
-    select distinct {{ chave }} from presencas
+    select distinct _particao, {{ chave }} from presencas
 ),
 
+-- cada chave só é comparada nas datas da sua partição
 grade as (
     select c.{{ chave }}, d.data_referencia, p.estado
     from chaves as c
-    cross join datas as d
+    join datas as d
+        on d._particao is not distinct from c._particao
     left join presencas as p
         on p.{{ chave }} = c.{{ chave }} and p.data_referencia = d.data_referencia
 ),

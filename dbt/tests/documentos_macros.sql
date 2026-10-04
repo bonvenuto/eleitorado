@@ -9,6 +9,7 @@ with casos as (
         struct('12.ABC.345/01DE-35', 'CNPJ', true),
         struct('12abc34501de35', 'CNPJ', true),
         struct('1234567890123', 'INVALIDO', false),
+        struct('123456789', 'INVALIDO', false),
         -- pontuação fora do lugar não importa: só os caracteres contam
         struct('071.414.740/0010-0', 'CNPJ', true),
         struct(cast(null as string), cast(null as string), cast(null as bool))
@@ -37,3 +38,5 @@ where tipo_obtido is distinct from tipo
     or (tipo = 'CPF' and publico_obtido != concat('***.', substr(documento, 4, 3), '.', substr(documento, 7, 3), '-**'))
     or (tipo = 'CPF' and texto_obtido != concat('JOSE DA SILVA ', publico_obtido))
     or (tipo = 'CNPJ' and texto_obtido != concat('JOSE DA SILVA ', entrada))
+    -- CPF que perdeu zeros à esquerda (9 ou 10 dígitos) também sai mascarado
+    or (entrada = '123456789' and publico_obtido != '***.234.567-**')

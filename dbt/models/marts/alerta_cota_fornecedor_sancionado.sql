@@ -14,7 +14,8 @@ sancoes as (
         sancao_id, cadastro, tipo_pessoa, documento,
         {{ tipo_documento('documento') }} as tipo_documento,
         {{ cnpj_raiz('documento') }} as cnpj_raiz,
-        nome_sancionado, categoria, abrangencia, orgao_sancionador, data_inicio, data_fim, _coleta_id
+        nome_sancionado, categoria, abrangencia, orgao_sancionador, data_inicio, data_fim, _coleta_id,
+        data_evento
     from {{ ref('int_cgu__sancoes_eventos') }}
     where evento != 'exclusao' and data_inicio is not null
 ),
@@ -43,7 +44,8 @@ cruzadas as (
         s.data_inicio as sancao_data_inicio,
         s.data_fim as sancao_data_fim,
         d._coleta_id as despesa_coleta_id,
-        s._coleta_id as sancao_coleta_id
+        s._coleta_id as sancao_coleta_id,
+        s.data_evento as sancao_data_evento
     from despesas as d
     join sancoes as s
         on (
@@ -57,12 +59,12 @@ cruzadas as (
 
 select
     to_hex(md5(concat('cota_fornecedor_sancionado|', despesa_id, '|', sancao_id))) as alerta_id,
-    *,
+    * except (sancao_data_evento),
     'Despesa de cota com fornecedor que tinha sanção vigente no CEIS/CNEP na data de emissão '
     || '(correspondência por CPF, CNPJ ou raiz do CNPJ)' as regra
 from cruzadas
--- uma linha por (despesa, sanção), preferindo o CNPJ completo à raiz
+-- uma linha por (despesa, sanção): CNPJ completo antes da raiz, versão mais recente da sanção
 qualify row_number() over (
     partition by despesa_id, sancao_id
-    order by if(tipo_correspondencia = 'cnpj_raiz', 1, 0), sancao_coleta_id
+    order by if(tipo_correspondencia = 'cnpj_raiz', 1, 0), sancao_data_evento desc
 ) = 1

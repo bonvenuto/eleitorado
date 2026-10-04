@@ -56,9 +56,14 @@ terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO"
   O projeto inteiro processa cerca de 7,7 GiB; a cota é de 30 GiB por dia.
 - LGPD: CPF completo só até `intermediate`. Nos marts, todo CPF sai mascarado (`***.456.789-**`),
   inclusive dentro de nomes; o teste `sem_cpf_completo` roda em todos os marts.
-- Reconstruir os históricos a partir dos originais: recarregue cada data no replay
-  (`coletor recarregar <recurso> --competencia <data> --destino replay`) e rode
-  `dbt build --full-refresh --vars "{fonte_historico: replay}" --select int_cgu__sancoes_eventos+ int_parlamentares__eventos+`.
+- Históricos (`int_cgu__sancoes_eventos`, `int_parlamentares__eventos`) são permanentes: o raw só
+  guarda 60 dias de snapshots, e um `--full-refresh` comum é ignorado nesses modelos. Datas
+  carregadas fora de ordem (anteriores à última já processada de cada cadastro ou casa) também
+  só entram por reconstrução. Para reconstruir a partir dos originais: recarregue cada data no
+  replay (`coletor recarregar <recurso> --competencia <data> --destino replay`) e rode
+  `dbt build --full-refresh --vars "{fonte_historico: replay}" --select +int_cgu__sancoes_eventos+ +int_parlamentares__eventos+`.
+  O `+` inicial reconstrói as views de staging apontando para o replay; o build diário seguinte
+  as devolve ao raw.
 - Alertas são indícios para investigar, não constatações: a cota reembolsa gastos do parlamentar
   (não é contratação pública) e só aparecem sanções vistas desde a primeira coleta.
 

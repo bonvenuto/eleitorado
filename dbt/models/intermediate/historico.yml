@@ -58,3 +58,42 @@ unit_tests:
       rows:
         - {sancao_id: 'ceis:B', data_evento: '2026-10-02', evento: exclusao, _coleta_id: c1}
         - {sancao_id: 'ceis:C', data_evento: '2026-10-02', evento: inclusao, _coleta_id: c2}
+
+  - name: eventos_por_cadastro_com_datas_diferentes
+    description: >
+      Cada cadastro tem sua própria sequência de datas: um dia em que só o CEIS foi carregado
+      não exclui as sanções do CNEP, e um CNEP atrasado (data já vista no CEIS) ainda é lido.
+    model: int_cgu__sancoes_eventos
+    overrides:
+      macros: {is_incremental: false}
+    given:
+      - input: ref('stg_cgu__sancoes')
+        rows:
+          - {sancao_id: 'ceis:A', cadastro: CEIS, data_referencia: '2026-10-01', hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'cnep:X', cadastro: CNEP, data_referencia: '2026-10-01', hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'ceis:A', cadastro: CEIS, data_referencia: '2026-10-02', hash_atributos: h1, _coleta_id: c2}
+    expect:
+      rows:
+        - {sancao_id: 'ceis:A', data_evento: '2026-10-01', evento: inclusao}
+        - {sancao_id: 'cnep:X', data_evento: '2026-10-01', evento: inclusao}
+
+  - name: eventos_incremental_por_cadastro
+    description: >
+      No incremental, o corte é a última data de cada cadastro: o CNEP de 02/10 é processado
+      mesmo com o CEIS já em 02/10.
+    model: int_cgu__sancoes_eventos
+    overrides:
+      macros: {is_incremental: true}
+    given:
+      - input: this
+        rows:
+          - {sancao_id: 'ceis:A', cadastro: CEIS, data_evento: '2026-10-01', evento: inclusao, hash_atributos: h1, _coleta_id: c1}
+          - {sancao_id: 'ceis:B', cadastro: CEIS, data_evento: '2026-10-02', evento: inclusao, hash_atributos: h1, _coleta_id: c2}
+          - {sancao_id: 'cnep:X', cadastro: CNEP, data_evento: '2026-10-01', evento: inclusao, hash_atributos: h1, _coleta_id: c1}
+      - input: ref('stg_cgu__sancoes')
+        rows:
+          - {sancao_id: 'cnep:Y', cadastro: CNEP, data_referencia: '2026-10-02', hash_atributos: h1, _coleta_id: c3}
+    expect:
+      rows:
+        - {sancao_id: 'cnep:X', data_evento: '2026-10-02', evento: exclusao}
+        - {sancao_id: 'cnep:Y', data_evento: '2026-10-02', evento: inclusao}

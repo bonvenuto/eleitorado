@@ -1,8 +1,10 @@
+{#- histórico permanente: --full-refresh só reconstrói a partir do replay (seção 7.4) -#}
 {{
     config(
         materialized='incremental',
         incremental_strategy='merge',
         unique_key='evento_id',
+        full_refresh=(var('fonte_historico', 'raw') == 'replay'),
         partition_by={'field': 'data_evento', 'data_type': 'date', 'granularity': 'month'},
         cluster_by=['sancao_id'],
     )
@@ -19,4 +21,5 @@
         'data_transito_julgado', 'abrangencia', 'orgao_sancionador', 'uf_orgao_sancionador',
         'esfera_orgao_sancionador', 'fundamentacao_legal', 'numero_processo',
     ],
+    particao='cadastro',
 ) }}
