@@ -47,8 +47,16 @@ terraform -chdir=infra init "-backend-config=bucket=$($env:ELEITORADO_PROJETO)-t
 terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO"
 ```
 
-### Até a coleta agendada (Plano 2)
+## Operação
 
-A CGU só publica o arquivo do dia do CEIS e do CNEP. Até o job diário existir, rode
-`uv run --env-file .env.prod coletor executar` uma vez por dia para não perder dias do
-histórico de sanções.
+- **Execução diária:** Cloud Scheduler `pipeline-diario` às 07:30 (Brasília) dispara o Cloud Run Job
+  `pipeline`, que roda `coletor pipeline` (coleta + `dbt build`) e grava `meta.execucoes`.
+- **Deploy:** cada push em `main` publica a imagem no Artifact Registry e atualiza o job
+  (`.github/workflows/deploy.yml`).
+- **Vigia:** às 10:00 (Brasília), `.github/workflows/vigia.yml` roda `coletor vigia`; se não houve
+  execução agendada com sucesso no dia, o workflow falha e o GitHub avisa por e-mail.
+- **Travas de custo:** orçamento de R$ 30/mês com alertas em 50/90/100% (sem créditos), cota de
+  30 GiB consultados por dia no BigQuery e `maximum_bytes_billed` de 10 GiB no dbt.
+- **Primeiro dia após um deploy feito depois das 07:30:** o vigia das 10:00 reprova porque ainda não
+  houve execução agendada da imagem nova; rode o job à mão logo após o deploy.
+- **Rodar o job à mão:** `gcloud run jobs execute pipeline --region southamerica-east1 --wait`.

@@ -1,0 +1,28 @@
+name: vigia
+
+on:
+  schedule:
+    - cron: "0 13 * * *" # 10:00 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  vigia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --no-dev
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_CI }}
+      - name: execução agendada de hoje terminou com sucesso?
+        run: uv run coletor vigia
+        env:
+          ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}
+          ELEITORADO_BUCKET: ${{ vars.GCP_PROJETO }}-dados
+          ELEITORADO_AMBIENTE: prod

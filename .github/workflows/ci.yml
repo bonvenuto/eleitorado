@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+      - name: dbt parse (sem conexão)
+        run: uv run dbt parse --project-dir dbt --profiles-dir dbt --target ci
+        env:
+          ELEITORADO_PROJETO: ci-sem-conexao
+
+  imagem:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build da imagem (sem publicar)
+        run: docker build --build-arg VERSAO=${{ github.sha }} -t pipeline:ci .
+      - name: a imagem responde
+        run: docker run --rm pipeline:ci --help

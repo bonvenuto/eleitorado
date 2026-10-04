@@ -1,0 +1,34 @@
+# Sem segredos: autenticação por ADC (local) ou pela conta de serviço (Cloud Run).
+eleitorado:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('ELEITORADO_PROJETO') }}"
+      quota_project: "{{ env_var('ELEITORADO_PROJETO') }}"
+      dataset: "dev_{{ env_var('ELEITORADO_USUARIO_DBT', 'local') }}"
+      location: southamerica-east1
+      threads: 4
+      maximum_bytes_billed: 10737418240
+      job_execution_timeout_seconds: 900
+    prod:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('ELEITORADO_PROJETO') }}"
+      quota_project: "{{ env_var('ELEITORADO_PROJETO') }}"
+      dataset: marts
+      location: southamerica-east1
+      threads: 4
+      maximum_bytes_billed: 10737418240
+      job_execution_timeout_seconds: 900
+    ci:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('ELEITORADO_PROJETO') }}"
+      quota_project: "{{ env_var('ELEITORADO_PROJETO') }}"
+      dataset: ci
+      location: southamerica-east1
+      threads: 4
+      maximum_bytes_billed: 10737418240
+      job_execution_timeout_seconds: 900
