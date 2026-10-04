@@ -31,3 +31,29 @@ jobs:
         run: docker build --build-arg VERSAO=${{ github.sha }} -t pipeline:ci .
       - name: a imagem responde
         run: docker run --rm pipeline:ci --help
+
+  dbt-unitarios:
+    runs-on: ubuntu-latest
+    # um de cada vez: todas as execuções usam o mesmo dataset ci
+    concurrency:
+      group: dbt-ci
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_CI }}
+      - name: relações vazias no dataset ci
+        run: uv run dbt run --empty --project-dir dbt --profiles-dir dbt --target ci
+        env:
+          ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}
+      - name: testes unitários do dbt
+        run: uv run dbt test --select "test_type:unit" --project-dir dbt --profiles-dir dbt --target ci
+        env:
+          ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}

@@ -66,6 +66,13 @@ resource "google_bigquery_dataset_iam_member" "pipeline_editor" {
   member     = "serviceAccount:${google_service_account.pipeline.email}"
 }
 
+resource "google_bigquery_dataset_iam_member" "pipeline_edita_dbt" {
+  for_each   = toset(local.datasets_dbt)
+  dataset_id = google_bigquery_dataset.dbt[each.key].dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_service_account.pipeline.email}"
+}
+
 resource "google_storage_bucket_iam_member" "pipeline_cria_objetos" {
   bucket = google_storage_bucket.dados.name
   role   = "roles/storage.objectCreator"
