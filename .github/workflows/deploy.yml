@@ -1,0 +1,46 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  REGIAO: southamerica-east1
+  IMAGEM: southamerica-east1-docker.pkg.dev/${{ vars.GCP_PROJETO }}/eleitorado/pipeline:${{ github.sha }}
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
+  deploy:
+    needs: testes # não publica imagem com testes vermelhos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker "$REGIAO-docker.pkg.dev" --quiet
+      - run: docker build --build-arg VERSAO=${{ github.sha }} -t "$IMAGEM" .
+      - run: docker push "$IMAGEM"
+      - run: >-
+          gcloud run jobs update pipeline
+          --project "${{ vars.GCP_PROJETO }}" --region "$REGIAO" --image "$IMAGEM"

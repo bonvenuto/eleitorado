@@ -315,6 +315,15 @@ class RepositorioMeta:
         ]
         self._warehouse.substituir_linhas(self.tabela_fontes, linhas, COLUNAS_FONTES)
 
+    def execucao_agendada_com_sucesso(self, dia: date) -> bool:
+        sql = (
+            f"SELECT COUNT(*) AS n FROM `{self._config.projeto}.{self.tabela_execucoes}` "
+            "WHERE origem = 'agendada' AND status = 'sucesso' "
+            f"AND DATE(iniciada_em, 'America/Sao_Paulo') = '{dia.isoformat()}'"
+        )
+        linhas = self._warehouse.consultar(sql)
+        return bool(linhas) and int(linhas[0]["n"]) > 0
+
     def buscar_coleta(self, coleta_id: str) -> dict[str, Any] | None:
         """Identificação e original de uma coleta: orgao, recurso, competencia, status."""
         coleta_id = str(uuid.UUID(coleta_id))  # valida o formato antes de montar o SQL

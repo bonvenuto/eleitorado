@@ -8,6 +8,7 @@ from datetime import datetime
 
 from coletor.agenda import Tarefa
 from coletor.coleta import Dependencias, coletar
+from coletor.dbt import ResultadoDbt
 from coletor.meta import HistoricoColetas, RegistroColeta, RegistroExecucao, RepositorioMeta
 
 log = logging.getLogger(__name__)
@@ -80,16 +81,20 @@ def registro_execucao(
     deps: Dependencias,
     inicio: datetime,
     resumo: ResumoColetas,
+    dbt: ResultadoDbt | None = None,
 ) -> RegistroExecucao:
+    sucesso = resumo.sucesso and (dbt is None or dbt.status == "sucesso")
     return RegistroExecucao(
         execucao_id=execucao_id,
         origem=origem,
         iniciada_em=inicio,
         finalizada_em=deps.agora(),
-        status="sucesso" if resumo.sucesso else "falha",
+        status="sucesso" if sucesso else "falha",
         coletas_carregadas=resumo.carregadas,
         coletas_sem_alteracao=resumo.sem_alteracao,
         coletas_nao_publicadas=resumo.nao_publicadas,
         coletas_falha=resumo.falhas,
         versao=deps.config.versao,
+        dbt_status=dbt.status if dbt else None,
+        dbt_testes_com_erro=dbt.testes_com_erro if dbt else None,
     )
