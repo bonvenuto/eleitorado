@@ -1,34 +1,37 @@
-"""Testes contra o GCP e as fontes reais. Rodar com: uv run --env-file .env pytest -m integracao"""
+"""Testes contra o GCS e as fontes reais.
 
-import uuid
-from datetime import UTC, datetime
+Rodar com: uv run --env-file .env pytest -m integracao
+
+Usam o prefixo `dev/` do bucket e um lago local temporário.
+"""
+
+import os
+from dataclasses import replace
 
 import pytest
 
+from coletor import estado
 from coletor.coleta import coletar
-from coletor.competencias import data_brasilia
 from coletor.config import Config, carregar_config
-from coletor.conversao import Controle, csv_para_parquet
 from coletor.gcp import montar_dependencias
-from coletor.manifesto import Formato, carregar_manifesto
+from coletor.manifesto import carregar_manifesto
 from coletor.meta import RepositorioMeta
-from coletor.warehouse import Particionamento
 from tests.amostras import RAIZ
 
 pytestmark = pytest.mark.integracao
 
 
 @pytest.fixture
-def config_dev() -> Config:
+def config_dev(tmp_path) -> Config:
     config = carregar_config()
     assert config.ambiente == "dev", "os testes de integração só rodam com ELEITORADO_AMBIENTE=dev"
-    return config
+    return replace(config, lago=tmp_path / "lago", publico=tmp_path / "publico")
 
 
 def test_coleta_real_do_cnep_e_idempotente(config_dev):
     deps = montar_dependencias(config_dev)
     try:
-        repo = RepositorioMeta(deps.warehouse, config_dev)
+        repo = RepositorioMeta(deps.warehouse)
         repo.preparar()
         cnep = carregar_manifesto(RAIZ / "fontes").obter("cgu.cnep")
         historico = repo.carregar_historico()
@@ -36,9 +39,10 @@ def test_coleta_real_do_cnep_e_idempotente(config_dev):
         repo.registrar_coleta(primeira)
         assert primeira.status == "carregada", primeira.erro
         assert primeira.linhas > 1000
-        tabela = f"{config_dev.projeto}.{config_dev.dataset('raw_cgu')}.cnep"
         [contagem] = deps.warehouse.consultar(
-            f"SELECT COUNT(*) AS n FROM `{tabela}` WHERE _coleta_id = '{primeira.coleta_id}'"
+            "select count(*) as n from read_parquet("
+            f"'{config_dev.lago.as_posix()}/raw/cgu/cnep/*/*.parquet') "
+            f"where _coleta_id = '{primeira.coleta_id}'"
         )
         assert contagem["n"] == primeira.linhas
         historico.registrar(primeira)
@@ -49,28 +53,22 @@ def test_coleta_real_do_cnep_e_idempotente(config_dev):
         deps.http.fechar()
 
 
-def test_coluna_nova_e_coluna_ausente_entre_cargas(config_dev, tmp_path):
-    from google.cloud import bigquery
-
+def test_estado_vai_ao_gcs_e_volta_para_um_lago_vazio(config_dev, tmp_path):
     deps = montar_dependencias(config_dev)
-    tabela = f"{config_dev.dataset('raw_cgu')}.teste_evolucao_{uuid.uuid4().hex[:8]}"
-    dia = data_brasilia(datetime.now(UTC))
+    prefixo = f"dev/teste-estado-{os.getpid()}/"
+    arquivo = config_dev.lago / "raw" / "teste" / "x" / "20261004" / "a.parquet"
+    arquivo.parent.mkdir(parents=True)
+    arquivo.write_bytes(b"conteudo")
+    banco = tmp_path / "banco.duckdb"
     try:
-        for indice, cabecalho in enumerate(["A;B", "A;C"]):
-            csv = tmp_path / f"{indice}.csv"
-            csv.write_text(f"{cabecalho}\n1;2\n", encoding="utf-8")
-            parquet = tmp_path / f"{indice}.parquet"
-            controle = Controle(
-                f"teste-{indice}", dia.isoformat(), dia, "gs://teste", datetime.now(UTC)
-            )
-            csv_para_parquet(csv, parquet, Formato(tipo="csv"), controle)
-            uri = deps.armazenamento.enviar(parquet, f"dev/carga/teste/{uuid.uuid4()}.parquet")
-            linhas = deps.warehouse.carregar_parquet(tabela, uri, Particionamento("DAY"), dia)
-            assert linhas == 1
-        resultado = deps.warehouse.consultar(f"SELECT a, b, c FROM `{config_dev.projeto}.{tabela}`")
-        assert resultado == [{"a": "1", "b": None, "c": "2"}]
+        enviado = estado.salvar(deps.armazenamento, prefixo, config_dev.lago, banco)
+        assert enviado.enviados == 1
+        assert estado.salvar(deps.armazenamento, prefixo, config_dev.lago, banco).enviados == 0
+        outro_lago = tmp_path / "outro"
+        restaurado = estado.restaurar(deps.armazenamento, prefixo, outro_lago, banco)
+        assert restaurado.baixados == 1
+        assert (outro_lago / "raw/teste/x/20261004/a.parquet").read_bytes() == b"conteudo"
     finally:
-        bigquery.Client(project=config_dev.projeto).delete_table(
-            f"{config_dev.projeto}.{tabela}", not_found_ok=True
-        )
+        for caminho in deps.armazenamento.listar(prefixo):
+            deps.armazenamento.apagar(caminho)
         deps.http.fechar()

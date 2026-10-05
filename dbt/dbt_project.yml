@@ -18,7 +18,10 @@ models:
       +materialized: table
     marts:
       +schema: marts
-      +materialized: table
+      # Parquet em ELEITORADO_PUBLICO/marts (external_root no profile): vai para o bucket público
+      +materialized: external
+      +options:
+        compression: zstd
 
 flags:
   send_anonymous_usage_stats: false

@@ -1,4 +1,4 @@
-"""Montagem das dependências reais (GCP e HTTP)."""
+"""Montagem das dependências reais: GCS, lago local e HTTP."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from coletor.armazenamento import GcsArmazenamento
 from coletor.coleta import Dependencias
 from coletor.config import Config
 from coletor.http import ClienteHttp
-from coletor.warehouse import BigQueryWarehouse
+from coletor.lago import LagoWarehouse
 
 
 def agora_utc() -> datetime:
@@ -21,8 +21,8 @@ def credenciais_do_ambiente(projeto: str, obter: Callable[..., Any] | None = Non
     """Credenciais do ADC; só as de usuário recebem o projeto como quota project.
 
     No computador local, o ADC do usuário pode carregar o quota project de outro projeto.
-    No Cloud Run e no GitHub (WIF), forçar o quota project exigiria
-    serviceusage.services.use até da identidade federada, então ele não é aplicado.
+    No GitHub (WIF), forçar o quota project exigiria serviceusage.services.use até da
+    identidade federada, então ele não é aplicado.
     """
     import google.auth
     import google.oauth2.credentials
@@ -40,6 +40,6 @@ def montar_dependencias(config: Config) -> Dependencias:
         config=config,
         http=ClienteHttp(),
         armazenamento=GcsArmazenamento(config.bucket, config.projeto, credenciais),
-        warehouse=BigQueryWarehouse(config.projeto, config.regiao, credenciais),
+        warehouse=LagoWarehouse(config.lago),
         agora=agora_utc,
     )

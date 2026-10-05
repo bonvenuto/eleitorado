@@ -1,7 +1,7 @@
 {{
     config(
-        partition_by={'field': 'data_competencia', 'data_type': 'date', 'granularity': 'month'},
-        cluster_by=['casa', 'fornecedor_cnpj_raiz', 'parlamentar_id'],
+        location=env_var('ELEITORADO_PUBLICO', 'dados/publico') ~ '/marts/fct_despesa_cota_parlamentar',
+        options={'partition_by': 'casa, ano', 'overwrite_or_ignore': True, 'compression': 'zstd'},
     )
 }}
 

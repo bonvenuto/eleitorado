@@ -4,12 +4,17 @@
 nullif(trim({{ coluna }}), '')
 {%- endmacro %}
 
+{#- valores monetários: até 38 dígitos, 2 casas -#}
+{% macro numero(expressao) -%}
+try_cast({{ expressao }} as decimal(38, 2))
+{%- endmacro %}
+
 {#- CGU: vírgula decimal e ponto de milhar ("1.234,56") -#}
 {% macro numero_br(coluna) -%}
-safe_cast(replace(replace({{ texto(coluna) }}, '.', ''), ',', '.') as numeric)
+{{ numero("replace(replace(" ~ texto(coluna) ~ ", '.', ''), ',', '.')") }}
 {%- endmacro %}
 
 {#- CGU: "dd/mm/aaaa" -#}
 {% macro data_br(coluna) -%}
-safe.parse_date('%d/%m/%Y', {{ texto(coluna) }})
+try_strptime({{ texto(coluna) }}, '%d/%m/%Y')::date
 {%- endmacro %}

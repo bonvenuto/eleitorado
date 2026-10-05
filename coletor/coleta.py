@@ -10,15 +10,15 @@ from pathlib import Path
 
 from coletor.adaptadores import adaptador_para
 from coletor.adaptadores.base import Preparado
-from coletor.armazenamento import Armazenamento, caminho_carga, caminho_de_uri, caminho_original
+from coletor.armazenamento import Armazenamento, caminho_de_uri, caminho_original
 from coletor.competencias import Competencia, data_brasilia
 from coletor.config import Config
 from coletor.conversao import Controle, csv_para_parquet, registros_para_parquet
 from coletor.hashes import sha256_arquivo
 from coletor.http import ClienteHttp, ErroHttp
+from coletor.lago import Particionamento, Warehouse
 from coletor.manifesto import Recurso, RecursoCompleto
 from coletor.meta import HistoricoColetas, RegistroColeta
-from coletor.warehouse import Particionamento, Warehouse
 
 EXPIRACAO_SNAPSHOT_DIAS = 60
 
@@ -38,10 +38,10 @@ def particionamento(recurso: Recurso, destino: str) -> Particionamento:
     return Particionamento("YEAR")
 
 
-def tabela_destino(config: Config, recurso: RecursoCompleto, destino: str) -> str:
-    if destino == "replay":
-        return f"{config.dataset('replay')}.{recurso.orgao}__{recurso.recurso.id}"
-    return f"{config.dataset('raw_' + recurso.orgao)}.{recurso.recurso.id}"
+def tabela_destino(recurso: RecursoCompleto, destino: str) -> str:
+    """Pasta no lago: `raw/<órgão>/<recurso>`, ou `replay/raw/...` na reconstrução."""
+    raiz = "replay/raw" if destino == "replay" else "raw"
+    return f"{raiz}/{recurso.orgao}/{recurso.recurso.id}"
 
 
 def nao_publicada(
@@ -72,7 +72,6 @@ def _converter_e_carregar(
     pasta: Path,
     destino: str,
 ) -> None:
-    config = deps.config
     controle = Controle(
         registro.coleta_id, competencia.rotulo, competencia.data, uri_original, deps.agora()
     )
@@ -81,20 +80,15 @@ def _converter_e_carregar(
         resultado = csv_para_parquet(preparado.csv, parquet, recurso.recurso.formato, controle)
     else:
         resultado = registros_para_parquet(preparado.registros or [], parquet, controle)
-    caminho = caminho_carga(
-        config.prefixo_gcs,
-        recurso.orgao,
-        recurso.recurso.id,
-        competencia.rotulo,
-        registro.coleta_id,
-    )
-    registro.arquivo_carga = deps.armazenamento.enviar(parquet, caminho)
-    registro.linhas = deps.warehouse.carregar_parquet(
-        tabela_destino(config, recurso, destino),
-        registro.arquivo_carga,
+    carga = deps.warehouse.carregar_parquet(
+        tabela_destino(recurso, destino),
+        parquet,
         particionamento(recurso.recurso, destino),
         competencia.data,
+        registro.coleta_id,
     )
+    registro.arquivo_carga = carga.caminho
+    registro.linhas = carga.linhas
     registro.colunas = resultado.colunas
     referencia = historico.colunas_referencia(recurso.id, competencia)
     registro.esquema_alterado = referencia is not None and [o for o, _ in referencia] != [

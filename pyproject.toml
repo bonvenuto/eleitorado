@@ -1,11 +1,12 @@
 [project]
 name = "eleitorado"
 version = "0.1.0"
-description = "Ingestão de dados públicos no BigQuery"
+description = "Ingestão de dados públicos em DuckDB e Parquet"
 requires-python = ">=3.12"
 dependencies = [
-    "dbt-bigquery>=1.12.1",
-    "google-cloud-bigquery>=3.46.1",
+    "boto3>=1.43.108",
+    "dbt-duckdb>=1.11.0",
+    "duckdb>=1.5.6",
     "google-cloud-storage>=2.18",
     "httpx>=0.28.1",
     "pyarrow>=25.0.1",
@@ -16,6 +17,11 @@ dependencies = [
 
 [project.scripts]
 coletor = "coletor.cli:main"
+
+[project.optional-dependencies]
+migracao = [
+    "google-cloud-bigquery>=3.46.1",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -32,6 +38,8 @@ addopts = "-m 'not integracao'"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# os planos em docs/ trazem trechos de código fora de contexto (métodos soltos, por exemplo)
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

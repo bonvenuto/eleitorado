@@ -2,11 +2,9 @@
 {{
     config(
         materialized='incremental',
-        incremental_strategy='merge',
+        incremental_strategy='delete+insert',
         unique_key='evento_id',
         full_refresh=(var('fonte_historico', 'raw') == 'replay'),
-        partition_by={'field': 'data_evento', 'data_type': 'date', 'granularity': 'month'},
-        cluster_by=['sancao_id'],
     )
 }}
 

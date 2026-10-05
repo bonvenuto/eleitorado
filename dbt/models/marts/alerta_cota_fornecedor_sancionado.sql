@@ -2,8 +2,15 @@
 -- É um indício para investigar, não a constatação de irregularidade: a cota reembolsa gastos
 -- do parlamentar (não é contratação pública) e a abrangência da sanção varia.
 -- Cobertura: só sanções vistas desde a primeira coleta (a CGU publica apenas o arquivo do dia).
+-- chave de correspondência: CPF completo para pessoa física, raiz do CNPJ para pessoa jurídica
+-- (matriz e filiais são a mesma pessoa jurídica); um join por igualdade, sem OR
 with despesas as (
-    select *
+    select
+        *,
+        case fornecedor_tipo_documento
+            when 'CPF' then 'cpf:' || fornecedor_documento
+            when 'CNPJ' then 'cnpj:' || fornecedor_cnpj_raiz
+        end as chave
     from {{ ref('int_cota__despesas') }}
     where fornecedor_documento_valido and data_emissao is not null
 ),
@@ -18,6 +25,16 @@ sancoes as (
         data_evento
     from {{ ref('int_cgu__sancoes_eventos') }}
     where evento != 'exclusao' and data_inicio is not null
+),
+
+sancoes_com_chave as (
+    select
+        *,
+        case tipo_documento
+            when 'CPF' then 'cpf:' || documento
+            when 'CNPJ' then 'cnpj:' || cnpj_raiz
+        end as chave
+    from sancoes
 ),
 
 cruzadas as (
@@ -47,19 +64,14 @@ cruzadas as (
         s._coleta_id as sancao_coleta_id,
         s.data_evento as sancao_data_evento
     from despesas as d
-    join sancoes as s
-        on (
-            (d.fornecedor_tipo_documento = 'CPF' and s.tipo_documento = 'CPF'
-                and d.fornecedor_documento = s.documento)
-            or (d.fornecedor_tipo_documento = 'CNPJ' and s.tipo_documento = 'CNPJ'
-                and d.fornecedor_cnpj_raiz = s.cnpj_raiz)
-        )
+    join sancoes_com_chave as s
+        on s.chave = d.chave
         and d.data_emissao between s.data_inicio and coalesce(s.data_fim, date '9999-12-31')
 )
 
 select
-    to_hex(md5(concat('cota_fornecedor_sancionado|', despesa_id, '|', sancao_id))) as alerta_id,
-    * except (sancao_data_evento),
+    md5(concat('cota_fornecedor_sancionado|', despesa_id, '|', sancao_id)) as alerta_id,
+    * exclude (sancao_data_evento),
     'Despesa de cota com fornecedor que tinha sanção vigente no CEIS/CNEP na data de emissão '
     || '(correspondência por CPF, CNPJ ou raiz do CNPJ)' as regra
 from cruzadas

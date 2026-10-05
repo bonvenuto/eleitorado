@@ -10,7 +10,8 @@ with origem as (
 ),
 
 fato as (
-    select casa, ano, count(*) as linhas, sum(valor_reembolsado) as valor
+    -- o ano vem da pasta do Parquet particionado (casa=/ano=): sem arquivos, o tipo é texto
+    select casa, cast(ano as bigint) as ano, count(*) as linhas, sum(valor_reembolsado) as valor
     from {{ ref('fct_despesa_cota_parlamentar') }}
     group by 1, 2
 )

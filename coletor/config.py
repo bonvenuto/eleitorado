@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 AMBIENTES = ("dev", "prod")
 
@@ -21,14 +22,14 @@ class Config:
     ambiente: str
     versao: str
     origem: str
+    lago: Path = Path("dados")
+    publico: Path = Path("dados/publico")
+    prefixo: str = ""
 
     @property
     def prefixo_gcs(self) -> str:
-        return "dev/" if self.ambiente == "dev" else ""
-
-    def dataset(self, nome: str) -> str:
-        """Nome do dataset no ambiente: `raw_cgu` vira `raw_cgu_dev` em dev."""
-        return f"{nome}_dev" if self.ambiente == "dev" else nome
+        """`ELEITORADO_PREFIXO` (`paralelo/` durante a migração) e, em dev, `dev/`."""
+        return self.prefixo + ("dev/" if self.ambiente == "dev" else "")
 
 
 def carregar_config(env: Mapping[str, str] | None = None) -> Config:
@@ -42,6 +43,9 @@ def carregar_config(env: Mapping[str, str] | None = None) -> Config:
     origem = env.get("ELEITORADO_ORIGEM", "manual")
     if origem not in ("manual", "agendada"):
         raise ErroConfig(f"ELEITORADO_ORIGEM deve ser manual ou agendada, recebido: {origem!r}")
+    prefixo = env.get("ELEITORADO_PREFIXO", "")
+    if prefixo and not prefixo.endswith("/"):
+        raise ErroConfig(f"ELEITORADO_PREFIXO deve terminar com /, recebido: {prefixo!r}")
     return Config(
         projeto=env["ELEITORADO_PROJETO"],
         bucket=env["ELEITORADO_BUCKET"],
@@ -49,4 +53,7 @@ def carregar_config(env: Mapping[str, str] | None = None) -> Config:
         ambiente=ambiente,
         versao=env.get("ELEITORADO_VERSAO", "local"),
         origem=origem,
+        lago=Path(env.get("ELEITORADO_LAGO", "dados")),
+        publico=Path(env.get("ELEITORADO_PUBLICO", "dados/publico")),
+        prefixo=prefixo,
     )

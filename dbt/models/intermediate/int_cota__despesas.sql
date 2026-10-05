@@ -1,10 +1,3 @@
-{{
-    config(
-        partition_by={'field': 'data_competencia', 'data_type': 'date', 'granularity': 'month'},
-        cluster_by=['casa', 'fornecedor_cnpj_raiz'],
-    )
-}}
-
 -- CEAP e CEAPS no mesmo grão: uma linha de despesa como publicada.
 -- Documento do fornecedor completo (CPF inclusive): esta camada não é exposta à web app.
 with camara as (
@@ -12,7 +5,7 @@ with camara as (
         -- a CEAP não tem chave natural: hash do conteúdo + ocorrência entre linhas idênticas
         concat(
             'camara:', hash_linha, '-',
-            cast(row_number() over (partition by hash_linha order by _competencia, _linha) as string)
+            cast(row_number() over (partition by hash_linha order by _competencia, _linha) as varchar)
         ) as despesa_id,
         'camara' as casa,
         if(id_deputado is null, null, concat('camara:', id_deputado)) as parlamentar_id,
@@ -27,7 +20,7 @@ with camara as (
         subcategoria,
         fornecedor_nome,
         fornecedor_documento,
-        cast(null as string) as fornecedor_documento_mascarado,
+        cast(null as varchar) as fornecedor_documento_mascarado,
         valor_documento,
         valor_glosa,
         valor_reembolsado,
@@ -36,7 +29,7 @@ with camara as (
         id_documento_origem,
         passageiro as camara_passageiro,
         trecho as camara_trecho,
-        cast(null as string) as senado_detalhamento,
+        cast(null as varchar) as senado_detalhamento,
         _coleta_id
     from {{ ref('stg_camara__ceap') }}
 ),
@@ -49,7 +42,7 @@ senado as (
         'parlamentar' as tipo_beneficiario,
         c.nome_senador as nome_beneficiario,
         s.uf_sigla,
-        cast(null as string) as partido_sigla,
+        cast(null as varchar) as partido_sigla,
         c.ano,
         c.mes,
         c.data_emissao,
@@ -58,14 +51,14 @@ senado as (
         c.fornecedor_nome,
         c.fornecedor_documento,
         c.fornecedor_documento_mascarado,
-        cast(null as numeric) as valor_documento,
-        cast(null as numeric) as valor_glosa,
+        cast(null as decimal(38, 2)) as valor_documento,
+        cast(null as decimal(38, 2)) as valor_glosa,
         c.valor_reembolsado,
         c.numero_documento,
-        cast(null as string) as url_documento,
+        cast(null as varchar) as url_documento,
         c.id_despesa as id_documento_origem,
-        cast(null as string) as camara_passageiro,
-        cast(null as string) as camara_trecho,
+        cast(null as varchar) as camara_passageiro,
+        cast(null as varchar) as camara_trecho,
         c.detalhamento as senado_detalhamento,
         c._coleta_id
     from {{ ref('stg_senado__ceaps') }} as c
@@ -92,7 +85,7 @@ classificadas as (
         *,
         case
             when fornecedor_documento_mascarado is not null then 'CPF_MASCARADO'
-            when casa = 'camara' and regexp_contains(fornecedor_documento, r'^0{12}[0-9]{2}$')
+            when casa = 'camara' and regexp_matches(fornecedor_documento, '^0{12}[0-9]{2}$')
                 then 'CODIGO_CAMARA'
             else {{ tipo_documento('fornecedor_documento') }}
         end as fornecedor_tipo_documento
@@ -100,8 +93,8 @@ classificadas as (
 )
 
 select
-    * except (fornecedor_documento, fornecedor_documento_mascarado, fornecedor_tipo_documento),
-    safe.date(ano, mes, 1) as data_competencia,
+    * exclude (fornecedor_documento, fornecedor_documento_mascarado, fornecedor_tipo_documento),
+    try(make_date(ano::integer, mes::integer, 1)) as data_competencia,
     coalesce(fornecedor_documento_mascarado, fornecedor_documento) as fornecedor_documento,
     fornecedor_tipo_documento,
     case fornecedor_tipo_documento

@@ -22,22 +22,22 @@ def test_executar_coleta_o_recurso_pedido_e_registra_tudo(respx_mock, deps, ware
         )
     )
     assert _rodar(["executar", "--recursos", "cgu.cnep"], deps) == 0
-    [coleta] = warehouse.linhas["meta_dev.coletas"]
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    [coleta] = warehouse.linhas["meta/coletas"]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (coleta["recurso"], coleta["status"], coleta["linhas"]) == ("cnep", "carregada", 2)
     assert (execucao["status"], execucao["coletas_carregadas"], execucao["origem"]) == (
         "sucesso",
         1,
         "manual",
     )
-    assert len(warehouse.linhas["meta_dev.fontes"]) == 7
-    assert "meta_dev.coletas" in warehouse.tabelas
+    assert len(warehouse.linhas["meta/fontes"]) == 7
+    assert "meta/coletas" in warehouse.tabelas
 
 
 def test_executar_com_falha_sai_com_codigo_1(respx_mock, deps, warehouse):
     respx_mock.get(url__startswith=PAGINA).mock(return_value=httpx.Response(403))
     assert _rodar(["executar", "--recursos", "cgu.cnep"], deps) == 1
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["coletas_falha"]) == ("falha", 1)
 
 
@@ -47,34 +47,13 @@ def test_coletar_intervalo_de_anos(respx_mock, deps, warehouse):
             return_value=httpx.Response(200, content=zip_com({f"Ano-{ano}.csv": CEAP_CSV.encode()}))
         )
     assert _rodar(["coletar", "camara.ceap", "--de", "2025"], deps) == 0
-    competencias = [linha["competencia"] for linha in warehouse.linhas["meta_dev.coletas"]]
+    competencias = [linha["competencia"] for linha in warehouse.linhas["meta/coletas"]]
     assert competencias == ["2025", "2026"]
 
 
 def test_coletar_snapshot_com_competencia_e_erro_de_uso(deps, capsys):
     assert _rodar(["coletar", "cgu.cnep", "--competencia", "2025"], deps) == 2
     assert "snapshot" in capsys.readouterr().err
-
-
-def test_recarregar_snapshot_antigo_no_raw_e_recusado(deps, capsys):
-    assert _rodar(["recarregar", "cgu.cnep", "--competencia", "2026-07-01"], deps) == 2
-    assert "--destino replay" in capsys.readouterr().err
-
-
-def test_recarregar_para_replay_usa_o_ultimo_original(respx_mock, deps, warehouse):
-    respx_mock.get(PAGINA).mock(return_value=httpx.Response(200, text=PAGINA_CGU))
-    respx_mock.get(f"{PAGINA}/20261002").mock(
-        return_value=httpx.Response(
-            200, content=zip_com({"20261002_CNEP.csv": CNEP_CSV.encode("cp1252")})
-        )
-    )
-    assert _rodar(["executar", "--recursos", "cgu.cnep"], deps) == 0
-    codigo = _rodar(
-        ["recarregar", "cgu.cnep", "--competencia", "2026-10-02", "--destino", "replay"], deps
-    )
-    assert codigo == 0
-    ultima = warehouse.linhas["meta_dev.coletas"][-1]
-    assert (ultima["status"], ultima["destino"]) == ("recarregada", "replay")
 
 
 def test_sem_configuracao_sai_com_codigo_2(capsys):
@@ -93,45 +72,15 @@ def test_coletar_por_competencia_sem_anos_e_erro_de_uso(deps, argumentos):
 COLETA_ID = "6f1c2a3b-0000-4000-8000-000000000001"
 
 
-def test_recarregar_coleta_de_outra_competencia_e_recusado(deps, warehouse, capsys):
-    warehouse.resposta_consulta = [
-        {
-            "orgao": "cgu",
-            "recurso": "cnep",
-            "competencia": "2026-10-01",
-            "arquivo_original": "gs://bucket-teste/x.zip",
-            "status": "carregada",
-        }
-    ]
-    argumentos = ["recarregar", "cgu.cnep", "--competencia", "2026-10-02", "--coleta-id", COLETA_ID]
-    assert _rodar(argumentos, deps) == 2
-    assert "2026-10-01" in capsys.readouterr().err
-
-
-def test_recarregar_coleta_sem_original_explica_o_motivo(deps, warehouse, capsys):
-    warehouse.resposta_consulta = [
-        {
-            "orgao": "cgu",
-            "recurso": "cnep",
-            "competencia": "2026-10-02",
-            "arquivo_original": None,
-            "status": "falha",
-        }
-    ]
-    argumentos = ["recarregar", "cgu.cnep", "--competencia", "2026-10-02", "--coleta-id", COLETA_ID]
-    assert _rodar(argumentos, deps) == 2
-    assert "sem original" in capsys.readouterr().err
-
-
 def test_falha_ao_gravar_meta_nao_interrompe_as_demais_coletas(respx_mock, deps, warehouse):
     for ano in (2025, 2026):
         respx_mock.get(f"https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip").mock(
             return_value=httpx.Response(200, content=zip_com({f"Ano-{ano}.csv": CEAP_CSV.encode()}))
         )
-    warehouse.falhas_ao_anexar["meta_dev.coletas"] = 2  # a gravação da 1ª coleta falha duas vezes
+    warehouse.falhas_ao_anexar["meta/coletas"] = 2  # a gravação da 1ª coleta falha duas vezes
     assert _rodar(["coletar", "camara.ceap", "--de", "2025"], deps) == 1
-    assert [linha["competencia"] for linha in warehouse.linhas["meta_dev.coletas"]] == ["2026"]
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    assert [linha["competencia"] for linha in warehouse.linhas["meta/coletas"]] == ["2026"]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["coletas_carregadas"], execucao["coletas_falha"]) == (
         "falha",
         1,

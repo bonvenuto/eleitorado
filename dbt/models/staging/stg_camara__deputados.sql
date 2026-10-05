@@ -6,10 +6,10 @@ with origem as (
 select
     _coleta_id,
     _competencia_data as data_referencia,
-    json_value(payload, '$.id') as id_deputado,
-    json_value(payload, '$.nome') as nome,
-    json_value(payload, '$.siglaPartido') as partido_sigla,
-    json_value(payload, '$.siglaUf') as uf_sigla,
-    safe_cast(json_value(payload, '$.idLegislatura') as int64) as legislatura,
-    json_value(payload, '$.urlFoto') as url_foto
+    json_extract_string(payload, '$.id') as id_deputado,
+    json_extract_string(payload, '$.nome') as nome,
+    json_extract_string(payload, '$.siglaPartido') as partido_sigla,
+    json_extract_string(payload, '$.siglaUf') as uf_sigla,
+    try_cast(json_extract_string(payload, '$.idLegislatura') as bigint) as legislatura,
+    json_extract_string(payload, '$.urlFoto') as url_foto
 from origem

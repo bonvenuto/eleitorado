@@ -1,34 +1,25 @@
-# Sem segredos: autenticação por ADC (local) ou pela conta de serviço (Cloud Run).
+# DuckDB local. O lago (raw e meta em Parquet) fica em ELEITORADO_LAGO; o arquivo .duckdb é
+# descartável: os históricos são restaurados de Parquet antes de cada execução.
 eleitorado:
   target: dev
   outputs:
     dev:
-      type: bigquery
-      method: oauth
-      project: "{{ env_var('ELEITORADO_PROJETO') }}"
-      quota_project: "{{ env_var('ELEITORADO_PROJETO') }}"
-      dataset: "dev_{{ env_var('ELEITORADO_USUARIO_DBT', 'local') }}"
-      location: southamerica-east1
+      type: duckdb
+      path: "{{ env_var('ELEITORADO_LAGO', 'dados') }}/dev.duckdb"
+      external_root: "{{ env_var('ELEITORADO_PUBLICO', 'dados/publico') }}/marts"
       threads: 4
-      maximum_bytes_billed: 10737418240
-      job_execution_timeout_seconds: 900
+      settings:
+        memory_limit: 4GB
     prod:
-      type: bigquery
-      method: oauth
-      project: "{{ env_var('ELEITORADO_PROJETO') }}"
-      quota_project: "{{ env_var('ELEITORADO_PROJETO') }}"
-      dataset: marts
-      location: southamerica-east1
+      type: duckdb
+      path: "{{ env_var('ELEITORADO_LAGO', 'dados') }}/eleitorado.duckdb"
+      external_root: "{{ env_var('ELEITORADO_PUBLICO', 'dados/publico') }}/marts"
       threads: 4
-      maximum_bytes_billed: 10737418240
-      job_execution_timeout_seconds: 900
-    # ci: só no GitHub, com credencial federada (WIF), que não aceita quota_project
+      settings:
+        memory_limit: 4GB
+    # ci: lê o lago vazio de dbt/tests/lago_vazio (só esquemas, sem dados)
     ci:
-      type: bigquery
-      method: oauth
-      project: "{{ env_var('ELEITORADO_PROJETO') }}"
-      dataset: ci
-      location: southamerica-east1
+      type: duckdb
+      path: "{{ env_var('ELEITORADO_LAGO', 'dados') }}/ci.duckdb"
+      external_root: "{{ env_var('ELEITORADO_PUBLICO', 'dados/publico') }}/marts"
       threads: 4
-      maximum_bytes_billed: 10737418240
-      job_execution_timeout_seconds: 900

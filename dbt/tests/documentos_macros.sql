@@ -1,19 +1,18 @@
 -- Casos conhecidos das macros de documento (CPF, CNPJ numérico e alfanumérico).
-with casos as (
-    select * from unnest([
-        struct('111.444.777-35' as entrada, 'CPF' as tipo, true as valido),
-        struct('11144477734', 'CPF', false),
-        struct('00000000000', 'CPF', false),
-        struct('11.222.333/0001-81', 'CNPJ', true),
-        struct('11222333000180', 'CNPJ', false),
-        struct('12.ABC.345/01DE-35', 'CNPJ', true),
-        struct('12abc34501de35', 'CNPJ', true),
-        struct('1234567890123', 'INVALIDO', false),
-        struct('123456789', 'INVALIDO', false),
+with casos (entrada, tipo, valido) as (
+    values
+        ('111.444.777-35', 'CPF', true),
+        ('11144477734', 'CPF', false),
+        ('00000000000', 'CPF', false),
+        ('11.222.333/0001-81', 'CNPJ', true),
+        ('11222333000180', 'CNPJ', false),
+        ('12.ABC.345/01DE-35', 'CNPJ', true),
+        ('12abc34501de35', 'CNPJ', true),
+        ('1234567890123', 'INVALIDO', false),
+        ('123456789', 'INVALIDO', false),
         -- pontuação fora do lugar não importa: só os caracteres contam
-        struct('071.414.740/0010-0', 'CNPJ', true),
-        struct(cast(null as string), cast(null as string), cast(null as bool))
-    ])
+        ('071.414.740/0010-0', 'CNPJ', true),
+        (null, null, null)
 ),
 
 calculados as (

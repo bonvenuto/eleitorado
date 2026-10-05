@@ -1,10 +1,18 @@
-"""Gravação de originais e arquivos de carga no Cloud Storage."""
+"""Bucket privado no Cloud Storage: originais imutáveis e o estado espelhado do lago."""
 
 from __future__ import annotations
 
+import base64
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class Objeto:
+    tamanho: int
+    md5: str  # hexadecimal
 
 
 class Armazenamento(Protocol):
@@ -20,6 +28,16 @@ class Armazenamento(Protocol):
 
     def listar(self, prefixo: str) -> list[str]: ...
 
+    def listar_objetos(self, prefixo: str) -> dict[str, Objeto]:
+        """Objetos sob `prefixo`, pelo caminho completo."""
+        ...
+
+    def substituir(self, origem: Path, caminho: str) -> None:
+        """Grava sobrescrevendo (só para o estado espelhado: raw/, meta/, estado/)."""
+        ...
+
+    def apagar(self, caminho: str) -> None: ...
+
 
 def caminho_original(
     prefixo: str,
@@ -34,10 +52,6 @@ def caminho_original(
         f"{prefixo}originais/{orgao}/{recurso}/competencia={competencia}/"
         f"{instante:%Y%m%dT%H%M%S}_{sha256_conteudo[:12]}.{extensao}"
     )
-
-
-def caminho_carga(prefixo: str, orgao: str, recurso: str, competencia: str, coleta_id: str) -> str:
-    return f"{prefixo}carga/{orgao}/{recurso}/competencia={competencia}/{coleta_id}.parquet"
 
 
 def caminho_de_uri(uri: str) -> str:
@@ -69,3 +83,15 @@ class GcsArmazenamento:
 
     def listar(self, prefixo: str) -> list[str]:
         return sorted(blob.name for blob in self._cliente.list_blobs(self._bucket, prefix=prefixo))
+
+    def listar_objetos(self, prefixo: str) -> dict[str, Objeto]:
+        return {
+            blob.name: Objeto(int(blob.size), base64.b64decode(blob.md5_hash).hex())
+            for blob in self._cliente.list_blobs(self._bucket, prefix=prefixo)
+        }
+
+    def substituir(self, origem: Path, caminho: str) -> None:
+        self._bucket.blob(caminho).upload_from_filename(str(origem))
+
+    def apagar(self, caminho: str) -> None:
+        self._bucket.blob(caminho).delete()

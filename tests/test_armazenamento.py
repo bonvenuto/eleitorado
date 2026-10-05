@@ -2,8 +2,8 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from coletor.armazenamento import caminho_carga, caminho_de_uri, caminho_original
-from coletor.warehouse import Particionamento
+from coletor.armazenamento import caminho_de_uri, caminho_original
+from coletor.lago import Particionamento
 
 
 def test_caminho_do_original_tem_data_hora_e_hash():
@@ -13,12 +13,6 @@ def test_caminho_do_original_tem_data_hora_e_hash():
     )
     assert (
         caminho == "dev/originais/cgu/ceis/competencia=2026-10-02/20261003T103000_abcdef012345.zip"
-    )
-
-
-def test_caminho_de_carga_usa_o_id_da_coleta():
-    assert caminho_carga("", "camara", "ceap", "2025", "id-1") == (
-        "carga/camara/ceap/competencia=2025/id-1.parquet"
     )
 
 

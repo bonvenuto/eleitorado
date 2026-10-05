@@ -85,6 +85,28 @@ resource "google_storage_bucket_iam_member" "pipeline_le_objetos" {
   member = "serviceAccount:${google_service_account.pipeline.email}"
 }
 
+# pipeline (GitHub Actions): sobrescreve e apaga só o estado espelhado do lago; os originais
+# continuam só com objectCreator (sem sobrescrever nem apagar)
+locals {
+  prefixos_estado = ["raw/", "meta/", "estado/"]
+  prefixos_estado_com_paralelo = concat(
+    local.prefixos_estado, [for p in local.prefixos_estado : "paralelo/${p}"]
+  )
+}
+
+resource "google_storage_bucket_iam_member" "pipeline_espelha_estado" {
+  bucket = google_storage_bucket.dados.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:${google_service_account.pipeline.email}"
+  condition {
+    title = "estado-do-lago"
+    expression = join(" || ", [
+      for p in local.prefixos_estado_com_paralelo :
+      "resource.name.startsWith(\"projects/_/buckets/${google_storage_bucket.dados.name}/objects/${p}\")"
+    ])
+  }
+}
+
 resource "google_cloud_run_v2_job" "pipeline" {
   name                = "pipeline"
   location            = var.regiao

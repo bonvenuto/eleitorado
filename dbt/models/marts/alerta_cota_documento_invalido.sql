@@ -2,7 +2,7 @@
 -- Ficam de fora documentos vazios, CPFs que o Senado já publica mascarados e os códigos
 -- internos da Câmara (`000000000000NN`).
 select
-    to_hex(md5(concat('cota_documento_invalido|', despesa_id))) as alerta_id,
+    md5(concat('cota_documento_invalido|', despesa_id)) as alerta_id,
     despesa_id,
     casa,
     parlamentar_id,

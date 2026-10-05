@@ -5,11 +5,17 @@ resource "google_storage_bucket" "dados" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
 
+  # Objetos sobrescritos ou apagados (raw substituído, históricos regravados) podem ser
+  # recuperados por 30 dias.
+  soft_delete_policy {
+    retention_duration_seconds = 2592000
+  }
+
   # Originais nunca são apagados; depois de 30 dias vão para a classe mais barata.
   lifecycle_rule {
     condition {
       age                   = 30
-      matches_prefix        = ["originais/", "dev/originais/"]
+      matches_prefix        = ["originais/", "dev/originais/", "paralelo/originais/"]
       matches_storage_class = ["STANDARD"]
     }
     action {

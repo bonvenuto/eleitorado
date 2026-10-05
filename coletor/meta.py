@@ -1,4 +1,4 @@
-"""Tabelas de controle em `meta`: coletas, execuções e manifesto publicado."""
+"""Tabelas de controle em `meta/` no lago: coletas, execuções e manifesto publicado."""
 
 from __future__ import annotations
 
@@ -9,9 +9,8 @@ from datetime import date, datetime
 from typing import Any
 
 from coletor.competencias import Competencia, data_brasilia
-from coletor.config import Config
+from coletor.lago import Coluna, Warehouse
 from coletor.manifesto import Manifesto, RecursoCompleto
-from coletor.warehouse import Coluna, Warehouse
 
 STATUS_SUCESSO = ("carregada", "sem_alteracao")
 
@@ -242,14 +241,14 @@ WITH sucesso AS (
   SELECT orgao, recurso, competencia, competencia_data, finalizada_em, sha256_conteudo,
          ROW_NUMBER() OVER (
            PARTITION BY orgao, recurso, competencia ORDER BY finalizada_em DESC) AS ordem
-  FROM `{tabela}`
+  FROM coletas
   WHERE status IN ('carregada', 'sem_alteracao', 'recarregada') AND destino = 'raw'
 ),
 carga AS (
   SELECT orgao, recurso, competencia, colunas,
          ROW_NUMBER() OVER (
            PARTITION BY orgao, recurso, competencia ORDER BY finalizada_em DESC) AS ordem
-  FROM `{tabela}`
+  FROM coletas
   WHERE status IN ('carregada', 'recarregada') AND destino = 'raw'
 )
 SELECT s.orgao, s.recurso, s.competencia, s.competencia_data, s.finalizada_em,
@@ -262,23 +261,21 @@ WHERE s.ordem = 1
 
 
 class RepositorioMeta:
-    def __init__(self, warehouse: Warehouse, config: Config) -> None:
+    tabela_coletas = "meta/coletas"
+    tabela_execucoes = "meta/execucoes"
+    tabela_fontes = "meta/fontes"
+
+    def __init__(self, warehouse: Warehouse) -> None:
         self._warehouse = warehouse
-        self._config = config
-        dataset = config.dataset("meta")
-        self.tabela_coletas = f"{dataset}.coletas"
-        self.tabela_execucoes = f"{dataset}.execucoes"
-        self.tabela_fontes = f"{dataset}.fontes"
 
     def preparar(self) -> None:
-        self._warehouse.garantir_tabela(self.tabela_coletas, COLUNAS_COLETAS, "iniciada_em")
-        self._warehouse.garantir_tabela(self.tabela_execucoes, COLUNAS_EXECUCOES, "iniciada_em")
+        self._warehouse.garantir_tabela(self.tabela_coletas, COLUNAS_COLETAS)
+        self._warehouse.garantir_tabela(self.tabela_execucoes, COLUNAS_EXECUCOES)
         self._warehouse.garantir_tabela(self.tabela_fontes, COLUNAS_FONTES)
 
     def carregar_historico(self) -> HistoricoColetas:
-        sql = SQL_HISTORICO.format(tabela=f"{self._config.projeto}.{self.tabela_coletas}")
         sucessos: dict[tuple[str, str], Sucesso] = {}
-        for linha in self._warehouse.consultar(sql):
+        for linha in self._warehouse.consultar(SQL_HISTORICO):
             colunas = json.loads(linha["colunas"]) if linha.get("colunas") else None
             chave = (f"{linha['orgao']}.{linha['recurso']}", linha["competencia"])
             sucessos[chave] = Sucesso(
@@ -314,23 +311,3 @@ class RepositorioMeta:
             for rc in manifesto.todos()
         ]
         self._warehouse.substituir_linhas(self.tabela_fontes, linhas, COLUNAS_FONTES)
-
-    def execucao_agendada_com_sucesso(self, dia: date) -> bool:
-        sql = (
-            f"SELECT COUNT(*) AS n FROM `{self._config.projeto}.{self.tabela_execucoes}` "
-            "WHERE origem = 'agendada' AND status = 'sucesso' "
-            f"AND DATE(iniciada_em, 'America/Sao_Paulo') = '{dia.isoformat()}'"
-        )
-        linhas = self._warehouse.consultar(sql)
-        return bool(linhas) and int(linhas[0]["n"]) > 0
-
-    def buscar_coleta(self, coleta_id: str) -> dict[str, Any] | None:
-        """Identificação e original de uma coleta: orgao, recurso, competencia, status."""
-        coleta_id = str(uuid.UUID(coleta_id))  # valida o formato antes de montar o SQL
-        sql = (
-            "SELECT orgao, recurso, competencia, arquivo_original, status "
-            f"FROM `{self._config.projeto}.{self.tabela_coletas}` "
-            f"WHERE coleta_id = '{coleta_id}' LIMIT 1"
-        )
-        linhas = self._warehouse.consultar(sql)
-        return linhas[0] if linhas else None

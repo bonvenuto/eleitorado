@@ -1,0 +1,82 @@
+name: pipeline
+
+on:
+  schedule:
+    - cron: "30 10 * * *" # 07:30 em Brasília
+  workflow_dispatch:
+    inputs:
+      reconstruir:
+        description: "refazer os históricos a partir dos originais (primeira carga)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+# nunca duas execuções escrevendo no estado ao mesmo tempo
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+env:
+  ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}
+  ELEITORADO_BUCKET: ${{ vars.GCP_PROJETO }}-dados
+  ELEITORADO_AMBIENTE: prod
+  ELEITORADO_PREFIXO: paralelo/ # vazio depois da virada (Plano 5)
+  ELEITORADO_LAGO: dados
+  ELEITORADO_PUBLICO: dados/publico
+  ELEITORADO_VERSAO: ${{ github.sha }}
+  ELEITORADO_ORIGEM: ${{ github.event_name == 'schedule' && 'agendada' || 'manual' }}
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --no-dev --extra migracao
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_PIPELINE }}
+      - name: cache do lago
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            dados/raw
+            dados/meta
+            dados/estado
+          key: lago-${{ github.run_id }}
+          restore-keys: lago-
+      - name: estado restaurar
+        id: restaurar
+        run: uv run coletor estado restaurar
+      - name: coleta e dbt
+        run: uv run coletor pipeline
+      - name: reconstruir históricos
+        if: inputs.reconstruir
+        run: uv run coletor reconstruir --origem-prefixo ""
+      # o que foi coletado e os históricos valem mesmo se um teste do dbt falhou
+      - name: estado salvar
+        if: always() && steps.restaurar.outcome == 'success'
+        run: uv run coletor estado salvar
+      - name: guardar cache do lago
+        if: always() && steps.restaurar.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            dados/raw
+            dados/meta
+            dados/estado
+          key: lago-${{ github.run_id }}
+      - name: publicar
+        run: uv run coletor publicar
+        env:
+          R2_CONTA: ${{ secrets.R2_CONTA }}
+          R2_CHAVE_ID: ${{ secrets.R2_CHAVE_ID }}
+          R2_SEGREDO: ${{ secrets.R2_SEGREDO }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+      - name: reconciliar com o BigQuery (só no paralelo)
+        run: uv run coletor reconciliar
