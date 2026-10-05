@@ -69,3 +69,29 @@ regexp_replace(
     '(^|[^0-9])[0-9]{3}\.?([0-9]{3})\.?([0-9]{3})-?[0-9]{2}([^0-9]|$)', '\1***.\2.\3-**\4', 'g'
 )
 {%- endmacro %}
+
+{#- Documento como a fonte publica. CPF já mascarado pela fonte (`***.444.712-**`) fica como veio;
+    códigos negativos do Portal da Transparência (`-11` sigilo, `-3` sem informação) não são
+    documento. -#}
+{% macro documento_fonte(coluna) -%}
+case
+    when contains(coalesce({{ coluna }}, ''), '*') then trim({{ coluna }})
+    when regexp_matches(coalesce(trim({{ coluna }}), ''), '^-[0-9]+$') then null
+    else {{ normalizar_documento(coluna) }}
+end
+{%- endmacro %}
+
+{% macro tipo_documento_fonte(coluna) -%}
+case
+    when contains(coalesce({{ coluna }}, ''), '*') then 'CPF_MASCARADO'
+    when trim({{ coluna }}) = '-11' then 'SIGILOSO'
+    when regexp_matches(coalesce(trim({{ coluna }}), ''), '^-[0-9]+$') then null
+    else {{ tipo_documento(normalizar_documento(coluna)) }}
+end
+{%- endmacro %}
+
+{#- Nome para comparar entre fontes: sem acentos, maiúsculo, espaços simples -#}
+{% macro nome_normalizado(coluna) -%}
+upper(trim(regexp_replace(strip_accents(coalesce({{ coluna }}, '')), '\s+', ' ', 'g')))
+{%- endmacro %}
+
