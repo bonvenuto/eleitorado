@@ -11,7 +11,8 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from coletor.armazenamento import caminho_de_uri
+from coletor.armazenamento import Objeto, caminho_de_uri
+from coletor.estado import md5_arquivo
 from coletor.warehouse import Coluna, Particionamento
 
 
@@ -35,6 +36,22 @@ class FakeArmazenamento:
 
     def listar(self, prefixo: str) -> list[str]:
         return sorted(caminho for caminho in self.objetos if caminho.startswith(prefixo))
+
+    def listar_objetos(self, prefixo: str) -> dict[str, Objeto]:
+        return {
+            caminho: Objeto(arquivo.stat().st_size, md5_arquivo(arquivo))
+            for caminho, arquivo in self.objetos.items()
+            if caminho.startswith(prefixo)
+        }
+
+    def substituir(self, origem: Path, caminho: str) -> None:
+        destino = self.raiz / caminho
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(origem, destino)
+        self.objetos[caminho] = destino
+
+    def apagar(self, caminho: str) -> None:
+        self.objetos.pop(caminho).unlink()
 
 
 class FakeWarehouse:

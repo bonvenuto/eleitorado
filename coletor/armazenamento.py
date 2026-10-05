@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import base64
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class Objeto:
+    tamanho: int
+    md5: str  # hexadecimal
 
 
 class Armazenamento(Protocol):
@@ -19,6 +27,16 @@ class Armazenamento(Protocol):
     def baixar(self, caminho: str, destino: Path) -> None: ...
 
     def listar(self, prefixo: str) -> list[str]: ...
+
+    def listar_objetos(self, prefixo: str) -> dict[str, Objeto]:
+        """Objetos sob `prefixo`, pelo caminho completo."""
+        ...
+
+    def substituir(self, origem: Path, caminho: str) -> None:
+        """Grava sobrescrevendo (só para o estado espelhado: raw/, meta/, estado/)."""
+        ...
+
+    def apagar(self, caminho: str) -> None: ...
 
 
 def caminho_original(
@@ -69,3 +87,15 @@ class GcsArmazenamento:
 
     def listar(self, prefixo: str) -> list[str]:
         return sorted(blob.name for blob in self._cliente.list_blobs(self._bucket, prefix=prefixo))
+
+    def listar_objetos(self, prefixo: str) -> dict[str, Objeto]:
+        return {
+            blob.name: Objeto(int(blob.size), base64.b64decode(blob.md5_hash).hex())
+            for blob in self._cliente.list_blobs(self._bucket, prefix=prefixo)
+        }
+
+    def substituir(self, origem: Path, caminho: str) -> None:
+        self._bucket.blob(caminho).upload_from_filename(str(origem))
+
+    def apagar(self, caminho: str) -> None:
+        self._bucket.blob(caminho).delete()
