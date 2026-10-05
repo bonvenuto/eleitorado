@@ -1,82 +1,90 @@
 # eleitorado
 
-Repositório de dados públicos dos portais de transparência no BigQuery, para monitorar o
-governo e as ações públicas. Desenho em `docs/superpowers/specs/`; planos em
-`docs/superpowers/plans/`.
+Repositório de dados públicos dos portais de transparência, para monitorar o governo e as ações
+públicas. O pipeline roda no GitHub Actions com DuckDB; os dados privados ficam no Cloud Storage
+(São Paulo) e os marts são publicados em Parquet no Cloudflare R2. Desenho em
+`docs/superpowers/specs/`; planos em `docs/superpowers/plans/`.
 
 ## Coletor (onda A)
 
 Fontes declaradas em `fontes/*.yaml`: deputados e CEAP (Câmara), senadores e CEAPS (Senado),
-CEIS e CNEP (CGU), municípios (IBGE). Cada coleta guarda o original no GCS
-(`originais/…`), carrega o raw no BigQuery (`raw_<órgão>`) e registra tudo em `meta.coletas`.
+CEIS e CNEP (CGU), municípios (IBGE). Cada coleta guarda o original no GCS (`originais/…`,
+imutável), grava o raw em Parquet no lago local (`dados/raw/<órgão>/<recurso>/<partição>/`) e
+registra tudo em `dados/meta/`. O lago local espelha `raw/`, `meta/` e `estado/` do bucket.
 
 ### Configuração local
 
 1. `uv sync`
-2. Copie `.env.exemplo` para `.env` (dev) e `.env.prod` (prod) e ajuste o projeto e o bucket.
-   O gcloud deste projeto fica isolado em `.gcloud/` (variável `CLOUDSDK_CONFIG`) e não altera
-   outras configurações da máquina.
-3. No PowerShell, `. .\scripts\ambiente.ps1` carrega o `.env` para usar `gcloud`, `bq` e
-   `terraform`.
+2. Copie `.env.exemplo` para `.env` e ajuste o projeto e o bucket. O gcloud deste projeto fica
+   isolado em `.gcloud/` (variável `CLOUDSDK_CONFIG`) e não altera outras configurações da
+   máquina.
+3. No PowerShell, `. .\scripts\ambiente.ps1` carrega o `.env` para usar `gcloud` e `terraform`.
 
 ### Comandos
 
 ```bash
+uv run --env-file .env coletor estado restaurar            # traz o lago do bucket (dev/)
 uv run --env-file .env coletor fontes                      # recursos e última coleta
 uv run --env-file .env coletor executar                    # coleta o que está vencido
 uv run --env-file .env coletor coletar camara.ceap --de 2020
-uv run --env-file .env coletor recarregar cgu.ceis --competencia 2026-10-02 --destino replay
+uv run --env-file .env coletor --target dev pipeline       # coleta + dbt build
+uv run --env-file .env coletor estado salvar               # devolve o lago ao bucket
 ```
 
-Use `.env.prod` no lugar de `.env` para gravar em produção, num terminal sem as variáveis de dev
-carregadas. A primeira linha do log mostra o ambiente e o projeto em uso.
+Em dev, tudo no bucket fica sob `dev/`. O pipeline de produção só roda no GitHub Actions.
 
 ### Testes
 
 ```bash
 uv run pytest                                     # unitários
-uv run --env-file .env pytest -m integracao       # contra o GCP, só em dev
+uv run --env-file .env pytest -m integracao       # contra o GCS e as fontes, só em dev
 ```
 
 ### Infraestrutura
 
-`infra/` (Terraform): bucket `<projeto>-dados` e datasets em `southamerica-east1`.
+`infra/` (Terraform): bucket `<projeto>-dados`, contas de serviço e a autenticação do GitHub (WIF).
 
 ```powershell
 terraform -chdir=infra init "-backend-config=bucket=$($env:ELEITORADO_PROJETO)-tfstate" "-backend-config=prefix=infra"
-terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO"
+terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO" "-var=conta_faturamento=<conta>"
 ```
 
 ## Modelagem (dbt)
 
-- Camadas: `staging` (views sobre o raw), `intermediate` (cota unificada e históricos por eventos)
-  e `marts` (dimensões, fatos, alertas e `monitor_fontes`). Em dev, os datasets são
-  `dev_<ELEITORADO_USUARIO_DBT>_<camada>`; raw e meta são sempre os de produção.
-- Rodar um modelo: `uv run --env-file .env dbt build --project-dir dbt --profiles-dir dbt --target dev --select <modelo>`.
-  O projeto inteiro processa cerca de 7,7 GiB; a cota é de 30 GiB por dia.
+- DuckDB: `dbt/profiles.yml` tem um arquivo `.duckdb` por target (`dev`, `prod`, `ci`), dentro de
+  `ELEITORADO_LAGO`. O arquivo é descartável: os históricos são restaurados de Parquet
+  (`estado/historicos/`) antes de cada execução.
+- Camadas: `staging` (views sobre o raw em Parquet), `intermediate` (cota unificada e históricos
+  por eventos) e `marts` (Parquet em `ELEITORADO_PUBLICO/marts`, o que vai para o bucket público).
+- Rodar um modelo: `uv run --env-file .env dbt build --project-dir dbt --profiles-dir dbt --target dev --select <modelo>`
+  (crie antes `dados/publico/marts`; o `coletor pipeline` faz isso sozinho).
 - LGPD: CPF completo só até `intermediate`. Nos marts, todo CPF sai mascarado (`***.456.789-**`),
   inclusive dentro de nomes; o teste `sem_cpf_completo` roda em todos os marts.
 - Históricos (`int_cgu__sancoes_eventos`, `int_parlamentares__eventos`) são permanentes: o raw só
-  guarda 60 dias de snapshots, e um `--full-refresh` comum é ignorado nesses modelos. Datas
-  carregadas fora de ordem (anteriores à última já processada de cada cadastro ou casa) também
-  só entram por reconstrução. Para reconstruir a partir dos originais: recarregue cada data no
-  replay (`coletor recarregar <recurso> --competencia <data> --destino replay`) e rode
-  `dbt build --full-refresh --vars "{fonte_historico: replay}" --select +int_cgu__sancoes_eventos+ +int_parlamentares__eventos+`.
-  O `+` inicial reconstrói as views de staging apontando para o replay; o build diário seguinte
-  as devolve ao raw.
+  guarda 60 dias de snapshots, e um `--full-refresh` comum é ignorado nesses modelos. Para
+  refazê-los a partir dos originais: `coletor reconstruir` (depois de um `pipeline`).
+- CI: o dbt roda sobre `dbt/tests/lago_vazio` (Parquets sem linhas, só com os esquemas). Quando
+  uma fonte mudar de colunas, regere com `uv run python scripts/lago_vazio.py dados`.
 - Alertas são indícios para investigar, não constatações: a cota reembolsa gastos do parlamentar
   (não é contratação pública) e só aparecem sanções vistas desde a primeira coleta.
 
 ## Operação
 
-- **Execução diária:** Cloud Scheduler `pipeline-diario` às 07:30 (Brasília) dispara o Cloud Run Job
-  `pipeline`, que roda `coletor pipeline` (coleta + `dbt build`) e grava `meta.execucoes`.
-- **Deploy:** cada push em `main` publica a imagem no Artifact Registry e atualiza o job
-  (`.github/workflows/deploy.yml`).
-- **Vigia:** às 10:00 (Brasília), `.github/workflows/vigia.yml` roda `coletor vigia`; se não houve
-  execução agendada com sucesso no dia, o workflow falha e o GitHub avisa por e-mail.
-- **Travas de custo:** orçamento de R$ 30/mês com alertas em 50/90/100% (sem créditos), cota de
-  30 GiB consultados por dia no BigQuery e `maximum_bytes_billed` de 10 GiB no dbt.
-- **Primeiro dia após um deploy feito depois das 07:30:** o vigia das 10:00 reprova porque ainda não
-  houve execução agendada da imagem nova; rode o job à mão logo após o deploy.
-- **Rodar o job à mão:** `gcloud run jobs execute pipeline --region southamerica-east1 --wait`.
+- **Execução diária:** `.github/workflows/pipeline.yml`, às 07:30 (Brasília): restaura o lago (cache
+  do Actions ou bucket), coleta, roda o `dbt build`, salva o estado no bucket e publica marts e
+  linhagem no R2. Uma falha em qualquer passo gera e-mail do GitHub.
+- **Primeira carga:** dispare o workflow à mão com `reconstruir` marcado.
+- **Público:** `manifesto.json`, `marts/` e `linhagem/index.html` no bucket R2. Os arquivos são
+  enviados antes do manifesto; quem lê o manifesto sempre vê um conjunto completo.
+- **Recuperação:** objetos sobrescritos ou apagados no bucket privado ficam 30 dias na exclusão
+  reversível; `coletor reconstruir` refaz os históricos a partir dos originais.
+- **Paralelo da migração:** enquanto o Cloud Run antigo roda (imagem congelada), o workflow grava
+  sob `paralelo/` e roda `coletor reconciliar`, que falha se os marts divergirem do BigQuery.
+
+### Cloudflare R2 (configuração única)
+
+1. No painel da Cloudflare, crie o bucket `eleitorado-publico` e ative o acesso público pelo
+   endereço `r2.dev` (até haver um domínio próprio).
+2. Crie um token de API do R2 com permissão "Object Read & Write" só nesse bucket.
+3. No GitHub: secrets `R2_CONTA` (id da conta), `R2_CHAVE_ID` e `R2_SEGREDO`; variável
+   `R2_BUCKET=eleitorado-publico`. Use `gh secret set <nome>`, que lê o valor sem ecoar.

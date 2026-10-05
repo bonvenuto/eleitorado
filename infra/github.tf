@@ -28,6 +28,13 @@ resource "google_service_account_iam_member" "deployer_wif" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.ref/refs/heads/main"
 }
 
+# pipeline: o workflow pipeline.yml, só a partir da branch principal
+resource "google_service_account_iam_member" "pipeline_wif" {
+  service_account_id = google_service_account.pipeline.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.ref/refs/heads/main"
+}
+
 resource "google_service_account_iam_member" "ci_wif" {
   service_account_id = google_service_account.ci.name
   role               = "roles/iam.workloadIdentityUser"
@@ -97,4 +104,8 @@ resource "google_bigquery_dataset_iam_member" "ci_le_raw" {
   dataset_id = google_bigquery_dataset.prod[each.key].dataset_id
   role       = "roles/bigquery.dataViewer"
   member     = "serviceAccount:${google_service_account.ci.email}"
+}
+
+output "sa_pipeline" {
+  value = google_service_account.pipeline.email
 }

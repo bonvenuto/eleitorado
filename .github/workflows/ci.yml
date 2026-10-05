@@ -18,42 +18,14 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
-      - name: dbt parse (sem conexão)
-        run: uv run dbt parse --project-dir dbt --profiles-dir dbt --target ci
+      # o dbt inteiro sobre o lago vazio (só esquemas): modelos, testes de dados e unitários,
+      # sem credencial nem dado nenhum
+      - name: dbt sobre o lago vazio
+        run: |
+          uv run python scripts/lago_vazio.py
+          mkdir -p "$ELEITORADO_PUBLICO/marts"
+          uv run dbt run --project-dir dbt --profiles-dir dbt --target ci
+          uv run dbt test --project-dir dbt --profiles-dir dbt --target ci
         env:
-          ELEITORADO_PROJETO: ci-sem-conexao
-
-  imagem:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: build da imagem (sem publicar)
-        run: docker build --build-arg VERSAO=${{ github.sha }} -t pipeline:ci .
-      - name: a imagem responde
-        run: docker run --rm pipeline:ci --help
-
-  dbt-unitarios:
-    runs-on: ubuntu-latest
-    # um de cada vez: todas as execuções usam o mesmo dataset ci
-    concurrency:
-      group: dbt-ci
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_SA_CI }}
-      - name: relações vazias no dataset ci
-        run: uv run dbt run --empty --project-dir dbt --profiles-dir dbt --target ci
-        env:
-          ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}
-      - name: testes unitários do dbt
-        run: uv run dbt test --select "test_type:unit" --project-dir dbt --profiles-dir dbt --target ci
-        env:
-          ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}
+          ELEITORADO_LAGO: dbt/tests/lago_vazio
+          ELEITORADO_PUBLICO: ${{ runner.temp }}/publico
