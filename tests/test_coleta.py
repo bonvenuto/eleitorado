@@ -31,12 +31,10 @@ def test_coleta_nova_arquiva_converte_e_carrega(respx_mock, deps, armazenamento,
         "gs://bucket-teste/dev/originais/cgu/cnep/competencia=2026-10-02/20261003T103000_"
     )
     assert registro.arquivo_original.endswith(".bin")
-    assert registro.arquivo_carga == (
-        f"gs://bucket-teste/dev/carga/cgu/cnep/competencia=2026-10-02/{registro.coleta_id}.parquet"
-    )
-    tabela = warehouse.particoes[("raw_cgu_dev.cnep", "20261002")]
+    assert registro.arquivo_carga == f"raw/cgu/cnep/20261002/{registro.coleta_id}.parquet"
+    tabela = warehouse.particoes[("raw/cgu/cnep", "20261002")]
     assert tabela.column("_arquivo_original").to_pylist() == [registro.arquivo_original] * 2
-    particionamento = warehouse.particionamentos["raw_cgu_dev.cnep"]
+    particionamento = warehouse.particionamentos["raw/cgu/cnep"]
     assert (particionamento.granularidade, particionamento.expiracao_dias) == ("DAY", 60)
 
 
@@ -118,8 +116,8 @@ def test_por_competencia_carrega_na_particao_anual(respx_mock, deps, warehouse):
     )
     registro = coletar(_ceap(), Competencia.de_ano(2025), HistoricoColetas(), deps, "exec-1")
     assert registro.status == "carregada", registro.erro
-    assert ("raw_camara_dev.ceap", "2025") in warehouse.particoes
-    particionamento = warehouse.particionamentos["raw_camara_dev.ceap"]
+    assert ("raw/camara/ceap", "2025") in warehouse.particoes
+    particionamento = warehouse.particionamentos["raw/camara/ceap"]
     assert (particionamento.granularidade, particionamento.expiracao_dias) == ("YEAR", None)
 
 
@@ -137,8 +135,8 @@ def test_recarga_para_replay_usa_o_original_e_nao_expira(respx_mock, deps, wareh
     )
     assert registro.status == "recarregada", registro.erro
     assert registro.sha256_conteudo == original.sha256_conteudo
-    assert ("replay_dev.cgu__cnep", "20261002") in warehouse.particoes
-    assert warehouse.particionamentos["replay_dev.cgu__cnep"].expiracao_dias is None
+    assert ("replay/raw/cgu/cnep", "20261002") in warehouse.particoes
+    assert warehouse.particionamentos["replay/raw/cgu/cnep"].expiracao_dias is None
 
 
 def test_coleta_forcada_duas_vezes_no_mesmo_segundo_reaproveita_o_original(
@@ -196,7 +194,7 @@ def test_execucao_interrompida_antes_da_carga_e_refeita_na_seguinte(respx_mock, 
     deps.agora = lambda: datetime(2026, 10, 3, 11, 0, tzinfo=UTC)
     refeita = coletar(CNEP, None, historico, deps, "exec-2")
     assert (interrompida.status, refeita.status) == ("falha", "carregada")
-    assert ("raw_cgu_dev.cnep", "20261002") in warehouse.particoes
+    assert ("raw/cgu/cnep", "20261002") in warehouse.particoes
 
 
 def test_resumo_conta_status_e_so_falha_derruba_o_sucesso():

@@ -1,4 +1,4 @@
-"""Dublês de GCS e BigQuery para testes sem nuvem."""
+"""Dublês do GCS e do lago para testes sem nuvem nem disco de verdade."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from coletor.armazenamento import Objeto, caminho_de_uri
+from coletor.armazenamento import Objeto
 from coletor.estado import md5_arquivo
-from coletor.warehouse import Coluna, Particionamento
+from coletor.lago import Carga, Coluna, Particionamento
 
 
 class FakeArmazenamento:
@@ -66,18 +66,22 @@ class FakeWarehouse:
         self.falhas_ao_anexar: dict[str, int] = {}
 
     def carregar_parquet(
-        self, tabela: str, uri: str, particionamento: Particionamento, dia: date
-    ) -> int:
+        self,
+        tabela: str,
+        origem: Path,
+        particionamento: Particionamento,
+        dia: date,
+        coleta_id: str,
+    ) -> Carga:
         if self.falha_na_carga is not None:
             raise self.falha_na_carga
-        dados = pq.read_table(self.armazenamento.objetos[caminho_de_uri(uri)])
+        dados = pq.read_table(origem)
+        particao = particionamento.decorador(dia)
         self.particionamentos.setdefault(tabela, particionamento)
-        self.particoes[(tabela, particionamento.decorador(dia))] = dados
-        return dados.num_rows
+        self.particoes[(tabela, particao)] = dados
+        return Carga(dados.num_rows, f"{tabela}/{particao}/{coleta_id}.parquet")
 
-    def garantir_tabela(
-        self, tabela: str, colunas: list[Coluna], particao_por: str | None = None
-    ) -> None:
+    def garantir_tabela(self, tabela: str, colunas: list[Coluna]) -> None:
         self.tabelas.add(tabela)
 
     def anexar_linhas(
@@ -85,7 +89,7 @@ class FakeWarehouse:
     ) -> None:
         if self.falhas_ao_anexar.get(tabela, 0) > 0:
             self.falhas_ao_anexar[tabela] -= 1
-            raise RuntimeError(f"BigQuery indisponível ao gravar {tabela}")
+            raise RuntimeError(f"disco indisponível ao gravar {tabela}")
         self.linhas[tabela].extend(linhas)
 
     def substituir_linhas(

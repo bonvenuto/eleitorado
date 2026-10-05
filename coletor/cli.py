@@ -1,9 +1,10 @@
-"""CLI `coletor`: fontes, executar, coletar e recarregar."""
+"""CLI `coletor`: coleta, pipeline diário, estado, publicação, reconstrução e reconciliação."""
 
 from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 import sys
 import uuid
 from collections.abc import Callable, Mapping
@@ -11,10 +12,10 @@ from datetime import datetime
 from pathlib import Path
 
 from coletor.agenda import Tarefa, tarefa_snapshot, tarefas_pendentes
-from coletor.coleta import EXPIRACAO_SNAPSHOT_DIAS, Dependencias, recarregar
+from coletor.coleta import Dependencias, recarregar
 from coletor.competencias import Competencia, data_brasilia
 from coletor.config import Config, ErroConfig, carregar_config
-from coletor.dbt import ResultadoDbt, rodar_dbt
+from coletor.dbt import ResultadoDbt, banco_do_target, gerar_linhagem, rodar_dbt
 from coletor.execucao import ResumoColetas, registro_execucao, rodar
 from coletor.manifesto import ErroManifesto, Manifesto, carregar_manifesto
 from coletor.meta import HistoricoColetas, RepositorioMeta
@@ -22,7 +23,11 @@ from coletor.meta import HistoricoColetas, RepositorioMeta
 log = logging.getLogger("coletor")
 
 Fabrica = Callable[[Config], Dependencias]
-RodarDbt = Callable[[Path, str], ResultadoDbt]
+RodarDbt = Callable[..., ResultadoDbt]
+
+# recursos cujos snapshots alimentam os históricos (fonte_snapshot no dbt)
+RECURSOS_HISTORICO = ("cgu.ceis", "cgu.cnep", "camara.deputados", "senado.senadores")
+SELECAO_HISTORICOS = ["+int_cgu__sancoes_eventos+", "+int_parlamentares__eventos+"]
 
 
 class ErroUso(Exception):
@@ -34,6 +39,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fontes", type=Path, default=Path("fontes"), help="diretório do manifesto"
     )
+    parser.add_argument("--dbt-dir", type=Path, default=Path("dbt"), help="projeto dbt")
+    parser.add_argument("--target", default="prod", help="target do dbt")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     sub.add_parser("fontes", help="lista os recursos e a última coleta bem-sucedida")
@@ -52,16 +59,21 @@ def _parser() -> argparse.ArgumentParser:
 
     pipeline = sub.add_parser("pipeline", help="coleta o que está vencido e roda o dbt build")
     pipeline.add_argument("--recursos", help="ids separados por vírgula (padrão: todos)")
-    pipeline.add_argument("--dbt-dir", type=Path, default=Path("dbt"), help="projeto dbt")
-    pipeline.add_argument("--target", default="prod", help="target do dbt")
 
-    sub.add_parser("vigia", help="falha se a execução agendada de hoje não teve sucesso")
+    estado = sub.add_parser("estado", help="sincroniza o lago local com o bucket privado")
+    estado.add_argument("acao", choices=["restaurar", "salvar"])
 
-    recarga = sub.add_parser("recarregar", help="refaz a carga a partir do original no GCS")
-    recarga.add_argument("recurso")
-    recarga.add_argument("--competencia", required=True)
-    recarga.add_argument("--coleta-id")
-    recarga.add_argument("--destino", choices=["raw", "replay"], default="raw")
+    sub.add_parser("publicar", help="gera a linhagem e envia marts e linhagem ao bucket público")
+
+    reconstruir = sub.add_parser(
+        "reconstruir", help="refaz os históricos a partir dos originais no bucket"
+    )
+    reconstruir.add_argument(
+        "--origem-prefixo",
+        help="prefixo dos originais (padrão: o do ambiente; '' para a raiz do bucket)",
+    )
+
+    sub.add_parser("reconciliar", help="compara os marts com os do BigQuery (só no paralelo)")
     return parser
 
 
@@ -107,17 +119,19 @@ def _fontes(manifesto: Manifesto, repo: RepositorioMeta) -> int:
     return 0
 
 
+def _recursos(args: argparse.Namespace, manifesto: Manifesto) -> list:
+    if args.recursos:
+        return [manifesto.obter(item.strip()) for item in args.recursos.split(",")]
+    return manifesto.todos()
+
+
 def _executar(
     args: argparse.Namespace, manifesto: Manifesto, deps: Dependencias, repo: RepositorioMeta
 ) -> int:
-    if args.recursos:
-        recursos = [manifesto.obter(item.strip()) for item in args.recursos.split(",")]
-    else:
-        recursos = manifesto.todos()
     inicio = deps.agora()
     repo.publicar_fontes(manifesto, inicio)
     historico = repo.carregar_historico()
-    tarefas = tarefas_pendentes(recursos, historico, data_brasilia(inicio))
+    tarefas = tarefas_pendentes(_recursos(args, manifesto), historico, data_brasilia(inicio))
     log.info("%d tarefa(s) pendente(s)", len(tarefas))
     return _rodar_tarefas(tarefas, historico, deps, repo, inicio, args.forcar)
 
@@ -129,14 +143,10 @@ def _pipeline(
     repo: RepositorioMeta,
     rodar_dbt_: RodarDbt,
 ) -> int:
-    if args.recursos:
-        recursos = [manifesto.obter(item.strip()) for item in args.recursos.split(",")]
-    else:
-        recursos = manifesto.todos()
     inicio = deps.agora()
     repo.publicar_fontes(manifesto, inicio)
     historico = repo.carregar_historico()
-    tarefas = tarefas_pendentes(recursos, historico, data_brasilia(inicio))
+    tarefas = tarefas_pendentes(_recursos(args, manifesto), historico, data_brasilia(inicio))
     log.info("%d tarefa(s) pendente(s)", len(tarefas))
     return _rodar_tarefas(
         tarefas,
@@ -145,17 +155,8 @@ def _pipeline(
         repo,
         inicio,
         False,
-        dbt=lambda: rodar_dbt_(args.dbt_dir, args.target),
+        dbt=lambda: rodar_dbt_(args.dbt_dir, args.target, deps.config.publico),
     )
-
-
-def _vigia(deps: Dependencias, repo: RepositorioMeta) -> int:
-    hoje = data_brasilia(deps.agora())
-    if repo.execucao_agendada_com_sucesso(hoje):
-        log.info("execução agendada de %s terminou com sucesso", hoje.isoformat())
-        return 0
-    print(f"erro: nenhuma execução agendada com sucesso em {hoje.isoformat()}", file=sys.stderr)
-    return 1
 
 
 def _coletar(
@@ -184,52 +185,120 @@ def _coletar(
     return _rodar_tarefas(tarefas, historico, deps, repo, inicio, args.forcar)
 
 
-def _recarregar(
-    args: argparse.Namespace, manifesto: Manifesto, deps: Dependencias, repo: RepositorioMeta
-) -> int:
-    rc = manifesto.obter(args.recurso)
-    try:
-        competencia = Competencia.de_rotulo(args.competencia)
-    except ValueError:
-        raise ErroUso(f"competência inválida: {args.competencia}") from None
-    hoje = data_brasilia(deps.agora())
-    antiga = (hoje - competencia.data).days >= EXPIRACAO_SNAPSHOT_DIAS
-    if args.destino == "raw" and rc.recurso.publicacao == "snapshot" and antiga:
-        raise ErroUso(
-            f"snapshot com {EXPIRACAO_SNAPSHOT_DIAS} dias ou mais expiraria no raw: "
-            "use --destino replay"
-        )
-    if args.coleta_id:
-        coleta = repo.buscar_coleta(args.coleta_id)
-        if coleta is None:
-            raise ErroUso(f"coleta {args.coleta_id} não encontrada")
-        origem = (f"{coleta['orgao']}.{coleta['recurso']}", coleta["competencia"])
-        if origem != (rc.id, competencia.rotulo):
-            raise ErroUso(
-                f"coleta {args.coleta_id} é de {origem[0]} competência {origem[1]}, "
-                f"não de {rc.id} competência {competencia.rotulo}"
-            )
-        if not coleta["arquivo_original"]:
-            raise ErroUso(f"coleta {args.coleta_id} ({coleta['status']}) está sem original no GCS")
-        uri = coleta["arquivo_original"]
+def _estado(args: argparse.Namespace, deps: Dependencias) -> int:
+    from coletor import estado
+
+    config = deps.config
+    banco = banco_do_target(config.lago, args.target)
+    if args.acao == "restaurar":
+        estado.restaurar(deps.armazenamento, config.prefixo_gcs, config.lago, banco)
     else:
-        prefixo = (
-            f"{deps.config.prefixo_gcs}originais/{rc.orgao}/{rc.recurso.id}/"
-            f"competencia={competencia.rotulo}/"
-        )
-        objetos = deps.armazenamento.listar(prefixo)
-        if not objetos:
-            raise ErroUso(f"nenhum original em gs://{deps.config.bucket}/{prefixo}")
-        uri = f"gs://{deps.config.bucket}/{objetos[-1]}"
-    historico = repo.carregar_historico()
-    registro = recarregar(rc, competencia, uri, historico, deps, str(uuid.uuid4()), args.destino)
-    repo.registrar_coleta(registro)
-    log.info(
-        "%s %s status=%s linhas=%s", rc.id, competencia.rotulo, registro.status, registro.linhas
+        estado.salvar(deps.armazenamento, config.prefixo_gcs, config.lago, banco)
+    return 0
+
+
+def _publicar(args: argparse.Namespace, deps: Dependencias, env: Mapping[str, str]) -> int:
+    from coletor.publicacao import R2Publicador, publicar
+
+    faltando = [
+        nome for nome in ("R2_CONTA", "R2_CHAVE_ID", "R2_SEGREDO", "R2_BUCKET") if not env.get(nome)
+    ]
+    if faltando:
+        raise ErroConfig(f"variáveis de ambiente ausentes: {', '.join(faltando)}")
+    if not gerar_linhagem(args.dbt_dir, args.target, deps.config.publico):
+        log.error("dbt docs generate falhou: nada foi publicado")
+        return 1
+    publicador = R2Publicador(
+        env["R2_CONTA"], env["R2_CHAVE_ID"], env["R2_SEGREDO"], env["R2_BUCKET"]
     )
-    if registro.erro:
-        log.error(registro.erro)
-    return 0 if registro.status == "recarregada" else 1
+    publicar(publicador, deps.config.publico, deps.agora(), deps.config.versao)
+    return 0
+
+
+def _reconstruir(
+    args: argparse.Namespace,
+    manifesto: Manifesto,
+    deps: Dependencias,
+    repo: RepositorioMeta,
+    rodar_dbt_: RodarDbt,
+) -> int:
+    """Recria no lago (`replay/`) os snapshots de todas as datas e refaz os históricos.
+
+    Roda depois de um `pipeline` completo: os marts que dependem dos históricos (o alerta de
+    fornecedor sancionado) também leem a cota, que precisa já existir no banco.
+    """
+    config = deps.config
+    prefixo = config.prefixo_gcs if args.origem_prefixo is None else args.origem_prefixo
+    replay = config.lago / "replay"
+    if replay.exists():
+        shutil.rmtree(replay)
+    historico = repo.carregar_historico()
+    execucao_id = str(uuid.uuid4())
+    falhas = 0
+    for recurso_id in RECURSOS_HISTORICO:
+        rc = manifesto.obter(recurso_id)
+        base = f"{prefixo}originais/{rc.orgao}/{rc.recurso.id}/"
+        ultimos: dict[str, str] = {}
+        for caminho in deps.armazenamento.listar(base):  # ordem por nome = ordem no tempo
+            rotulo = caminho.removeprefix(base).split("/", 1)[0].removeprefix("competencia=")
+            ultimos[rotulo] = caminho
+        log.info("%s: %d data(s) de referência", recurso_id, len(ultimos))
+        for rotulo, caminho in sorted(ultimos.items()):
+            registro = recarregar(
+                rc,
+                Competencia.de_rotulo(rotulo),
+                f"gs://{config.bucket}/{caminho}",
+                historico,
+                deps,
+                execucao_id,
+                "replay",
+            )
+            repo.registrar_coleta(registro)
+            if registro.status != "recarregada":
+                falhas += 1
+                log.error("%s %s: %s", recurso_id, rotulo, registro.erro)
+    if falhas:
+        log.error("%d original(is) com falha: os históricos não foram refeitos", falhas)
+        return 1
+    resultado = rodar_dbt_(
+        args.dbt_dir,
+        args.target,
+        config.publico,
+        [
+            "--full-refresh",
+            "--vars",
+            "{fonte_historico: replay}",
+            "--select",
+            *SELECAO_HISTORICOS,
+        ],
+    )
+    if resultado.status != "sucesso":
+        log.error("dbt da reconstrução falhou: %s", resultado)
+        return 1
+    # as views de staging ficaram apontando para o replay: volta a apontá-las para o raw
+    resultado = rodar_dbt_(args.dbt_dir, args.target, config.publico, ["--select", "staging"])
+    shutil.rmtree(replay)
+    return 0 if resultado.status == "sucesso" else 1
+
+
+def _reconciliar(deps: Dependencias) -> int:
+    from coletor.gcp import credenciais_do_ambiente
+    from coletor.reconciliacao import consulta_bigquery, consulta_duckdb, reconciliar
+
+    config = deps.config
+    divergencias = reconciliar(
+        consulta_bigquery(config.projeto, credenciais_do_ambiente(config.projeto)),
+        consulta_duckdb(config.publico),
+    )
+    for divergencia in divergencias:
+        print(f"divergência em {divergencia.nome}:", file=sys.stderr)
+        for linha in divergencia.so_no_bigquery[:20]:
+            print(f"  só no BigQuery: {linha}", file=sys.stderr)
+        for linha in divergencia.so_no_duckdb[:20]:
+            print(f"  só no DuckDB:   {linha}", file=sys.stderr)
+    if not divergencias:
+        log.info("reconciliação sem divergências")
+    return 1 if divergencias else 0
 
 
 def main(
@@ -238,31 +307,38 @@ def main(
     env: Mapping[str, str] | None = None,
     dbt: RodarDbt | None = None,
 ) -> int:
+    import os
+
     args = _parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    env = os.environ if env is None else env
     deps: Dependencias | None = None
     try:
         config = carregar_config(env)
-        log.info("ambiente=%s projeto=%s", config.ambiente, config.projeto)
+        log.info("ambiente=%s prefixo=%r lago=%s", config.ambiente, config.prefixo_gcs, config.lago)
         manifesto = carregar_manifesto(args.fontes)
         if fabrica is None:
             from coletor.gcp import montar_dependencias
 
             fabrica = montar_dependencias
         deps = fabrica(config)
-        repo = RepositorioMeta(deps.warehouse, config)
-        if args.comando == "vigia":
-            return _vigia(deps, repo)  # conta do vigia só lê: não cria tabelas
+        if args.comando == "estado":
+            return _estado(args, deps)
+        if args.comando == "publicar":
+            return _publicar(args, deps, env)
+        if args.comando == "reconciliar":
+            return _reconciliar(deps)
+        repo = RepositorioMeta(deps.warehouse)
         repo.preparar()
         if args.comando == "pipeline":
             return _pipeline(args, manifesto, deps, repo, dbt or rodar_dbt)
+        if args.comando == "reconstruir":
+            return _reconstruir(args, manifesto, deps, repo, dbt or rodar_dbt)
         if args.comando == "fontes":
             return _fontes(manifesto, repo)
         if args.comando == "executar":
             return _executar(args, manifesto, deps, repo)
-        if args.comando == "coletar":
-            return _coletar(args, manifesto, deps, repo)
-        return _recarregar(args, manifesto, deps, repo)
+        return _coletar(args, manifesto, deps, repo)
     except (ErroConfig, ErroManifesto, ErroUso) as erro:
         print(f"erro: {erro}", file=sys.stderr)
         return 2

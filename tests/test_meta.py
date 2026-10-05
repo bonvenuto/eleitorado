@@ -1,8 +1,6 @@
 import json
 from datetime import UTC, date, datetime
 
-import pytest
-
 from coletor.competencias import Competencia
 from coletor.manifesto import RecursoCompleto
 from coletor.meta import (
@@ -78,7 +76,7 @@ def test_linha_de_coleta_serializa_json_e_datas():
     assert linha["iniciada_em"] == "2026-10-03T11:00:00+00:00"
 
 
-def test_historico_e_montado_a_partir_da_consulta(warehouse, config):
+def test_historico_e_montado_a_partir_da_consulta(warehouse):
     warehouse.resposta_consulta = [
         {
             "orgao": "camara",
@@ -90,14 +88,9 @@ def test_historico_e_montado_a_partir_da_consulta(warehouse, config):
             "colunas": '[["A", "a"]]',
         }
     ]
-    historico = RepositorioMeta(warehouse, config).carregar_historico()
+    historico = RepositorioMeta(warehouse).carregar_historico()
     assert historico.ultimo_sha("camara.ceap", "2025") == "abc"
     assert historico.ultima_data_sucesso("camara.ceap") == HOJE
-
-
-def test_buscar_coleta_exige_uuid(warehouse, config):
-    with pytest.raises(ValueError):
-        RepositorioMeta(warehouse, config).buscar_coleta("1' OR '1'='1")
 
 
 def test_recarga_no_raw_passa_a_ser_a_referencia_de_deduplicacao():

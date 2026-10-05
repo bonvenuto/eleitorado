@@ -1,4 +1,4 @@
-"""Gravação de originais e arquivos de carga no Cloud Storage."""
+"""Bucket privado no Cloud Storage: originais imutáveis e o estado espelhado do lago."""
 
 from __future__ import annotations
 
@@ -52,10 +52,6 @@ def caminho_original(
         f"{prefixo}originais/{orgao}/{recurso}/competencia={competencia}/"
         f"{instante:%Y%m%dT%H%M%S}_{sha256_conteudo[:12]}.{extensao}"
     )
-
-
-def caminho_carga(prefixo: str, orgao: str, recurso: str, competencia: str, coleta_id: str) -> str:
-    return f"{prefixo}carga/{orgao}/{recurso}/competencia={competencia}/{coleta_id}.parquet"
 
 
 def caminho_de_uri(uri: str) -> str:

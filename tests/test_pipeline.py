@@ -1,10 +1,7 @@
-from datetime import date
-
 import httpx
 
 from coletor.cli import main
 from coletor.dbt import ResultadoDbt
-from coletor.meta import RepositorioMeta
 from tests.amostras import CNEP_CSV, PAGINA_CGU, RAIZ, zip_com
 
 PAGINA = "https://portaldatransparencia.gov.br/download-de-dados/cnep"
@@ -34,14 +31,14 @@ def test_pipeline_coleta_roda_dbt_e_registra_uma_execucao(respx_mock, deps, ware
     _mock_tudo_sem_alteracao(respx_mock)
     chamadas = []
 
-    def dbt(diretorio, target):
-        chamadas.append((diretorio.name, target))
+    def dbt(diretorio, target, publico, argumentos=()):
+        chamadas.append((diretorio.name, target, publico.as_posix()))
         return ResultadoDbt("sucesso", 0)
 
     codigo = _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt)
     assert codigo == 0
-    assert chamadas == [("dbt", "prod")]
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    assert chamadas == [("dbt", "prod", "dados/publico")]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["dbt_status"]) == ("sucesso", "sucesso")
     assert execucao["dbt_testes_com_erro"] == 0
 
@@ -49,10 +46,10 @@ def test_pipeline_coleta_roda_dbt_e_registra_uma_execucao(respx_mock, deps, ware
 def test_pipeline_com_dbt_falhando_termina_com_erro(respx_mock, deps, warehouse):
     _mock_tudo_sem_alteracao(respx_mock)
     codigo = _rodar(
-        ["pipeline", "--recursos", "cgu.cnep"], deps, lambda d, t: ResultadoDbt("falha", 3)
+        ["pipeline", "--recursos", "cgu.cnep"], deps, lambda d, t, p, a=(): ResultadoDbt("falha", 3)
     )
     assert codigo == 1
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["dbt_status"], execucao["dbt_testes_com_erro"]) == (
         "falha",
         "falha",
@@ -64,13 +61,13 @@ def test_pipeline_roda_o_dbt_mesmo_com_falha_de_coleta(respx_mock, deps, warehou
     respx_mock.get(url__startswith=PAGINA).mock(return_value=httpx.Response(403))
     chamadas = []
 
-    def dbt(diretorio, target):
+    def dbt(diretorio, target, publico, argumentos=()):
         chamadas.append(target)
         return ResultadoDbt("sucesso", 0)
 
     assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
     assert chamadas == ["prod"]
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["coletas_falha"], execucao["dbt_status"]) == (
         "falha",
         1,
@@ -85,27 +82,5 @@ def test_pipeline_registra_a_execucao_mesmo_se_o_dbt_explodir(respx_mock, deps, 
         raise FileNotFoundError("dbt não instalado")
 
     assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
-    [execucao] = warehouse.linhas["meta_dev.execucoes"]
+    [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["dbt_status"]) == ("falha", "falha")
-
-
-def test_vigia_aprova_quando_ha_execucao_agendada_com_sucesso_hoje(deps, warehouse):
-    warehouse.resposta_consulta = [{"n": 1}]
-    assert _rodar(["vigia"], deps, None) == 0
-    assert warehouse.tabelas == set()  # não tenta criar tabelas: a conta do vigia só lê
-
-
-def test_vigia_reprova_sem_execucao_agendada_com_sucesso(deps, warehouse, capsys):
-    warehouse.resposta_consulta = [{"n": 0}]
-    assert _rodar(["vigia"], deps, None) == 1
-    assert "2026-10-03" in capsys.readouterr().err
-
-
-def test_consulta_do_vigia_filtra_dia_origem_e_status(warehouse, config):
-    consultas = []
-    warehouse.consultar = lambda sql: consultas.append(sql) or [{"n": 2}]
-    assert RepositorioMeta(warehouse, config).execucao_agendada_com_sucesso(date(2026, 10, 3))
-    [sql] = consultas
-    assert "origem = 'agendada'" in sql
-    assert "status = 'sucesso'" in sql
-    assert "DATE(iniciada_em, 'America/Sao_Paulo') = '2026-10-03'" in sql
