@@ -33,10 +33,10 @@ with unidas as (
 select
     *,
     -- muda quando qualquer atributo da sanção muda (base do histórico)
-    to_hex(md5(to_json_string(struct(
+    md5(to_json(struct_pack(
         tipo_pessoa, documento, nome_sancionado, razao_social_receita, categoria, valor_multa,
         data_inicio, data_fim, data_publicacao, data_transito_julgado, abrangencia,
         orgao_sancionador, uf_orgao_sancionador, esfera_orgao_sancionador, fundamentacao_legal,
         numero_processo
-    )))) as hash_atributos
+    ))) as hash_atributos
 from unidas

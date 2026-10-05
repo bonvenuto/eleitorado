@@ -42,7 +42,7 @@ def _schemas(projeto, target: str) -> dict[str, str]:
         capture_output=True,
         text=True,
         check=True,
-        env={**__import__("os").environ, "ELEITORADO_PROJETO": "projeto-teste"},
+        env={**__import__("os").environ, "ELEITORADO_LAGO": str(projeto)},
     )
     linhas = [json.loads(linha) for linha in saida.stdout.splitlines() if linha.startswith("{")]
     return {
@@ -52,26 +52,20 @@ def _schemas(projeto, target: str) -> dict[str, str]:
     }
 
 
-def test_schemas_em_producao_sao_os_configurados(projeto):
-    assert _schemas(projeto, "prod") == {"com_schema": "staging", "sem_schema": "marts"}
+@pytest.mark.parametrize("target", ["prod", "dev", "ci"])
+def test_schema_e_sempre_o_configurado(projeto, target):
+    # cada target tem o próprio arquivo .duckdb: não há prefixo por usuário nem por ambiente
+    assert _schemas(projeto, target) == {"com_schema": "staging", "sem_schema": "main"}
 
 
-def test_schemas_em_dev_levam_o_prefixo_do_usuario(projeto, monkeypatch):
-    monkeypatch.setenv("ELEITORADO_USUARIO_DBT", "angelo")
-    assert _schemas(projeto, "dev") == {
-        "com_schema": "dev_angelo_staging",
-        "sem_schema": "dev_angelo",
-    }
-
-
-def test_schemas_em_ci_ficam_todos_no_dataset_do_ci(projeto):
-    assert _schemas(projeto, "ci") == {"com_schema": "ci", "sem_schema": "ci"}
-
-
-def test_target_ci_nao_define_quota_project():
-    # No CI a credencial é federada (WIF): com quota_project, a troca de credenciais exige
-    # serviceusage da identidade federada e falha com 403 (mesmo caso do coletor, PR #4).
+def test_targets_usam_duckdb_com_arquivos_separados():
     import yaml
 
     perfil = yaml.safe_load((RAIZ / "dbt" / "profiles.yml").read_text(encoding="utf-8"))
-    assert "quota_project" not in perfil["eleitorado"]["outputs"]["ci"]
+    saidas = perfil["eleitorado"]["outputs"]
+    assert {nome: saida["type"] for nome, saida in saidas.items()} == {
+        "dev": "duckdb",
+        "prod": "duckdb",
+        "ci": "duckdb",
+    }
+    assert len({saida["path"] for saida in saidas.values()}) == 3

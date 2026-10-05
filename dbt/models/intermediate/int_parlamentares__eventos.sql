@@ -2,10 +2,9 @@
 {{
     config(
         materialized='incremental',
-        incremental_strategy='merge',
+        incremental_strategy='delete+insert',
         unique_key='evento_id',
         full_refresh=(var('fonte_historico', 'raw') == 'replay'),
-        cluster_by=['parlamentar_id'],
     )
 }}
 

@@ -8,9 +8,9 @@ com_mandatos as (
     select
         *,
         if(
-            starts_with(trim(json_query(payload, '$.Mandatos.Mandato')), '['),
-            json_query_array(payload, '$.Mandatos.Mandato'),
-            [json_query(payload, '$.Mandatos.Mandato')]
+            json_type(json_extract(payload, '$.Mandatos.Mandato')) = 'ARRAY',
+            json_extract(payload, '$.Mandatos.Mandato[*]'),
+            [json_extract(payload, '$.Mandatos.Mandato')]
         ) as mandatos
     from origem
 )
@@ -18,29 +18,29 @@ com_mandatos as (
 select
     _coleta_id,
     _competencia_data as data_referencia,
-    json_value(payload, '$.IdentificacaoParlamentar.CodigoParlamentar') as id_senador,
-    json_value(payload, '$.IdentificacaoParlamentar.NomeParlamentar') as nome,
-    json_value(payload, '$.IdentificacaoParlamentar.NomeCompletoParlamentar') as nome_completo,
-    json_value(payload, '$.IdentificacaoParlamentar.SexoParlamentar') as sexo,
-    json_value(payload, '$.IdentificacaoParlamentar.SiglaPartidoParlamentar') as partido_sigla,
-    json_value(payload, '$.IdentificacaoParlamentar.UrlFotoParlamentar') as url_foto,
+    json_extract_string(payload, '$.IdentificacaoParlamentar.CodigoParlamentar') as id_senador,
+    json_extract_string(payload, '$.IdentificacaoParlamentar.NomeParlamentar') as nome,
+    json_extract_string(payload, '$.IdentificacaoParlamentar.NomeCompletoParlamentar') as nome_completo,
+    json_extract_string(payload, '$.IdentificacaoParlamentar.SexoParlamentar') as sexo,
+    json_extract_string(payload, '$.IdentificacaoParlamentar.SiglaPartidoParlamentar') as partido_sigla,
+    json_extract_string(payload, '$.IdentificacaoParlamentar.UrlFotoParlamentar') as url_foto,
     -- UF do mandato mais recente
     (
-        select json_value(mandato, '$.UfParlamentar')
-        from unnest(mandatos) as mandato
+        select json_extract_string(mandato, '$.UfParlamentar')
+        from unnest(mandatos) as u(mandato)
         order by coalesce(
-            safe_cast(json_value(mandato, '$.SegundaLegislaturaDoMandato.NumeroLegislatura') as int64),
-            safe_cast(json_value(mandato, '$.PrimeiraLegislaturaDoMandato.NumeroLegislatura') as int64)
+            try_cast(json_extract_string(mandato, '$.SegundaLegislaturaDoMandato.NumeroLegislatura') as bigint),
+            try_cast(json_extract_string(mandato, '$.PrimeiraLegislaturaDoMandato.NumeroLegislatura') as bigint)
         ) desc
         limit 1
     ) as uf_sigla,
     array(
         select distinct legislatura
-        from unnest(mandatos) as mandato,
+        from unnest(mandatos) as u(mandato),
             unnest([
-                safe_cast(json_value(mandato, '$.PrimeiraLegislaturaDoMandato.NumeroLegislatura') as int64),
-                safe_cast(json_value(mandato, '$.SegundaLegislaturaDoMandato.NumeroLegislatura') as int64)
-            ]) as legislatura
+                try_cast(json_extract_string(mandato, '$.PrimeiraLegislaturaDoMandato.NumeroLegislatura') as bigint),
+                try_cast(json_extract_string(mandato, '$.SegundaLegislaturaDoMandato.NumeroLegislatura') as bigint)
+            ]) as l(legislatura)
         where legislatura is not null
         order by legislatura
     ) as legislaturas

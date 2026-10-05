@@ -21,3 +21,8 @@ dbt/target/
 dbt/dbt_packages/
 dbt/logs/
 .superpowers/
+
+# lago local (espelho do bucket privado) e artefatos públicos
+dados/
+*.duckdb
+dbt/tests/lago_vazio/**/*.parquet

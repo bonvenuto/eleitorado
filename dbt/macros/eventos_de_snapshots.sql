@@ -38,7 +38,7 @@ presencas as (
         {{ particao }} as _particao,
         {{ chave }},
         data_referencia,
-        struct(
+        struct_pack(
             hash_atributos, _coleta_id,
             {% for atributo in atributos %}{{ atributo }}{% if not loop.last %}, {% endif %}{% endfor %}
         ) as estado
@@ -51,7 +51,7 @@ presencas as (
         {{ particao }} as _particao,
         {{ chave }},
         date '0001-01-01' as data_referencia,
-        struct(
+        struct_pack(
             hash_atributos, _coleta_id,
             {% for atributo in atributos %}{{ atributo }}{% if not loop.last %}, {% endif %}{% endfor %}
         ) as estado
@@ -109,7 +109,7 @@ eventos as (
 )
 
 select
-    to_hex(md5(concat({{ chave }}, '|', cast(data_referencia as string), '|', evento))) as evento_id,
+    md5(concat({{ chave }}, '|', cast(data_referencia as varchar), '|', evento)) as evento_id,
     {{ chave }},
     data_referencia as data_evento,
     evento,

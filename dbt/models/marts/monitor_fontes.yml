@@ -14,12 +14,12 @@ unit_tests:
       aparece com último sucesso nulo.
     model: monitor_fontes
     given:
-      - input: source('meta', 'coletas')
+      - input: ref('stg_meta__coletas')
         rows:
-          - {orgao: cgu, recurso: ceis, destino: raw, status: sem_alteracao, iniciada_em: '2026-10-03 10:00:00', finalizada_em: '2026-10-03 10:01:00'}
-          - {orgao: cgu, recurso: ceis, destino: raw, status: falha, iniciada_em: '2026-10-04 10:00:00', finalizada_em: '2026-10-04 10:01:00'}
-          - {orgao: cgu, recurso: ceis, destino: replay, status: recarregada, iniciada_em: '2026-10-04 11:00:00', finalizada_em: '2026-10-04 11:01:00'}
-      - input: source('meta', 'fontes')
+          - {recurso_id: cgu.ceis, destino: raw, status: sem_alteracao, iniciada_em: '2026-10-03 10:00:00', finalizada_em: '2026-10-03 10:01:00'}
+          - {recurso_id: cgu.ceis, destino: raw, status: falha, iniciada_em: '2026-10-04 10:00:00', finalizada_em: '2026-10-04 10:01:00'}
+          - {recurso_id: cgu.ceis, destino: replay, status: recarregada, iniciada_em: '2026-10-04 11:00:00', finalizada_em: '2026-10-04 11:01:00'}
+      - input: ref('stg_meta__fontes')
         rows:
           - {recurso_id: cgu.ceis, cadencia_corrente: diaria}
           - {recurso_id: cgu.cnep, cadencia_corrente: semanal}

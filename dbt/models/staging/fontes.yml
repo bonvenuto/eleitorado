@@ -1,42 +1,49 @@
 version: 2
 
-# O raw e o meta são sempre os de produção, também em dev (seção 5.3 da spec).
+# Raw e meta são Parquet no lago local (ELEITORADO_LAGO), espelho do bucket privado.
+# Um arquivo por coleta: raw/<órgão>/<recurso>/<partição>/<coleta_id>.parquet.
 sources:
   - name: raw_camara
-    database: "{{ env_var('ELEITORADO_PROJETO') }}"
-    schema: raw_camara
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/camara/{name}/*/*.parquet', union_by_name = true)"
     tables:
       - name: ceap
       - name: deputados
   - name: raw_senado
-    database: "{{ env_var('ELEITORADO_PROJETO') }}"
-    schema: raw_senado
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/senado/{name}/*/*.parquet', union_by_name = true)"
     tables:
       - name: ceaps
       - name: senadores
   - name: raw_cgu
-    database: "{{ env_var('ELEITORADO_PROJETO') }}"
-    schema: raw_cgu
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/cgu/{name}/*/*.parquet', union_by_name = true)"
     tables:
       - name: ceis
       - name: cnep
   - name: raw_ibge
-    database: "{{ env_var('ELEITORADO_PROJETO') }}"
-    schema: raw_ibge
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/ibge/{name}/*/*.parquet', union_by_name = true)"
     tables:
       - name: municipios
-  # snapshots recarregados dos originais para reconstruir os históricos (seção 7.4)
+  # snapshots de todas as datas, recriados dos originais pelo `coletor reconstruir` (seção 7.4)
   - name: replay
-    database: "{{ env_var('ELEITORADO_PROJETO') }}"
-    schema: replay
     tables:
       - name: cgu__ceis
+        meta:
+          external_location: "read_parquet('{{ env_var('ELEITORADO_REPLAY', 'dados/replay') }}/raw/cgu/ceis/*/*.parquet', union_by_name = true)"
       - name: cgu__cnep
+        meta:
+          external_location: "read_parquet('{{ env_var('ELEITORADO_REPLAY', 'dados/replay') }}/raw/cgu/cnep/*/*.parquet', union_by_name = true)"
       - name: camara__deputados
+        meta:
+          external_location: "read_parquet('{{ env_var('ELEITORADO_REPLAY', 'dados/replay') }}/raw/camara/deputados/*/*.parquet', union_by_name = true)"
       - name: senado__senadores
+        meta:
+          external_location: "read_parquet('{{ env_var('ELEITORADO_REPLAY', 'dados/replay') }}/raw/senado/senadores/*/*.parquet', union_by_name = true)"
   - name: meta
-    database: "{{ env_var('ELEITORADO_PROJETO') }}"
-    schema: meta
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/meta/{name}/*/*.parquet', union_by_name = true)"
     tables:
       - name: coletas
       - name: fontes
