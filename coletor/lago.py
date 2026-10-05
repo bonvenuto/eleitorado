@@ -33,11 +33,12 @@ class Coluna:
 
 @dataclass(frozen=True)
 class Particionamento:
-    granularidade: Literal["DAY", "YEAR"]
+    granularidade: Literal["DAY", "MONTH", "YEAR"]
     expiracao_dias: int | None = None
 
     def decorador(self, dia: date) -> str:
-        return dia.strftime("%Y%m%d") if self.granularidade == "DAY" else dia.strftime("%Y")
+        formato = {"DAY": "%Y%m%d", "MONTH": "%Y%m", "YEAR": "%Y"}[self.granularidade]
+        return dia.strftime(formato)
 
 
 @dataclass(frozen=True)

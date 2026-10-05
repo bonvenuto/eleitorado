@@ -210,3 +210,21 @@ def test_resumo_conta_status_e_so_falha_derruba_o_sucesso():
         1,
     )
     assert not resumo.sucesso
+
+
+def test_mes_recente_nao_publicado():
+    from coletor.coleta import nao_publicada
+    from coletor.http import ErroHttp
+
+    mensal = recurso(
+        publicacao="por_competencia",
+        competencia={"tipo": "mes", "inicio": 2013},
+        cadencia={"corrente": "semanal", "anteriores": "mensal"},
+    )
+    hoje = date(2026, 10, 5)
+    erro = ErroHttp(url="u", status=403, mensagem="x")
+    assert nao_publicada(mensal, Competencia.de_mes(2026, 8), erro, hoje)
+    assert not nao_publicada(mensal, Competencia.de_mes(2026, 6), erro, hoje)  # antigo: falha
+    assert not nao_publicada(
+        mensal, Competencia.de_mes(2026, 8), ErroHttp(url="u", status=500, mensagem="x"), hoje
+    )

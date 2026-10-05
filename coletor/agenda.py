@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from coletor.competencias import Competencia, anos
+from coletor.competencias import Competencia, anos, meses
 from coletor.manifesto import RecursoCompleto
 from coletor.meta import HistoricoColetas
 
@@ -39,6 +39,20 @@ def tarefas_pendentes(
                 tarefas.append(tarefa_snapshot(rc, hoje))
             continue
         assert regra.competencia.inicio is not None and regra.cadencia.anteriores is not None
+        if regra.competencia.tipo == "mes":
+            corrente = date(hoje.year, hoje.month, 1)
+            anterior = date(corrente.year - (corrente.month == 1), (corrente.month - 2) % 12 + 1, 1)
+            ultimo = corrente
+            if regra.competencia.fim:
+                ultimo = min(ultimo, Competencia.de_rotulo(regra.competencia.fim).data)
+            for dia in meses(date(regra.competencia.inicio, 1, 1), ultimo):
+                cadencia = regra.cadencia.corrente if dia >= anterior else regra.cadencia.anteriores
+                competencia = Competencia.de_mes(dia.year, dia.month)
+                if _vencida(
+                    historico.ultima_data_sucesso(rc.id, competencia.rotulo), hoje, cadencia
+                ):
+                    tarefas.append(Tarefa(rc, competencia))
+            continue
         for ano in anos(regra.competencia.inicio, hoje):
             cadencia = regra.cadencia.corrente if ano == hoje.year else regra.cadencia.anteriores
             competencia = Competencia.de_ano(ano)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -17,9 +18,19 @@ class _Modelo(BaseModel):
 
 
 class RegraCompetencia(_Modelo):
-    tipo: Literal["ano", "data_arquivo", "data_coleta"]
+    tipo: Literal["ano", "mes", "data_arquivo", "data_coleta"]
     inicio: int | None = None
+    fim: str | None = None  # AAAA-MM, só para tipo "mes": última competência de série encerrada
     pagina: str | None = None
+
+    @model_validator(mode="after")
+    def _fim(self) -> RegraCompetencia:
+        if self.fim is not None:
+            if self.tipo != "mes":
+                raise ValueError("competencia.fim só vale para tipo 'mes'")
+            if not re.fullmatch(r"\d{4}-\d{2}", self.fim):
+                raise ValueError("competencia.fim deve ser AAAA-MM")
+        return self
 
 
 class RegraCadencia(_Modelo):
@@ -63,11 +74,13 @@ class Recurso(_Modelo):
     def _coerente(self) -> Recurso:
         regra = self.competencia
         if self.publicacao == "por_competencia":
-            if regra.tipo != "ano" or regra.inicio is None:
-                raise ValueError("por_competencia exige competencia.tipo 'ano' com 'inicio'")
+            if regra.tipo not in ("ano", "mes") or regra.inicio is None:
+                raise ValueError(
+                    "por_competencia exige competencia.tipo 'ano' ou 'mes' com 'inicio'"
+                )
             if self.cadencia.anteriores is None:
                 raise ValueError("por_competencia exige cadencia.anteriores")
-        elif regra.tipo == "ano":
+        elif regra.tipo in ("ano", "mes"):
             raise ValueError("snapshot exige competencia.tipo 'data_arquivo' ou 'data_coleta'")
         if regra.tipo == "data_arquivo" and not regra.pagina:
             raise ValueError("competencia.tipo 'data_arquivo' exige 'pagina'")

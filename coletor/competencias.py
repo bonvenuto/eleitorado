@@ -19,6 +19,10 @@ class Competencia:
         return cls(str(ano), date(ano, 1, 1))
 
     @classmethod
+    def de_mes(cls, ano: int, mes: int) -> Competencia:
+        return cls(f"{ano:04d}-{mes:02d}", date(ano, mes, 1))
+
+    @classmethod
     def de_dia(cls, dia: date) -> Competencia:
         return cls(dia.isoformat(), dia)
 
@@ -26,6 +30,8 @@ class Competencia:
     def de_rotulo(cls, rotulo: str) -> Competencia:
         if len(rotulo) == 4 and rotulo.isdigit():
             return cls.de_ano(int(rotulo))
+        if len(rotulo) == 7 and rotulo[4] == "-":
+            return cls.de_mes(int(rotulo[:4]), int(rotulo[5:]))
         return cls.de_dia(date.fromisoformat(rotulo))
 
 
@@ -45,3 +51,13 @@ def legislaturas(inicio: int, dia: date) -> list[int]:
 
 def anos(inicio: int, dia: date) -> list[int]:
     return list(range(inicio, dia.year + 1))
+
+
+def meses(inicio: date, fim: date) -> list[date]:
+    """Primeiro dia de cada mês, de `inicio` a `fim` (inclusive)."""
+    atual, ultimo = date(inicio.year, inicio.month, 1), date(fim.year, fim.month, 1)
+    resultado = []
+    while atual <= ultimo:
+        resultado.append(atual)
+        atual = date(atual.year + atual.month // 12, atual.month % 12 + 1, 1)
+    return resultado

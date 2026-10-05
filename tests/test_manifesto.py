@@ -52,3 +52,13 @@ def test_recurso_inexistente():
     manifesto = carregar_manifesto(RAIZ / "fontes")
     with pytest.raises(ErroManifesto, match="desconhecido"):
         manifesto.obter("cgu.nao_existe")
+
+
+def test_competencia_mensal_valida_e_fim_so_para_mes():
+    from coletor.manifesto import RegraCompetencia
+
+    assert RegraCompetencia(tipo="mes", inicio=2013, fim="2024-04").fim == "2024-04"
+    with pytest.raises(ValueError):
+        RegraCompetencia(tipo="mes", inicio=2013, fim="2024-4")
+    with pytest.raises(ValueError):
+        RegraCompetencia(tipo="ano", inicio=2013, fim="2024-04")
