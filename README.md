@@ -12,6 +12,8 @@ CEIS e CNEP (CGU), municípios (IBGE). Cada coleta guarda o original no GCS (`or
 imutável), grava o raw em Parquet no lago local (`dados/raw/<órgão>/<recurso>/<partição>/`) e
 registra tudo em `dados/meta/`. O lago local espelha `raw/`, `meta/` e `estado/` do bucket.
 Onda B1: emendas parlamentares (emendas, convênios, favorecidos e documentos de despesa), contratos do Executivo federal (2013 em diante) e licitações (2013 a abril de 2024), do Portal da Transparência.
+Onda B2: contratos do PNCP (todas as esferas no lago privado; o Executivo federal é unificado aos contratos do Portal no `fct_contrato_federal`).
+
 
 ### Configuração local
 
