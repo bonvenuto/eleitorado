@@ -242,14 +242,14 @@ WITH sucesso AS (
   SELECT orgao, recurso, competencia, competencia_data, finalizada_em, sha256_conteudo,
          ROW_NUMBER() OVER (
            PARTITION BY orgao, recurso, competencia ORDER BY finalizada_em DESC) AS ordem
-  FROM `{tabela}`
+  FROM coletas
   WHERE status IN ('carregada', 'sem_alteracao', 'recarregada') AND destino = 'raw'
 ),
 carga AS (
   SELECT orgao, recurso, competencia, colunas,
          ROW_NUMBER() OVER (
            PARTITION BY orgao, recurso, competencia ORDER BY finalizada_em DESC) AS ordem
-  FROM `{tabela}`
+  FROM coletas
   WHERE status IN ('carregada', 'recarregada') AND destino = 'raw'
 )
 SELECT s.orgao, s.recurso, s.competencia, s.competencia_data, s.finalizada_em,

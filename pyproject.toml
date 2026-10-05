@@ -38,6 +38,8 @@ addopts = "-m 'not integracao'"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# os planos em docs/ trazem trechos de código fora de contexto (métodos soltos, por exemplo)
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
