@@ -17,6 +17,8 @@ from pathlib import Path
 
 import duckdb
 
+from coletor.esquemas import gerar_vazio
+
 PASTA = Path(__file__).resolve().parents[1] / "dbt" / "tests" / "lago_vazio"
 ESQUEMAS = PASTA / "esquemas.json"
 TABELAS_META = ["meta/coletas", "meta/fontes"]
@@ -44,12 +46,7 @@ def gerar(esquemas: dict[str, dict[str, str]]) -> None:
         destino = PASTA / tabela / "vazio" / "vazio.parquet"
         if destino.parent.exists():
             shutil.rmtree(destino.parent)
-        destino.parent.mkdir(parents=True)
-        definicao = ", ".join(f'"{nome}" {tipo}' for nome, tipo in colunas.items())
-        conexao = duckdb.connect()
-        conexao.execute(f"create table vazia ({definicao})")
-        conexao.execute(f"copy vazia to '{destino.as_posix()}' (format parquet)")
-        conexao.close()
+        gerar_vazio(destino, colunas)
 
 
 def main() -> None:
