@@ -5,8 +5,9 @@ with contratos as (
     select
         *,
         {{ chave_correspondencia('fornecedor_tipo_documento', 'fornecedor_documento') }} as chave
-    from {{ ref('int_cgu__contratos') }}
+    from {{ ref('int_contratos_federais') }}
     where fornecedor_documento_valido and data_assinatura is not null
+
 ),
 
 sancoes as (
@@ -21,9 +22,10 @@ cruzadas as (
             as tipo_correspondencia,
         c.contrato_numero,
         c.orgao_nome,
-        c.ug_nome,
-        c.objeto,
+        {{ mascarar_cpfs_em_texto('c.ug_nome') }} as ug_nome,
+        {{ mascarar_cpfs_em_texto('c.objeto') }} as objeto,
         c.data_assinatura,
+
         c.valor_final,
         {{ mascarar_cpfs_em_texto('c.fornecedor_nome') }} as fornecedor_nome,
         {{ documento_publico('c.fornecedor_documento') }} as fornecedor_documento,

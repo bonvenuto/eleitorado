@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: int_pncp__contratos
+    columns:
+      - name: contrato_pncp_id
+        data_tests: [unique, not_null]
+  - name: int_contratos_federais
+    columns:
+      - name: contrato_id
+        data_tests: [unique, not_null]
+      - name: fonte
+        data_tests:
+          - accepted_values:
+              arguments: {values: [cgu, pncp, ambas]}
+
+unit_tests:
+  - name: pncp_fica_com_a_versao_mais_recente
+    model: int_pncp__contratos
+    given:
+      - input: ref('stg_pncp__contratos')
+        rows:
+          - {contrato_pncp_id: 'X-2-1/2026', data_atualizacao: '2026-06-01 10:00:00', valor_global: 100, origem: publicacao}
+          - {contrato_pncp_id: 'X-2-1/2026', data_atualizacao: '2026-06-10 10:00:00', valor_global: 150, origem: atualizacao}
+          - {contrato_pncp_id: 'Y-2-1/2026', data_atualizacao: '2026-06-01 10:00:00', valor_global: 70, origem: publicacao}
+    expect:
+      rows:
+        - {contrato_pncp_id: 'X-2-1/2026', valor_global: 150}
+        - {contrato_pncp_id: 'Y-2-1/2026', valor_global: 70}
+
+  - name: contrato_federal_pareia_as_duas_fontes
+    description: >
+      Portal 000112026 na UG 110096 pareia com o PNCP número 00011 de 2026 na unidade 110096
+      (vale o PNCP); empenho do PNCP sem par fica só no PNCP; contrato do Portal sem par fica;
+      órgão municipal do PNCP não entra.
+    model: int_contratos_federais
+    given:
+      - input: ref('int_cgu__contratos')
+        rows:
+          - {contrato_id: 'cgu:110096:000112026', ug_codigo: '110096', contrato_numero: '000112026', data_assinatura: '2026-05-29'}
+          - {contrato_id: 'cgu:170175:000032026', ug_codigo: '170175', contrato_numero: '000032026', data_assinatura: '2026-06-09'}
+      - input: ref('int_pncp__contratos')
+        rows:
+          - {contrato_pncp_id: 'A-2-1/2026', esfera: F, poder: E, unidade_codigo: '110096', numero_contrato: '00011', ano_contrato: 2026, tipo_contrato: 'Contrato (termo inicial)'}
+          - {contrato_pncp_id: 'B-2-2/2026', esfera: F, poder: E, unidade_codigo: '154051', numero_contrato: '2026NE000397', ano_contrato: 2026, tipo_contrato: Empenho}
+          - {contrato_pncp_id: 'C-2-3/2026', esfera: M, poder: E, unidade_codigo: '000000002', numero_contrato: '219', ano_contrato: 2026, tipo_contrato: 'Contrato (termo inicial)'}
+    expect:
+      rows:
+        - {contrato_id: 'pncp:A-2-1/2026', fonte: ambas, id_cgu: 'cgu:110096:000112026', id_pncp: 'A-2-1/2026'}
+        - {contrato_id: 'pncp:B-2-2/2026', fonte: pncp, id_cgu: null, id_pncp: 'B-2-2/2026'}
+        - {contrato_id: 'cgu:170175:000032026', fonte: cgu, id_cgu: 'cgu:170175:000032026', id_pncp: null}
