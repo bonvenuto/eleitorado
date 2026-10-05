@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
@@ -41,15 +41,18 @@ class Preparado:
 
 
 def preencher(modelo: str, competencia: Competencia | None, dia: date) -> str:
-    """Substitui `{ano}`, `{mes}`, `{anomes}`, `{data}` e `{legislatura}` em URLs e nomes de
-    arquivo.
+    """Substitui `{ano}`, `{mes}`, `{anomes}`, `{data}`, `{legislatura}`, `{ontem}` e
+    `{semana_passada}` em URLs e nomes de arquivo.
     """
     valores: dict[str, Any] = {"legislatura": legislatura_atual(dia)}
+    valores["ontem"] = (dia - timedelta(days=1)).strftime("%Y%m%d")
+    valores["semana_passada"] = (dia - timedelta(days=7)).strftime("%Y%m%d")
     if competencia is not None:
         valores["ano"] = competencia.data.year
         valores["anomes"] = competencia.data.strftime("%Y%m")
         valores["mes"] = competencia.data.strftime("%m")
         valores["data"] = competencia.data.strftime("%Y%m%d")
+
     try:
         return modelo.format_map(valores)
     except KeyError as erro:

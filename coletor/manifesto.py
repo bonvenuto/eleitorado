@@ -10,7 +10,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
-Cadencia = Literal["diaria", "semanal", "mensal"]
+Cadencia = Literal["diaria", "semanal", "mensal", "anual"]
 
 
 class _Modelo(BaseModel):
@@ -18,7 +18,7 @@ class _Modelo(BaseModel):
 
 
 class RegraCompetencia(_Modelo):
-    tipo: Literal["ano", "mes", "data_arquivo", "data_coleta"]
+    tipo: Literal["ano", "mes", "dia", "data_arquivo", "data_coleta"]
     inicio: int | None = None
     fim: str | None = None  # AAAA-MM, só para tipo "mes": última competência de série encerrada
     pagina: str | None = None
@@ -65,7 +65,10 @@ class Recurso(_Modelo):
     competencia: RegraCompetencia
     cadencia: RegraCadencia
     formato: Formato
-    paginacao: Literal["links_next", "nenhuma"] = "nenhuma"
+    paginacao: Literal["links_next", "nenhuma", "pagina_total"] = "nenhuma"
+    pagina_parametro: str = "pagina"
+    total_paginas_campo: str = "totalPaginas"
+    pausa_pagina_segundos: float = 0
     iteracao: Iteracao | None = None
     registros: str | None = None
     pausa_segundos: float = 0  # antes de cada coleta: fontes com proteção anti-robô
@@ -76,14 +79,15 @@ class Recurso(_Modelo):
     def _coerente(self) -> Recurso:
         regra = self.competencia
         if self.publicacao == "por_competencia":
-            if regra.tipo not in ("ano", "mes") or regra.inicio is None:
+            if regra.tipo not in ("ano", "mes", "dia") or regra.inicio is None:
                 raise ValueError(
-                    "por_competencia exige competencia.tipo 'ano' ou 'mes' com 'inicio'"
+                    "por_competencia exige competencia.tipo 'ano', 'mes' ou 'dia' com 'inicio'"
                 )
             if self.cadencia.anteriores is None:
                 raise ValueError("por_competencia exige cadencia.anteriores")
-        elif regra.tipo in ("ano", "mes"):
+        elif regra.tipo in ("ano", "mes", "dia"):
             raise ValueError("snapshot exige competencia.tipo 'data_arquivo' ou 'data_coleta'")
+
         if regra.tipo == "data_arquivo" and not regra.pagina:
             raise ValueError("competencia.tipo 'data_arquivo' exige 'pagina'")
         if self.adaptador == "arquivo" and self.formato.tipo != "csv":

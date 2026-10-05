@@ -115,3 +115,24 @@ def test_limite_por_execucao_fica_com_as_competencias_mais_recentes():
     rc = RecursoCompleto(rc.orgao, rc.recurso.model_copy(update={"limite_por_execucao": 2}))
     tarefas = tarefas_pendentes([rc], HistoricoColetas(), date(2024, 5, 10))
     assert [t.competencia.rotulo for t in tarefas] == ["2024-05", "2024-04"]
+
+
+def _diario(limite=None):
+    regra = {"tipo": "dia", "inicio": 2026}
+    r = recurso(
+        id="contratos",
+        publicacao="por_competencia",
+        competencia=regra,
+        cadencia={"corrente": "semanal", "anteriores": "anual"},
+    ).model_copy(update={"limite_por_execucao": limite})
+    return RecursoCompleto("pncp", r)
+
+
+def test_dias_ate_ontem():
+    tarefas = tarefas_pendentes([_diario()], HistoricoColetas(), date(2026, 1, 4))
+    assert [t.competencia.rotulo for t in tarefas] == ["2026-01-01", "2026-01-02", "2026-01-03"]
+
+
+def test_dias_mais_recentes_primeiro_com_limite():
+    tarefas = tarefas_pendentes([_diario(limite=2)], HistoricoColetas(), date(2026, 3, 1))
+    assert [t.competencia.rotulo for t in tarefas] == ["2026-02-28", "2026-02-27"]

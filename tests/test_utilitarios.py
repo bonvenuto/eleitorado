@@ -74,3 +74,9 @@ def test_competencia_mensal():
         date(2024, 1, 1),
         date(2024, 2, 1),
     ]
+
+
+def test_marcadores_ontem_e_semana_passada():
+    from coletor.adaptadores.base import preencher
+
+    assert preencher("{ontem}-{semana_passada}", None, date(2026, 10, 5)) == "20261004-20260928"

@@ -100,11 +100,15 @@ class ClienteHttp:
         def tentativa() -> RespostaJson:
             resposta = self._cliente.get(url, params=params, headers={"Accept": "application/json"})
             self._verificar(resposta)
-            return RespostaJson(
-                str(resposta.url), resposta.status_code, resposta.content, resposta.json()
-            )
+            dados = resposta.json() if resposta.content else None  # 204 No Content: sem registros
+            return RespostaJson(str(resposta.url), resposta.status_code, resposta.content, dados)
 
         return self._com_retentativas(url, tentativa)
+
+    def pausar(self, segundos: float) -> None:
+        """Pausa entre requisições (usa o `dormir` injetado, instantâneo nos testes)."""
+        if segundos > 0:
+            self._dormir(segundos)
 
     def obter_texto(self, url: str) -> str:
         def tentativa() -> str:
