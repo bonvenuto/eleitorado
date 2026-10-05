@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: fct_contrato_federal
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [contrato_numero, licitacao_numero]}
+    columns:
+      - name: contrato_id
+        data_tests: [unique, not_null]
+  - name: fct_licitacao_federal
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [licitacao_numero, numero_processo]}
+    columns:
+      - name: licitacao_id
+        data_tests: [unique, not_null]
+  - name: fct_licitacao_vencedor
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [licitacao_numero, item_codigo]}
+    columns:
+      - name: participante_linha_id
+        data_tests: [unique, not_null]
+      - name: licitacao_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('fct_licitacao_federal'), field: licitacao_id}
+              config: {severity: warn}
