@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: dim_autor_emenda
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: autor_codigo
+        data_tests: [unique, not_null]
+      - name: tipo_autor
+        data_tests:
+          - accepted_values:
+              arguments: {values: [parlamentar, bancada, comissao, relator, outro]}
+      - name: parlamentar_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_parlamentar'), field: parlamentar_id}
+  - name: fct_emenda
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: emenda_linha_id
+        data_tests: [unique, not_null]
+  - name: fct_emenda_favorecido
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: favorecido_linha_id
+        data_tests: [unique, not_null]
+  - name: fct_emenda_pagamento
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [documento_codigo]}
+    columns:
+      - name: pagamento_linha_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: autor_liga_so_com_um_parlamentar
+    description: >
+      Autor individual com um único parlamentar de mesmo nome (sem acento e caixa) é ligado;
+      homônimo (dois parlamentares) e bancada não são.
+    model: dim_autor_emenda
+    given:
+      - input: ref('stg_cgu__emendas')
+        rows:
+          - {autor_codigo: '1', autor_nome: 'Ícaro de Valmir', tipo_emenda: 'Emenda Individual - Transferências com Finalidade Definida'}
+          - {autor_codigo: '2', autor_nome: 'JOAO SILVA', tipo_emenda: 'Emenda Individual - Transferências Especiais'}
+          - {autor_codigo: '3', autor_nome: 'BANCADA DE TOCANTINS', tipo_emenda: 'Emenda de Bancada'}
+      - input: ref('stg_cgu__emendas_favorecidos')
+        rows: []
+      - input: ref('stg_cgu__emendas_documentos')
+        rows: []
+      - input: ref('dim_parlamentar')
+        rows:
+          - {parlamentar_id: 'camara:10', nome: 'ICARO DE VALMIR'}
+          - {parlamentar_id: 'camara:20', nome: 'João Silva'}
+          - {parlamentar_id: 'senado:30', nome: 'JOAO SILVA'}
+    expect:
+      rows:
+        - {autor_codigo: '1', tipo_autor: parlamentar, parlamentar_id: 'camara:10', parlamentares_com_o_nome: 1}
+        - {autor_codigo: '2', tipo_autor: parlamentar, parlamentar_id: null, parlamentares_com_o_nome: 2}
+        - {autor_codigo: '3', tipo_autor: bancada, parlamentar_id: null, parlamentares_com_o_nome: 0}
