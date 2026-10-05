@@ -1,0 +1,37 @@
+orgao: pncp
+nome: Portal Nacional de Contratações Públicas (PNCP)
+portal: https://pncp.gov.br/
+recursos:
+  - id: contratos
+    descricao: Contratos publicados no PNCP por dia (todas as esferas)
+    fonte_oficial: https://pncp.gov.br/api/consulta/swagger-ui/index.html
+    condicoes_uso: >-
+      Dados abertos do PNCP (Lei nº 14.133/2021, art. 174): consulta pública, livre utilização
+      com citação da fonte.
+    adaptador: api_json
+    url: https://pncp.gov.br/api/consulta/v1/contratos
+    parametros: {dataInicial: "{data}", dataFinal: "{data}", tamanhoPagina: 500}
+    publicacao: por_competencia
+    competencia: {tipo: dia, inicio: 2021}
+    cadencia: {corrente: semanal, anteriores: anual}
+    formato: {tipo: json}
+    paginacao: pagina_total
+    registros: data
+    pausa_pagina_segundos: 2
+    limite_por_execucao: 40
+  - id: contratos_atualizacao
+    descricao: Contratos do PNCP atualizados nos últimos 7 dias (retificações)
+    fonte_oficial: https://pncp.gov.br/api/consulta/swagger-ui/index.html
+    condicoes_uso: >-
+      Dados abertos do PNCP (Lei nº 14.133/2021, art. 174): consulta pública, livre utilização
+      com citação da fonte.
+    adaptador: api_json
+    url: https://pncp.gov.br/api/consulta/v1/contratos/atualizacao
+    parametros: {dataInicial: "{semana_passada}", dataFinal: "{ontem}", tamanhoPagina: 500}
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: diaria}
+    formato: {tipo: json}
+    paginacao: pagina_total
+    registros: data
+    pausa_pagina_segundos: 2

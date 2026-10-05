@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from coletor.competencias import Competencia, anos, meses
 from coletor.manifesto import RecursoCompleto
 from coletor.meta import HistoricoColetas
 
-INTERVALO_DIAS = {"diaria": 1, "semanal": 7, "mensal": 30}
+INTERVALO_DIAS = {"diaria": 1, "semanal": 7, "mensal": 30, "anual": 365}
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,19 @@ def tarefas_pendentes(
             continue
         assert regra.competencia.inicio is not None and regra.cadencia.anteriores is not None
         do_recurso: list[Tarefa] = []
-        if regra.competencia.tipo == "mes":
+        if regra.competencia.tipo == "dia":
+            ontem = hoje - timedelta(days=1)
+            recentes = hoje - timedelta(days=30)
+            dia = date(regra.competencia.inicio, 1, 1)
+            while dia <= ontem:
+                cadencia = regra.cadencia.corrente if dia >= recentes else regra.cadencia.anteriores
+                competencia = Competencia.de_dia(dia)
+                if _vencida(
+                    historico.ultima_data_sucesso(rc.id, competencia.rotulo), hoje, cadencia
+                ):
+                    do_recurso.append(Tarefa(rc, competencia))
+                dia += timedelta(days=1)
+        elif regra.competencia.tipo == "mes":
             corrente = date(hoje.year, hoje.month, 1)
             anterior = date(corrente.year - (corrente.month == 1), (corrente.month - 2) % 12 + 1, 1)
             ultimo = corrente
@@ -63,6 +75,7 @@ def tarefas_pendentes(
                     historico.ultima_data_sucesso(rc.id, competencia.rotulo), hoje, cadencia
                 ):
                     do_recurso.append(Tarefa(rc, competencia))
+
         if regra.limite_por_execucao is not None:
             do_recurso = sorted(do_recurso, key=lambda t: t.competencia.data, reverse=True)
             do_recurso = do_recurso[: regra.limite_por_execucao]

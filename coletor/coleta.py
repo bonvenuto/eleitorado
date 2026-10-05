@@ -37,6 +37,8 @@ class Dependencias:
 def particionamento(recurso: Recurso, destino: str) -> Particionamento:
     if recurso.publicacao == "snapshot":
         return Particionamento("DAY", EXPIRACAO_SNAPSHOT_DIAS if destino == "raw" else None)
+    if recurso.competencia.tipo == "dia":
+        return Particionamento("DAY")  # por competência diária: sem expiração
     return Particionamento("MONTH" if recurso.competencia.tipo == "mes" else "YEAR")
 
 

@@ -392,5 +392,23 @@
   "_linha": "BIGINT",
   "_arquivo_original": "VARCHAR",
   "_carregado_em": "TIMESTAMP WITH TIME ZONE"
+ },
+ "raw/pncp/contratos": {
+  "payload": "VARCHAR",
+  "_coleta_id": "VARCHAR",
+  "_competencia": "VARCHAR",
+  "_competencia_data": "DATE",
+  "_linha": "BIGINT",
+  "_arquivo_original": "VARCHAR",
+  "_carregado_em": "TIMESTAMP WITH TIME ZONE"
+ },
+ "raw/pncp/contratos_atualizacao": {
+  "payload": "VARCHAR",
+  "_coleta_id": "VARCHAR",
+  "_competencia": "VARCHAR",
+  "_competencia_data": "DATE",
+  "_linha": "BIGINT",
+  "_arquivo_original": "VARCHAR",
+  "_carregado_em": "TIMESTAMP WITH TIME ZONE"
  }
 }

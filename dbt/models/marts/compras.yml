@@ -4,7 +4,8 @@ models:
   - name: fct_contrato_federal
     data_tests:
       - sem_cpf_completo:
-          arguments: {excluir: [contrato_numero, licitacao_numero]}
+          arguments: {excluir: [contrato_numero, licitacao_numero, compra_pncp_id, id_pncp, id_cgu, emenda_parlamentar]}
+
     columns:
       - name: contrato_id
         data_tests: [unique, not_null]

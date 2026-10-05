@@ -20,6 +20,8 @@ def test_manifesto_do_repositorio_tem_os_sete_recursos_da_onda_a():
         "cgu.licitacoes",
         "cgu.licitacoes_participantes",
         "ibge.municipios",
+        "pncp.contratos",
+        "pncp.contratos_atualizacao",
         "senado.ceaps",
         "senado.senadores",
     ]
@@ -69,3 +71,10 @@ def test_competencia_mensal_valida_e_fim_so_para_mes():
         RegraCompetencia(tipo="mes", inicio=2013, fim="2024-4")
     with pytest.raises(ValueError):
         RegraCompetencia(tipo="ano", inicio=2013, fim="2024-04")
+
+
+def test_competencia_dia_e_cadencia_anual():
+    from coletor.manifesto import RegraCadencia, RegraCompetencia
+
+    assert RegraCompetencia(tipo="dia", inicio=2021).tipo == "dia"
+    assert RegraCadencia(corrente="semanal", anteriores="anual").anteriores == "anual"

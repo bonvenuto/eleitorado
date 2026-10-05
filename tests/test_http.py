@@ -65,3 +65,9 @@ def test_obter_json_envia_accept_json(respx_mock, http):
     pedido = rota.calls.last.request
     assert pedido.headers["accept"] == "application/json"
     assert pedido.url.params["itens"] == "100"
+
+
+def test_obter_json_com_204_devolve_dados_vazios(respx_mock, http):
+    respx_mock.get("https://api.exemplo/x").mock(return_value=httpx.Response(204))
+    resposta = http.obter_json("https://api.exemplo/x")
+    assert (resposta.status, resposta.dados) == (204, None)

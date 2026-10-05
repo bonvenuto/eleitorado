@@ -34,6 +34,14 @@ sources:
       external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/ibge/{name}/*/*.parquet', union_by_name = true)"
     tables:
       - name: municipios
+
+  - name: raw_pncp
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/pncp/{name}/*/*.parquet', union_by_name = true)"
+    tables:
+      - name: contratos
+      - name: contratos_atualizacao
+
   # snapshots de todas as datas, recriados dos originais pelo `coletor reconstruir` (seção 7.4)
   - name: replay
     tables:

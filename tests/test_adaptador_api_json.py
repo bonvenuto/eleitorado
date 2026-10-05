@@ -104,3 +104,45 @@ def test_adaptador_e_escolhido_pelo_manifesto():
 
     assert adaptador_para(recurso()) is arquivo
     assert adaptador_para(_recurso_deputados()) is api_json
+
+
+def _pncp(**sobrescritas):
+    return recurso(
+        adaptador="api_json",
+        url="https://pncp.exemplo/api/contratos",
+        parametros={"dataInicial": "{data}", "dataFinal": "{data}", "tamanhoPagina": 500},
+        publicacao="por_competencia",
+        competencia={"tipo": "dia", "inicio": 2021},
+        cadencia={"corrente": "semanal", "anteriores": "anual"},
+        formato={"tipo": "json"},
+        paginacao="pagina_total",
+        registros="data",
+        **sobrescritas,
+    )
+
+
+def test_pagina_total_percorre_todas_as_paginas(respx_mock, http, tmp_path):
+    rota = respx_mock.get("https://pncp.exemplo/api/contratos")
+    rota.side_effect = [
+        httpx.Response(200, json={"data": [{"id": 1}], "totalPaginas": 2}),
+        httpx.Response(200, json={"data": [{"id": 2}], "totalPaginas": 2}),
+    ]
+    regra = _pncp()
+    competencia = Competencia.de_dia(date(2026, 6, 1))
+    extracao = api_json.extrair(regra, competencia, tmp_path, http, date(2026, 6, 2))
+    preparado = api_json.preparar(regra, competencia, extracao.arquivo_original, tmp_path)
+    assert [r["id"] for r in preparado.registros] == [1, 2]
+    pedidas = [dict(chamada.request.url.params) for chamada in rota.calls]
+    assert pedidas == [
+        {"dataInicial": "20260601", "dataFinal": "20260601", "tamanhoPagina": "500", "pagina": "1"},
+        {"dataInicial": "20260601", "dataFinal": "20260601", "tamanhoPagina": "500", "pagina": "2"},
+    ]
+
+
+def test_pagina_total_com_resposta_vazia(respx_mock, http, tmp_path):
+    respx_mock.get("https://pncp.exemplo/api/contratos").mock(return_value=httpx.Response(204))
+    regra = _pncp()
+    competencia = Competencia.de_dia(date(2026, 6, 1))
+    extracao = api_json.extrair(regra, competencia, tmp_path, http, date(2026, 6, 2))
+    preparado = api_json.preparar(regra, competencia, extracao.arquivo_original, tmp_path)
+    assert preparado.registros == []
