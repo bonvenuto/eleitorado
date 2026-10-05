@@ -95,3 +95,7 @@ def test_cargas_com_colunas_diferentes_sao_lidas_juntas(tmp_path):
         f"select a, b, c from read_parquet('{padrao}', union_by_name = true) order by a"
     ).fetchall()
     assert linhas == [("1", "2", None), ("3", None, "4")]
+
+
+def test_particao_mensal():
+    assert Particionamento("MONTH").decorador(date(2024, 4, 1)) == "202404"

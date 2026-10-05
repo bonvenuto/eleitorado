@@ -61,3 +61,16 @@ def test_hash_de_registros_ignora_ordem_de_registros_e_de_chaves():
         [{"c": 3}, {"b": 2, "a": 1}]
     )
     assert sha256_registros([{"a": 1}]) != sha256_registros([{"a": 2}])
+
+
+def test_competencia_mensal():
+    from coletor.competencias import Competencia, meses
+
+    assert Competencia.de_mes(2024, 4) == Competencia("2024-04", date(2024, 4, 1))
+    assert Competencia.de_rotulo("2024-04") == Competencia.de_mes(2024, 4)
+    assert meses(date(2023, 11, 1), date(2024, 2, 1)) == [
+        date(2023, 11, 1),
+        date(2023, 12, 1),
+        date(2024, 1, 1),
+        date(2024, 2, 1),
+    ]

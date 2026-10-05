@@ -4,7 +4,8 @@ Os esquemas ficam em texto, em dbt/tests/lago_vazio/esquemas.json (versionado); 
 gerados a partir dele e não vão para o git.
 
     uv run python scripts/lago_vazio.py                   # gera os Parquets (o CI faz isso)
-    uv run python scripts/lago_vazio.py --de-lago dados   # esquemas a partir de um lago real
+    # acrescenta ou atualiza os esquemas a partir de um lago real:
+    uv run python scripts/lago_vazio.py --de-lago dados
 """
 
 from __future__ import annotations
@@ -55,12 +56,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--de-lago", type=Path, help="lago real de onde extrair os esquemas")
     args = parser.parse_args()
+    esquemas = json.loads(ESQUEMAS.read_text(encoding="utf-8")) if ESQUEMAS.exists() else {}
     if args.de_lago:
+        esquemas.update(extrair(args.de_lago))  # acrescenta/atualiza; não apaga o que falta no lago
         ESQUEMAS.parent.mkdir(parents=True, exist_ok=True)
         ESQUEMAS.write_text(
-            json.dumps(extrair(args.de_lago), ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
+            json.dumps(esquemas, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
         )
-    gerar(json.loads(ESQUEMAS.read_text(encoding="utf-8")))
+    gerar(esquemas)
 
 
 if __name__ == "__main__":

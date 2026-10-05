@@ -21,6 +21,14 @@ sources:
     tables:
       - name: ceis
       - name: cnep
+      - name: emendas
+      - name: emendas_convenios
+      - name: emendas_favorecidos
+      - name: emendas_documentos
+      - name: contratos
+      - name: licitacoes
+      - name: licitacoes_participantes
+
   - name: raw_ibge
     meta:
       external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/ibge/{name}/*/*.parquet', union_by_name = true)"

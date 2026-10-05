@@ -8,12 +8,12 @@ import shutil
 import sys
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from coletor.agenda import Tarefa, tarefa_snapshot, tarefas_pendentes
 from coletor.coleta import Dependencias, recarregar
-from coletor.competencias import Competencia, data_brasilia
+from coletor.competencias import Competencia, data_brasilia, meses
 from coletor.config import Config, ErroConfig, carregar_config
 from coletor.dbt import ResultadoDbt, banco_do_target, gerar_linhagem, rodar_dbt
 from coletor.execucao import ResumoColetas, registro_execucao, rodar
@@ -52,7 +52,7 @@ def _parser() -> argparse.ArgumentParser:
     coletar = sub.add_parser("coletar", help="coleta manual e backfill de um recurso")
     coletar.add_argument("recurso")
     grupo = coletar.add_mutually_exclusive_group()
-    grupo.add_argument("--competencia", help="ano, para recursos por competência")
+    grupo.add_argument("--competencia", help="ano (AAAA) ou mês (AAAA-MM)")
     grupo.add_argument("--de", type=int, help="primeiro ano do intervalo")
     coletar.add_argument("--ate", type=int, help="último ano do intervalo (padrão: ano atual)")
     coletar.add_argument("--forcar", action="store_true")
@@ -172,15 +172,31 @@ def _coletar(
     else:
         if args.ate is not None and args.de is None:
             raise ErroUso("--ate exige --de")
+        mensal = rc.recurso.competencia.tipo == "mes"
         if args.competencia:
-            if not (len(args.competencia) == 4 and args.competencia.isdigit()):
-                raise ErroUso("--competencia deve ser um ano, como 2025")
-            anos_alvo = [int(args.competencia)]
+            try:
+                competencia = Competencia.de_rotulo(args.competencia)
+            except ValueError:
+                raise ErroUso(f"competência inválida: {args.competencia}") from None
+            if (len(args.competencia) == 7) != mensal:
+                raise ErroUso("--competencia deve ser AAAA-MM (mensal) ou AAAA (anual)")
+            alvos = [competencia]
         elif args.de is not None:
-            anos_alvo = list(range(args.de, (args.ate or hoje.year) + 1))
+            anos_alvo = range(args.de, (args.ate or hoje.year) + 1)
+            if mensal:
+                fim = date(hoje.year, hoje.month, 1)
+                if rc.recurso.competencia.fim:
+                    fim = min(fim, Competencia.de_rotulo(rc.recurso.competencia.fim).data)
+                alvos = [
+                    Competencia.de_mes(d.year, d.month)
+                    for d in meses(date(min(anos_alvo), 1, 1), fim)
+                    if d.year in anos_alvo
+                ]
+            else:
+                alvos = [Competencia.de_ano(ano) for ano in anos_alvo]
         else:
             raise ErroUso(f"{rc.id}: informe --competencia ou --de/--ate")
-        tarefas = [Tarefa(rc, Competencia.de_ano(ano)) for ano in anos_alvo]
+        tarefas = [Tarefa(rc, competencia) for competencia in alvos]
     historico = repo.carregar_historico()
     return _rodar_tarefas(tarefas, historico, deps, repo, inicio, args.forcar)
 

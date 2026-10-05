@@ -41,10 +41,14 @@ class Preparado:
 
 
 def preencher(modelo: str, competencia: Competencia | None, dia: date) -> str:
-    """Substitui `{ano}`, `{data}` e `{legislatura}` em URLs e nomes de arquivo."""
+    """Substitui `{ano}`, `{mes}`, `{anomes}`, `{data}` e `{legislatura}` em URLs e nomes de
+    arquivo.
+    """
     valores: dict[str, Any] = {"legislatura": legislatura_atual(dia)}
     if competencia is not None:
         valores["ano"] = competencia.data.year
+        valores["anomes"] = competencia.data.strftime("%Y%m")
+        valores["mes"] = competencia.data.strftime("%m")
         valores["data"] = competencia.data.strftime("%Y%m%d")
     try:
         return modelo.format_map(valores)

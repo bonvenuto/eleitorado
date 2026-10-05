@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from coletor.agenda import tarefas_pendentes
 from coletor.competencias import Competencia
 from coletor.manifesto import RecursoCompleto
-from coletor.meta import HistoricoColetas, Sucesso
+from coletor.meta import HistoricoColetas, RegistroColeta, Sucesso
 from tests.amostras import recurso
 
 HOJE = date(2026, 10, 3)
@@ -74,3 +74,44 @@ def test_snapshot_por_data_de_coleta_recebe_a_competencia_de_hoje():
     )
     [tarefa] = tarefas_pendentes([deputados], HistoricoColetas(), HOJE)
     assert tarefa.competencia == Competencia.de_dia(HOJE)
+
+
+def _mensal(**competencia):
+    regra = {"tipo": "mes", "inicio": 2024, **competencia}
+    return RecursoCompleto(
+        "cgu",
+        recurso(
+            id="contratos",
+            publicacao="por_competencia",
+            competencia=regra,
+            cadencia={"corrente": "semanal", "anteriores": "mensal"},
+        ),
+    )
+
+
+def test_tarefas_mensais_desde_o_inicio_ate_o_mes_corrente():
+    tarefas = tarefas_pendentes([_mensal()], HistoricoColetas(), date(2024, 3, 10))
+    assert [t.competencia.rotulo for t in tarefas] == ["2024-01", "2024-02", "2024-03"]
+
+
+def test_serie_mensal_encerrada_nao_agenda_depois_do_fim():
+    tarefas = tarefas_pendentes([_mensal(fim="2024-02")], HistoricoColetas(), date(2026, 10, 5))
+    assert [t.competencia.rotulo for t in tarefas] == ["2024-01", "2024-02"]
+
+
+def test_mes_corrente_e_anterior_usam_a_cadencia_corrente():
+    historico = HistoricoColetas()
+    for rotulo in ("2024-01", "2024-02", "2024-03"):
+        registro = RegistroColeta.novo(
+            "e", _mensal(), Competencia.de_rotulo(rotulo), datetime(2024, 3, 2, 12, tzinfo=UTC), "v"
+        )
+        historico.registrar(registro.finalizar("carregada", datetime(2024, 3, 2, 12, tzinfo=UTC)))
+    tarefas = tarefas_pendentes([_mensal()], historico, date(2024, 3, 10))  # 8 dias depois
+    assert [t.competencia.rotulo for t in tarefas] == ["2024-02", "2024-03"]  # semanal vencida
+
+
+def test_limite_por_execucao_fica_com_as_competencias_mais_recentes():
+    rc = _mensal()
+    rc = RecursoCompleto(rc.orgao, rc.recurso.model_copy(update={"limite_por_execucao": 2}))
+    tarefas = tarefas_pendentes([rc], HistoricoColetas(), date(2024, 5, 10))
+    assert [t.competencia.rotulo for t in tarefas] == ["2024-05", "2024-04"]

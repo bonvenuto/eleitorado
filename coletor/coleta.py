@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -30,12 +31,13 @@ class Dependencias:
     armazenamento: Armazenamento
     warehouse: Warehouse
     agora: Callable[[], datetime]
+    dormir: Callable[[float], None] = time.sleep
 
 
 def particionamento(recurso: Recurso, destino: str) -> Particionamento:
     if recurso.publicacao == "snapshot":
         return Particionamento("DAY", EXPIRACAO_SNAPSHOT_DIAS if destino == "raw" else None)
-    return Particionamento("YEAR")
+    return Particionamento("MONTH" if recurso.competencia.tipo == "mes" else "YEAR")
 
 
 def tabela_destino(recurso: RecursoCompleto, destino: str) -> str:
@@ -47,14 +49,21 @@ def tabela_destino(recurso: RecursoCompleto, destino: str) -> str:
 def nao_publicada(
     recurso: Recurso, competencia: Competencia | None, erro: ErroHttp, hoje: date
 ) -> bool:
-    """HTTP 404 no ano corrente, no 1º trimestre: a fonte ainda não publicou o ano."""
-    return (
-        erro.status == 404
-        and recurso.publicacao == "por_competencia"
-        and competencia is not None
-        and competencia.data.year == hoje.year
-        and hoje.month <= 3
-    )
+    """A fonte ainda não publicou a competência.
+
+    Ano: HTTP 404 no ano corrente, no 1º trimestre. Mês: HTTP 403 ou 404 nos três meses mais
+    recentes (o Portal da Transparência gera os arquivos mensais com semanas de atraso).
+    """
+    if recurso.publicacao != "por_competencia" or competencia is None:
+        return False
+    if recurso.competencia.tipo == "mes":
+        tres_meses = date(hoje.year, hoje.month, 1)
+        for _ in range(2):
+            tres_meses = date(
+                tres_meses.year - (tres_meses.month == 1), (tres_meses.month - 2) % 12 + 1, 1
+            )
+        return erro.status in (403, 404) and competencia.data >= tres_meses
+    return erro.status == 404 and competencia.data.year == hoje.year and hoje.month <= 3
 
 
 def _descrever(erro: Exception) -> str:
@@ -155,12 +164,17 @@ def coletar(
             return registro.finalizar("carregada", deps.agora())
         except ErroHttp as erro:
             registro.erro = _descrever(erro)
-            status = (
-                "nao_publicada"
-                if nao_publicada(recurso.recurso, competencia, erro, hoje)
-                else "falha"
-            )
+            registro.http_status = erro.status
+            if erro.status in (405, 429):
+                status = (
+                    "adiada"  # bloqueio temporário da fonte (anti-robô ou limite de requisições)
+                )
+            elif nao_publicada(recurso.recurso, competencia, erro, hoje):
+                status = "nao_publicada"
+            else:
+                status = "falha"
             return registro.finalizar(status, deps.agora())
+
         except Exception as erro:  # noqa: BLE001 - toda falha vira registro e as demais seguem
             registro.erro = _descrever(erro)
             return registro.finalizar("falha", deps.agora())
