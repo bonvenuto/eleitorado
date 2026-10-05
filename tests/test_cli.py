@@ -30,7 +30,7 @@ def test_executar_coleta_o_recurso_pedido_e_registra_tudo(respx_mock, deps, ware
         1,
         "manual",
     )
-    assert len(warehouse.linhas["meta/fontes"]) == 14
+    assert len(warehouse.linhas["meta/fontes"]) == 16
     assert "meta/coletas" in warehouse.tabelas
 
 
@@ -85,4 +85,17 @@ def test_falha_ao_gravar_meta_nao_interrompe_as_demais_coletas(respx_mock, deps,
         "falha",
         1,
         1,
+    )
+
+
+def test_coletar_competencia_diaria(respx_mock, deps, warehouse):
+    respx_mock.get("https://pncp.gov.br/api/consulta/v1/contratos").mock(
+        return_value=httpx.Response(200, json={"data": [], "totalPaginas": 0})
+    )
+    assert _rodar(["coletar", "pncp.contratos", "--competencia", "2026-06-01"], deps) == 0
+    [coleta] = warehouse.linhas["meta/coletas"]
+    assert (coleta["recurso"], coleta["competencia"], coleta["status"]) == (
+        "contratos",
+        "2026-06-01",
+        "carregada",
     )

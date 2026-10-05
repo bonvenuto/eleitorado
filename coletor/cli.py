@@ -182,13 +182,16 @@ def _coletar(
         if args.ate is not None and args.de is None:
             raise ErroUso("--ate exige --de")
         mensal = rc.recurso.competencia.tipo == "mes"
+        esperado = {"ano": 4, "mes": 7, "dia": 10}.get(rc.recurso.competencia.tipo)
         if args.competencia:
             try:
                 competencia = Competencia.de_rotulo(args.competencia)
             except ValueError:
                 raise ErroUso(f"competência inválida: {args.competencia}") from None
-            if (len(args.competencia) == 7) != mensal:
-                raise ErroUso("--competencia deve ser AAAA-MM (mensal) ou AAAA (anual)")
+            if esperado is not None and len(args.competencia) != esperado:
+                raise ErroUso(
+                    "--competencia deve ser AAAA (anual), AAAA-MM (mensal) ou AAAA-MM-DD (diária)"
+                )
             alvos = [competencia]
         elif args.de is not None:
             anos_alvo = range(args.de, (args.ate or hoje.year) + 1)

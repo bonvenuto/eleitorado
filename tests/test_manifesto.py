@@ -20,6 +20,8 @@ def test_manifesto_do_repositorio_tem_os_sete_recursos_da_onda_a():
         "cgu.licitacoes",
         "cgu.licitacoes_participantes",
         "ibge.municipios",
+        "pncp.contratos",
+        "pncp.contratos_atualizacao",
         "senado.ceaps",
         "senado.senadores",
     ]
