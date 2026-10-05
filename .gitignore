@@ -24,5 +24,6 @@ dbt/logs/
 
 # lago local (espelho do bucket privado) e artefatos públicos
 dados/
+dados-b1/
 *.duckdb
 dbt/tests/lago_vazio/**/*.parquet

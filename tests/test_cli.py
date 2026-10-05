@@ -30,7 +30,7 @@ def test_executar_coleta_o_recurso_pedido_e_registra_tudo(respx_mock, deps, ware
         1,
         "manual",
     )
-    assert len(warehouse.linhas["meta/fontes"]) == 7
+    assert len(warehouse.linhas["meta/fontes"]) == 14
     assert "meta/coletas" in warehouse.tabelas
 
 

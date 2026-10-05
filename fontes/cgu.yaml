@@ -30,3 +30,88 @@ recursos:
       pagina: https://portaldatransparencia.gov.br/download-de-dados/cnep
     cadencia: {corrente: diaria}
     formato: {tipo: csv, compressao: zip, encoding: cp1252, delimitador: ";"}
+  - id: emendas
+    descricao: Emendas parlamentares (Portal da Transparência), uma linha por emenda e localidade
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares/UNICO
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv, compressao: zip, arquivo: EmendasParlamentares.csv, encoding: cp1252, delimitador: ";"}
+  - id: emendas_convenios
+    descricao: Convênios ligados a emendas parlamentares
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares/UNICO
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv, compressao: zip, arquivo: EmendasParlamentares_Convenios.csv, encoding: cp1252, delimitador: ";"}
+  - id: emendas_favorecidos
+    descricao: Favorecidos de emendas parlamentares por mês
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares/UNICO
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv, compressao: zip, arquivo: EmendasParlamentares_PorFavorecido.csv, encoding: cp1252, delimitador: ";"}
+  - id: emendas_documentos
+    descricao: Documentos de despesa (empenho, liquidação, pagamento) de emendas parlamentares
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares-documentos
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares-documentos/{ano}
+    publicacao: por_competencia
+    competencia: {tipo: ano, inicio: 2014}
+    cadencia: {corrente: semanal, anteriores: mensal}
+    formato: {tipo: csv, compressao: zip, arquivo: "{ano}_EmendasParlamentares_PorDocumento.csv", encoding: cp1252, delimitador: ";"}
+  - id: contratos
+    descricao: Contratos (compras) do Poder Executivo federal
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/compras
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/compras/{anomes}
+    publicacao: por_competencia
+    competencia: {tipo: mes, inicio: 2013}
+    cadencia: {corrente: semanal, anteriores: mensal}
+    formato: {tipo: csv, compressao: zip, arquivo: "{anomes}_Compras.csv", encoding: cp1252, delimitador: ";"}
+  - id: licitacoes
+    descricao: Licitações do Poder Executivo federal (série encerrada em abril de 2024)
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/licitacoes
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/licitacoes/{anomes}
+    publicacao: por_competencia
+    competencia: {tipo: mes, inicio: 2013, fim: "2024-04"}
+    cadencia: {corrente: mensal, anteriores: mensal}
+    formato: {tipo: csv, compressao: zip, arquivo: "{anomes}_Licita*o.csv", encoding: cp1252, delimitador: ";"}
+  - id: licitacoes_participantes
+    descricao: Participantes de licitações do Poder Executivo federal (série encerrada em abril de 2024)
+    fonte_oficial: https://portaldatransparencia.gov.br/download-de-dados/licitacoes
+    condicoes_uso: >-
+      Dados abertos do Poder Executivo federal (Decreto nº 8.777/2016): livre utilização,
+      limitada a creditar a autoria ou a fonte (Portal da Transparência/CGU).
+    adaptador: arquivo
+    url: https://portaldatransparencia.gov.br/download-de-dados/licitacoes/{anomes}
+    publicacao: por_competencia
+    competencia: {tipo: mes, inicio: 2013, fim: "2024-04"}
+    cadencia: {corrente: mensal, anteriores: mensal}
+    formato: {tipo: csv, compressao: zip, arquivo: "{anomes}_ParticipantesLicita*o.csv", encoding: cp1252, delimitador: ";"}
+
