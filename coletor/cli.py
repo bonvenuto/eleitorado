@@ -148,6 +148,15 @@ def _pipeline(
     historico = repo.carregar_historico()
     tarefas = tarefas_pendentes(_recursos(args, manifesto), historico, data_brasilia(inicio))
     log.info("%d tarefa(s) pendente(s)", len(tarefas))
+
+    def dbt() -> ResultadoDbt:
+        from coletor.esquemas import carregar_esquemas, garantir_fontes
+
+        criadas = garantir_fontes(deps.config.lago, carregar_esquemas(args.dbt_dir))
+        if criadas:
+            log.warning("fontes ainda sem dados (Parquet vazio criado): %s", ", ".join(criadas))
+        return rodar_dbt_(args.dbt_dir, args.target, deps.config.publico)
+
     return _rodar_tarefas(
         tarefas,
         historico,
@@ -155,7 +164,7 @@ def _pipeline(
         repo,
         inicio,
         False,
-        dbt=lambda: rodar_dbt_(args.dbt_dir, args.target, deps.config.publico),
+        dbt=dbt,
     )
 
 

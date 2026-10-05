@@ -3,6 +3,7 @@
 from dataclasses import replace
 from datetime import date
 
+import httpx
 import pytest
 
 from coletor.cli import main
@@ -159,3 +160,15 @@ def test_estado_pela_cli_usa_o_prefixo_do_ambiente(deps_lago, armazenamento):
 def test_publicar_sem_credenciais_do_r2_falha_antes_de_tudo(deps_lago, capsys):
     assert _rodar(["publicar"], deps_lago) == 2
     assert "R2_CONTA" in capsys.readouterr().err
+
+
+def test_pipeline_cria_fontes_vazias_antes_do_dbt(deps_lago, respx_mock):
+    vistos = []
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        vistos.append((deps_lago.config.lago / "raw/cgu/licitacoes/vazio/vazio.parquet").exists())
+        return ResultadoDbt("sucesso", 0)
+
+    respx_mock.route().mock(return_value=httpx.Response(503))  # nenhuma fonte responde
+    _rodar(["pipeline", "--recursos", "ibge.municipios"], deps_lago, dbt)
+    assert vistos == [True]
