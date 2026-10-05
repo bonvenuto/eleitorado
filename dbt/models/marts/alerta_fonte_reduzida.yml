@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: alerta_fonte_reduzida
+    data_tests: [sem_cpf_completo]
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: fonte_reduzida_compara_com_a_carga_anterior
+    description: >
+      Por competência (recursos por ano) ou pelo recurso inteiro (snapshots): queda de pelo menos
+      10% em relação à carga anterior vira alerta; queda menor, aumento e primeira carga não.
+      Coletas sem carga (sem_alteracao, falha) e recargas no replay não contam.
+    model: alerta_fonte_reduzida
+    given:
+      - input: ref('stg_meta__coletas')
+        rows:
+          - {coleta_id: a1, recurso_id: camara.ceap, competencia: '2009', destino: raw, status: carregada, linhas: 265197, finalizada_em: '2026-10-04 16:35:00'}
+          - {coleta_id: a2, recurso_id: camara.ceap, competencia: '2009', destino: raw, status: sem_alteracao, finalizada_em: '2026-10-04 20:00:00'}
+          - {coleta_id: a3, recurso_id: camara.ceap, competencia: '2009', destino: raw, status: carregada, linhas: 187332, finalizada_em: '2026-10-05 11:00:00'}
+          - {coleta_id: b1, recurso_id: camara.ceap, competencia: '2010', destino: raw, status: carregada, linhas: 100, finalizada_em: '2026-10-04 16:35:00'}
+          - {coleta_id: b2, recurso_id: camara.ceap, competencia: '2010', destino: raw, status: carregada, linhas: 95, finalizada_em: '2026-10-05 11:00:00'}
+          - {coleta_id: c1, recurso_id: camara.ceap, competencia: '2011', destino: raw, status: carregada, linhas: 100, finalizada_em: '2026-10-04 16:35:00'}
+          - {coleta_id: c2, recurso_id: camara.ceap, competencia: '2011', destino: raw, status: carregada, linhas: 200, finalizada_em: '2026-10-05 11:00:00'}
+          - {coleta_id: d1, recurso_id: cgu.ceis, competencia: '2026-10-02', destino: raw, status: carregada, linhas: 23739, finalizada_em: '2026-10-02 10:00:00'}
+          - {coleta_id: d2, recurso_id: cgu.ceis, competencia: '2026-10-03', destino: replay, status: recarregada, linhas: 5, finalizada_em: '2026-10-03 09:00:00'}
+          - {coleta_id: d3, recurso_id: cgu.ceis, competencia: '2026-10-03', destino: raw, status: carregada, linhas: 10000, finalizada_em: '2026-10-03 10:00:00'}
+          - {coleta_id: e1, recurso_id: cgu.cnep, competencia: '2026-10-02', destino: raw, status: carregada, linhas: 1823, finalizada_em: '2026-10-02 10:00:00'}
+      - input: ref('stg_meta__fontes')
+        rows:
+          - {recurso_id: camara.ceap, publicacao: por_competencia}
+          - {recurso_id: cgu.ceis, publicacao: snapshot}
+          - {recurso_id: cgu.cnep, publicacao: snapshot}
+    expect:
+      rows:
+        - {coleta_id: a3, coleta_id_antes: a1, recurso_id: camara.ceap, competencia: '2009', linhas_antes: 265197, linhas_depois: 187332}
+        - {coleta_id: d3, coleta_id_antes: d1, recurso_id: cgu.ceis, competencia: '2026-10-03', linhas_antes: 23739, linhas_depois: 10000}
