@@ -120,3 +120,36 @@ def test_extensao_a_partir_da_url_final():
     assert extensao_de("https://x/cotas/Ano-2025.csv.zip") == "csv.zip"
     assert extensao_de("https://x/saida/ceis/20261002_CEIS.zip?a=1") == "zip"
     assert extensao_de("https://x/download-de-dados/ceis/20261002") == "bin"
+
+
+def test_arquivo_no_zip_por_curinga(tmp_path):
+    from coletor.adaptadores.arquivo import preparar
+    from coletor.competencias import Competencia
+
+    original = tmp_path / "o.zip"
+    original.write_bytes(
+        zip_com(
+            {
+                "202404_ItemLicitação.csv": b"a\n1\n",
+                "202404_Licitação.csv": b"a\n2\n",
+                "202404_ParticipantesLicitação.csv": b"a\n3\n",
+            }
+        )
+    )
+    regra = recurso(
+        formato={"tipo": "csv", "compressao": "zip", "arquivo": "{anomes}_Licita*o.csv"}
+    )
+    preparado = preparar(regra, Competencia.de_mes(2024, 4), original, tmp_path)
+    assert preparado.csv.read_bytes() == b"a\n2\n"
+
+
+def test_curinga_ambiguo_falha(tmp_path):
+    from coletor.adaptadores.arquivo import preparar
+    from coletor.adaptadores.base import ErroColeta
+    from coletor.competencias import Competencia
+
+    original = tmp_path / "o.zip"
+    original.write_bytes(zip_com({"202404_A.csv": b"a\n", "202404_B.csv": b"b\n"}))
+    regra = recurso(formato={"tipo": "csv", "compressao": "zip", "arquivo": "{anomes}_*.csv"})
+    with pytest.raises(ErroColeta, match="2 arquivos"):
+        preparar(regra, Competencia.de_mes(2024, 4), original, tmp_path)

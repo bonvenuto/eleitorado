@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import shutil
 import zipfile
 from datetime import date
@@ -73,10 +74,19 @@ def preparar(recurso: Recurso, competencia: Competencia, original: Path, pasta: 
         membros = [membro for membro in compactado.infolist() if not membro.is_dir()]
         if formato.arquivo:
             nome = preencher(formato.arquivo, competencia, competencia.data)
-            escolhido = next((m for m in membros if m.filename == nome), None)
-            if escolhido is None:
-                nomes = [m.filename for m in membros]
-                raise ErroColeta(f"{nome} não está no ZIP (membros: {nomes})")
+            if any(caractere in nome for caractere in "*?["):
+                achados = [m for m in membros if fnmatch.fnmatchcase(m.filename, nome)]
+                if len(achados) != 1:
+                    nomes = [m.filename for m in membros]
+                    raise ErroColeta(
+                        f"{nome} corresponde a {len(achados)} arquivos no ZIP (membros: {nomes})"
+                    )
+                escolhido = achados[0]
+            else:
+                escolhido = next((m for m in membros if m.filename == nome), None)
+                if escolhido is None:
+                    nomes = [m.filename for m in membros]
+                    raise ErroColeta(f"{nome} não está no ZIP (membros: {nomes})")
         elif len(membros) == 1:
             escolhido = membros[0]
         else:
