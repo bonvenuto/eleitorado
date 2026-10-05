@@ -74,7 +74,8 @@ terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO" "-var=conta_
   do Actions ou bucket), coleta, roda o `dbt build`, salva o estado no bucket e publica marts e
   linhagem no R2. Uma falha em qualquer passo gera e-mail do GitHub.
 - **Primeira carga:** dispare o workflow à mão com `reconstruir` marcado.
-- **Público:** `manifesto.json`, `marts/` e `linhagem/index.html` no bucket R2. Os arquivos são
+- **Público:** `manifesto.json`, `marts/` e `linhagem/index.html` no bucket R2, em
+  <https://pub-e140b10136c94c9eb7cdb0a31fe603f3.r2.dev> (endereço `r2.dev`, até haver domínio próprio). Os arquivos são
   enviados antes do manifesto; quem lê o manifesto sempre vê um conjunto completo.
 - **Recuperação:** objetos sobrescritos ou apagados no bucket privado ficam 30 dias na exclusão
   reversível; `coletor reconstruir` refaz os históricos a partir dos originais.
