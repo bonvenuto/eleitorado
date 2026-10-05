@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -30,6 +31,7 @@ class Dependencias:
     armazenamento: Armazenamento
     warehouse: Warehouse
     agora: Callable[[], datetime]
+    dormir: Callable[[float], None] = time.sleep
 
 
 def particionamento(recurso: Recurso, destino: str) -> Particionamento:
@@ -162,12 +164,17 @@ def coletar(
             return registro.finalizar("carregada", deps.agora())
         except ErroHttp as erro:
             registro.erro = _descrever(erro)
-            status = (
-                "nao_publicada"
-                if nao_publicada(recurso.recurso, competencia, erro, hoje)
-                else "falha"
-            )
+            registro.http_status = erro.status
+            if erro.status in (405, 429):
+                status = (
+                    "adiada"  # bloqueio temporário da fonte (anti-robô ou limite de requisições)
+                )
+            elif nao_publicada(recurso.recurso, competencia, erro, hoje):
+                status = "nao_publicada"
+            else:
+                status = "falha"
             return registro.finalizar(status, deps.agora())
+
         except Exception as erro:  # noqa: BLE001 - toda falha vira registro e as demais seguem
             registro.erro = _descrever(erro)
             return registro.finalizar("falha", deps.agora())

@@ -41,6 +41,7 @@ recursos:
     publicacao: snapshot
     competencia: {tipo: data_coleta}
     cadencia: {corrente: semanal}
+    pausa_segundos: 3
     formato: {tipo: csv, compressao: zip, arquivo: EmendasParlamentares.csv, encoding: cp1252, delimitador: ";"}
   - id: emendas_convenios
     descricao: Convênios ligados a emendas parlamentares
@@ -53,6 +54,7 @@ recursos:
     publicacao: snapshot
     competencia: {tipo: data_coleta}
     cadencia: {corrente: semanal}
+    pausa_segundos: 3
     formato: {tipo: csv, compressao: zip, arquivo: EmendasParlamentares_Convenios.csv, encoding: cp1252, delimitador: ";"}
   - id: emendas_favorecidos
     descricao: Favorecidos de emendas parlamentares por mês
@@ -65,6 +67,7 @@ recursos:
     publicacao: snapshot
     competencia: {tipo: data_coleta}
     cadencia: {corrente: semanal}
+    pausa_segundos: 3
     formato: {tipo: csv, compressao: zip, arquivo: EmendasParlamentares_PorFavorecido.csv, encoding: cp1252, delimitador: ";"}
   - id: emendas_documentos
     descricao: Documentos de despesa (empenho, liquidação, pagamento) de emendas parlamentares
@@ -77,6 +80,8 @@ recursos:
     publicacao: por_competencia
     competencia: {tipo: ano, inicio: 2014}
     cadencia: {corrente: semanal, anteriores: mensal}
+    pausa_segundos: 3
+    limite_por_execucao: 10
     formato: {tipo: csv, compressao: zip, arquivo: "{ano}_EmendasParlamentares_PorDocumento.csv", encoding: cp1252, delimitador: ";"}
   - id: contratos
     descricao: Contratos (compras) do Poder Executivo federal
@@ -89,6 +94,8 @@ recursos:
     publicacao: por_competencia
     competencia: {tipo: mes, inicio: 2013}
     cadencia: {corrente: semanal, anteriores: mensal}
+    pausa_segundos: 3
+    limite_por_execucao: 10
     formato: {tipo: csv, compressao: zip, arquivo: "{anomes}_Compras.csv", encoding: cp1252, delimitador: ";"}
   - id: licitacoes
     descricao: Licitações do Poder Executivo federal (série encerrada em abril de 2024)
@@ -101,6 +108,8 @@ recursos:
     publicacao: por_competencia
     competencia: {tipo: mes, inicio: 2013, fim: "2024-04"}
     cadencia: {corrente: mensal, anteriores: mensal}
+    pausa_segundos: 3
+    limite_por_execucao: 10
     formato: {tipo: csv, compressao: zip, arquivo: "{anomes}_Licita*o.csv", encoding: cp1252, delimitador: ";"}
   - id: licitacoes_participantes
     descricao: Participantes de licitações do Poder Executivo federal (série encerrada em abril de 2024)
@@ -113,5 +122,8 @@ recursos:
     publicacao: por_competencia
     competencia: {tipo: mes, inicio: 2013, fim: "2024-04"}
     cadencia: {corrente: mensal, anteriores: mensal}
+    pausa_segundos: 3
+    limite_por_execucao: 10
     formato: {tipo: csv, compressao: zip, arquivo: "{anomes}_ParticipantesLicita*o.csv", encoding: cp1252, delimitador: ";"}
+
 

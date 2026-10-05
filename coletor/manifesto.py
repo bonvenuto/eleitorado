@@ -68,6 +68,8 @@ class Recurso(_Modelo):
     paginacao: Literal["links_next", "nenhuma"] = "nenhuma"
     iteracao: Iteracao | None = None
     registros: str | None = None
+    pausa_segundos: float = 0  # antes de cada coleta: fontes com proteção anti-robô
+    limite_por_execucao: int | None = None  # competências por execução (carga histórica parcelada)
     acesso: Literal["publico"] = "publico"
 
     @model_validator(mode="after")

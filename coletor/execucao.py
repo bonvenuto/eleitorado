@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import urlparse
 
 from coletor.agenda import Tarefa
 from coletor.coleta import Dependencias, coletar
@@ -19,6 +20,7 @@ class ResumoColetas:
     carregadas: int = 0
     sem_alteracao: int = 0
     nao_publicadas: int = 0
+    adiadas: int = 0
     falhas: int = 0
 
     def contar(self, status: str) -> None:
@@ -28,6 +30,8 @@ class ResumoColetas:
             self.sem_alteracao += 1
         elif status == "nao_publicada":
             self.nao_publicadas += 1
+        elif status == "adiada":
+            self.adiadas += 1
         else:
             self.falhas += 1
 
@@ -57,9 +61,24 @@ def rodar(
     forcar: bool = False,
 ) -> ResumoColetas:
     resumo = ResumoColetas()
+    bloqueados: set[str] = set()
     for tarefa in tarefas:
+        servidor = urlparse(tarefa.recurso.recurso.url).hostname or ""
+        if servidor in bloqueados:
+            log.warning(
+                "%s competencia=%s adiada: %s bloqueou requisições nesta execução",
+                tarefa.recurso.id,
+                tarefa.competencia.rotulo if tarefa.competencia else None,
+                servidor,
+            )
+            resumo.contar("adiada")
+            continue
+        if tarefa.recurso.recurso.pausa_segundos:
+            deps.dormir(tarefa.recurso.recurso.pausa_segundos)
         registro = coletar(tarefa.recurso, tarefa.competencia, historico, deps, execucao_id, forcar)
         historico.registrar(registro)
+        if registro.status == "adiada":
+            bloqueados.add(servidor)
         if _registrar_com_retentativa(repositorio, registro):
             resumo.contar(registro.status)
         else:

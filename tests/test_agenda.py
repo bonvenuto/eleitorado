@@ -108,3 +108,10 @@ def test_mes_corrente_e_anterior_usam_a_cadencia_corrente():
         historico.registrar(registro.finalizar("carregada", datetime(2024, 3, 2, 12, tzinfo=UTC)))
     tarefas = tarefas_pendentes([_mensal()], historico, date(2024, 3, 10))  # 8 dias depois
     assert [t.competencia.rotulo for t in tarefas] == ["2024-02", "2024-03"]  # semanal vencida
+
+
+def test_limite_por_execucao_fica_com_as_competencias_mais_recentes():
+    rc = _mensal()
+    rc = RecursoCompleto(rc.orgao, rc.recurso.model_copy(update={"limite_por_execucao": 2}))
+    tarefas = tarefas_pendentes([rc], HistoricoColetas(), date(2024, 5, 10))
+    assert [t.competencia.rotulo for t in tarefas] == ["2024-05", "2024-04"]

@@ -39,6 +39,7 @@ def tarefas_pendentes(
                 tarefas.append(tarefa_snapshot(rc, hoje))
             continue
         assert regra.competencia.inicio is not None and regra.cadencia.anteriores is not None
+        do_recurso: list[Tarefa] = []
         if regra.competencia.tipo == "mes":
             corrente = date(hoje.year, hoje.month, 1)
             anterior = date(corrente.year - (corrente.month == 1), (corrente.month - 2) % 12 + 1, 1)
@@ -51,11 +52,19 @@ def tarefas_pendentes(
                 if _vencida(
                     historico.ultima_data_sucesso(rc.id, competencia.rotulo), hoje, cadencia
                 ):
-                    tarefas.append(Tarefa(rc, competencia))
-            continue
-        for ano in anos(regra.competencia.inicio, hoje):
-            cadencia = regra.cadencia.corrente if ano == hoje.year else regra.cadencia.anteriores
-            competencia = Competencia.de_ano(ano)
-            if _vencida(historico.ultima_data_sucesso(rc.id, competencia.rotulo), hoje, cadencia):
-                tarefas.append(Tarefa(rc, competencia))
+                    do_recurso.append(Tarefa(rc, competencia))
+        else:
+            for ano in anos(regra.competencia.inicio, hoje):
+                cadencia = (
+                    regra.cadencia.corrente if ano == hoje.year else regra.cadencia.anteriores
+                )
+                competencia = Competencia.de_ano(ano)
+                if _vencida(
+                    historico.ultima_data_sucesso(rc.id, competencia.rotulo), hoje, cadencia
+                ):
+                    do_recurso.append(Tarefa(rc, competencia))
+        if regra.limite_por_execucao is not None:
+            do_recurso = sorted(do_recurso, key=lambda t: t.competencia.data, reverse=True)
+            do_recurso = do_recurso[: regra.limite_por_execucao]
+        tarefas.extend(do_recurso)
     return tarefas
