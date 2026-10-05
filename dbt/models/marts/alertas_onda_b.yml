@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: alerta_contrato_fornecedor_sancionado
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [contrato_numero]}
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+  - name: alerta_licitacao_vencedor_sancionado
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [licitacao_numero]}
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+  - name: alerta_emenda_favorecido_sancionado
+    data_tests:
+      - sem_cpf_completo:
+          arguments: {excluir: [documento_codigo]}
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: contrato_com_fornecedor_sancionado_na_assinatura
+    description: >
+      Contrato assinado na vigência da sanção gera alerta, por CNPJ completo ou pela raiz;
+      fora da vigência, com fornecedor sigiloso ou com sanção excluída, não.
+    model: alerta_contrato_fornecedor_sancionado
+    given:
+      - input: ref('int_cgu__contratos')
+        rows:
+          - {contrato_id: 'cgu:1:a', fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_assinatura: '2024-05-10'}
+          - {contrato_id: 'cgu:1:b', fornecedor_documento: '11222333000262', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_assinatura: '2024-05-10'}
+          - {contrato_id: 'cgu:1:c', fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11222333', data_assinatura: '2025-01-05'}
+          - {contrato_id: 'cgu:1:d', fornecedor_documento: null, fornecedor_tipo_documento: SIGILOSO, fornecedor_documento_valido: null, data_assinatura: '2024-05-10'}
+          - {contrato_id: 'cgu:1:e', fornecedor_documento: '11444777000161', fornecedor_tipo_documento: CNPJ, fornecedor_documento_valido: true, fornecedor_cnpj_raiz: '11444777', data_assinatura: '2024-06-01'}
+      - input: ref('int_cgu__sancoes_eventos')
+        rows:
+          - {sancao_id: 'ceis:1', evento: inclusao, data_evento: '2026-10-02', documento: '11222333000181', data_inicio: '2024-01-01', data_fim: '2024-12-31', _coleta_id: c1}
+          - {sancao_id: 'ceis:3', evento: exclusao, data_evento: '2026-10-02', documento: '11444777000161', data_inicio: '2024-01-01', _coleta_id: c1}
+    expect:
+      rows:
+        - {contrato_id: 'cgu:1:a', sancao_id: 'ceis:1', tipo_correspondencia: cnpj}
+        - {contrato_id: 'cgu:1:b', sancao_id: 'ceis:1', tipo_correspondencia: cnpj_raiz}

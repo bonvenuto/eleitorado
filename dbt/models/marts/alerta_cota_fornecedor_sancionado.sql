@@ -7,45 +7,22 @@
 with despesas as (
     select
         *,
-        case fornecedor_tipo_documento
-            when 'CPF' then 'cpf:' || fornecedor_documento
-            when 'CNPJ' then 'cnpj:' || fornecedor_cnpj_raiz
-        end as chave
+        {{ chave_correspondencia('fornecedor_tipo_documento', 'fornecedor_documento') }} as chave
     from {{ ref('int_cota__despesas') }}
     where fornecedor_documento_valido and data_emissao is not null
 ),
 
 -- qualquer versão já vista de cada sanção (exclusões não são versões)
 sancoes as (
-    select distinct
-        sancao_id, cadastro, tipo_pessoa, documento,
-        {{ tipo_documento('documento') }} as tipo_documento,
-        {{ cnpj_raiz('documento') }} as cnpj_raiz,
-        nome_sancionado, categoria, abrangencia, orgao_sancionador, data_inicio, data_fim, _coleta_id,
-        data_evento
-    from {{ ref('int_cgu__sancoes_eventos') }}
-    where evento != 'exclusao' and data_inicio is not null
-),
-
-sancoes_com_chave as (
-    select
-        *,
-        case tipo_documento
-            when 'CPF' then 'cpf:' || documento
-            when 'CNPJ' then 'cnpj:' || cnpj_raiz
-        end as chave
-    from sancoes
+    {{ sancoes_para_alerta() }}
 ),
 
 cruzadas as (
     select
         d.despesa_id,
         s.sancao_id,
-        case
-            when d.fornecedor_tipo_documento = 'CPF' then 'cpf'
-            when d.fornecedor_documento = s.documento then 'cnpj'
-            else 'cnpj_raiz'
-        end as tipo_correspondencia,
+        {{ tipo_correspondencia('d.fornecedor_tipo_documento', 'd.fornecedor_documento', 's.documento') }}
+            as tipo_correspondencia,
         d.casa,
         d.parlamentar_id,
         d.nome_beneficiario,
@@ -64,7 +41,7 @@ cruzadas as (
         s._coleta_id as sancao_coleta_id,
         s.data_evento as sancao_data_evento
     from despesas as d
-    join sancoes_com_chave as s
+    join sancoes as s
         on s.chave = d.chave
         and d.data_emissao between s.data_inicio and coalesce(s.data_fim, date '9999-12-31')
 )
