@@ -71,6 +71,7 @@ def _investigar(args: argparse.Namespace, config: ConfigAgente) -> int:
     from agente.preparar import ErroPreparo
 
     controlador = _controlador(config)
+    nova: Path | None = None
     try:
         with trava(config.investigacoes, datetime.now(UTC)):
             if args.retomar:
@@ -79,12 +80,14 @@ def _investigar(args: argparse.Namespace, config: ConfigAgente) -> int:
                 log.info("retomando a investigação %s", pendente.name)
                 pasta = pendente
             else:
-                pasta = controlador.nova(args.tema)
+                pasta = nova = controlador.nova(args.tema)
             estado = controlador.executar(pasta)
     except ErroTrava as erro:
         print(f"erro: {erro}", file=sys.stderr)
         return SAIDA_TRAVA
     except ErroPreparo as erro:
+        if nova is not None:  # a investigação nem começou: não fica "em andamento" para sempre
+            controlador.descartar_se_nao_comecou(nova)
         print(f"erro ao preparar os dados: {erro}", file=sys.stderr)
         return SAIDA_PREPARO
     _resumir(config, estado)

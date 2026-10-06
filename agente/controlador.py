@@ -108,6 +108,16 @@ class Controlador:
         persistencia.salvar(pasta, Estado(id=pasta.name, tema=tema, criada_em=agora))
         return pasta
 
+    def descartar_se_nao_comecou(self, pasta: Path) -> bool:
+        """Apaga a investigação que falhou antes de sair da preparação (não tem nada a retomar)."""
+        import shutil
+
+        estado = persistencia.carregar(pasta)
+        if estado.fase != "preparar" or estado.hipoteses or estado.achados:
+            return False
+        shutil.rmtree(pasta)
+        return True
+
     def pendente(self) -> Path | None:
         """A investigação mais recente que ficou pausada ou em andamento."""
         if not self.config.investigacoes.exists():
