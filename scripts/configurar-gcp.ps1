@@ -27,7 +27,7 @@ if (-not (Existe { gcloud projects describe $projeto --format="value(projectId)"
 Executar "vincular faturamento" { gcloud billing projects link $projeto --billing-account=$ContaFaturamento }
 Executar "projeto padrão" { gcloud config set project $projeto }
 Executar "habilitar APIs básicas" {
-    gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com storage.googleapis.com bigquery.googleapis.com
+    gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com storage.googleapis.com
 }
 Executar "quota project do ADC" { gcloud auth application-default set-quota-project $projeto }
 

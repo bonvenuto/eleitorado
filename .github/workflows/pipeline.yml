@@ -23,7 +23,6 @@ env:
   ELEITORADO_PROJETO: ${{ vars.GCP_PROJETO }}
   ELEITORADO_BUCKET: ${{ vars.GCP_PROJETO }}-dados
   ELEITORADO_AMBIENTE: prod
-  ELEITORADO_PREFIXO: paralelo/ # vazio depois da virada (Plano 5)
   ELEITORADO_LAGO: dados
   ELEITORADO_PUBLICO: dados/publico
   ELEITORADO_VERSAO: ${{ github.sha }}
@@ -36,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
-      - run: uv sync --frozen --no-dev --extra migracao
+      - run: uv sync --frozen --no-dev
       - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
@@ -110,6 +109,3 @@ jobs:
           R2_CHAVE_ID: ${{ secrets.R2_CHAVE_ID }}
           R2_SEGREDO: ${{ secrets.R2_SEGREDO }}
           R2_BUCKET: ${{ vars.R2_BUCKET }}
-      - name: reconciliar com o BigQuery (só no paralelo)
-        if: always() && (steps.pipeline.outputs.codigo == '0' || steps.pipeline.outputs.codigo == '3')
-        run: uv run coletor reconciliar

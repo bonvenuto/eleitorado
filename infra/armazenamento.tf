@@ -43,14 +43,18 @@ locals {
 }
 
 resource "google_bigquery_dataset" "prod" {
-  for_each    = toset(local.datasets)
-  dataset_id  = each.value
-  location    = var.regiao
-  description = "Eleitorado: ${each.value}"
-  depends_on  = [google_project_service.apis]
+  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
+  delete_contents_on_destroy = true
+  for_each                   = toset(local.datasets)
+  dataset_id                 = each.value
+  location                   = var.regiao
+  description                = "Eleitorado: ${each.value}"
+  depends_on                 = [google_project_service.apis]
 }
 
 resource "google_bigquery_dataset" "dev" {
+  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
+  delete_contents_on_destroy  = true
   for_each                    = toset(local.datasets)
   dataset_id                  = "${each.value}_dev"
   location                    = var.regiao
@@ -60,6 +64,8 @@ resource "google_bigquery_dataset" "dev" {
 }
 
 resource "google_bigquery_dataset" "ci" {
+  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
+  delete_contents_on_destroy  = true
   dataset_id                  = "ci"
   location                    = var.regiao
   description                 = "Eleitorado: relacoes temporarias dos testes unitarios do dbt"
@@ -73,11 +79,13 @@ locals {
 }
 
 resource "google_bigquery_dataset" "dbt" {
-  for_each    = toset(local.datasets_dbt)
-  dataset_id  = each.value
-  location    = var.regiao
-  description = "Eleitorado (dbt): ${each.value}"
-  depends_on  = [google_project_service.apis]
+  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
+  delete_contents_on_destroy = true
+  for_each                   = toset(local.datasets_dbt)
+  dataset_id                 = each.value
+  location                   = var.regiao
+  description                = "Eleitorado (dbt): ${each.value}"
+  depends_on                 = [google_project_service.apis]
 }
 
 output "bucket_dados" {

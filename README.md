@@ -106,8 +106,9 @@ Desenho em `docs/superpowers/specs/2026-10-06-agente-investigador-design.md`.
   enviados antes do manifesto; quem lê o manifesto sempre vê um conjunto completo.
 - **Recuperação:** objetos sobrescritos ou apagados no bucket privado ficam 30 dias na exclusão
   reversível; `coletor reconstruir` refaz os históricos a partir dos originais.
-- **Paralelo da migração:** enquanto o Cloud Run antigo roda (imagem congelada), o workflow grava
-  sob `paralelo/` e roda `coletor reconciliar`, que falha se os marts divergirem do BigQuery.
+- **Infraestrutura:** só o bucket privado (GCS), a conta `pipeline` com WIF e o orçamento no GCP;
+  o BigQuery e o Cloud Run foram desligados na virada de 2026-10-06 (`scripts/virada.py` copiou
+  `paralelo/` para a raiz do bucket).
 
 ### Cloudflare R2 (configuração única)
 

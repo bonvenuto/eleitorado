@@ -1,4 +1,4 @@
-"""CLI `coletor`: coleta, pipeline diário, estado, publicação, reconstrução e reconciliação."""
+"""CLI `coletor`: coleta, pipeline diário, estado, publicação e reconstrução."""
 
 from __future__ import annotations
 
@@ -77,7 +77,6 @@ def _parser() -> argparse.ArgumentParser:
         help="prefixo dos originais (padrão: o do ambiente; '' para a raiz do bucket)",
     )
 
-    sub.add_parser("reconciliar", help="compara os marts com os do BigQuery (só no paralelo)")
     return parser
 
 
@@ -317,26 +316,6 @@ def _reconstruir(
     return 0 if resultado.status == "sucesso" else 1
 
 
-def _reconciliar(deps: Dependencias) -> int:
-    from coletor.gcp import credenciais_do_ambiente
-    from coletor.reconciliacao import consulta_bigquery, consulta_duckdb, reconciliar
-
-    config = deps.config
-    divergencias = reconciliar(
-        consulta_bigquery(config.projeto, credenciais_do_ambiente(config.projeto)),
-        consulta_duckdb(config.publico),
-    )
-    for divergencia in divergencias:
-        print(f"divergência em {divergencia.nome}:", file=sys.stderr)
-        for linha in divergencia.so_no_bigquery[:20]:
-            print(f"  só no BigQuery: {linha}", file=sys.stderr)
-        for linha in divergencia.so_no_duckdb[:20]:
-            print(f"  só no DuckDB:   {linha}", file=sys.stderr)
-    if not divergencias:
-        log.info("reconciliação sem divergências")
-    return 1 if divergencias else 0
-
-
 def main(
     argv: list[str] | None = None,
     fabrica: Fabrica | None = None,
@@ -362,8 +341,6 @@ def main(
             return _estado(args, deps)
         if args.comando == "publicar":
             return _publicar(args, deps, env)
-        if args.comando == "reconciliar":
-            return _reconciliar(deps)
         repo = RepositorioMeta(deps.warehouse)
         repo.preparar()
         if args.comando == "pipeline":
