@@ -15,7 +15,7 @@ resource "google_storage_bucket" "dados" {
   lifecycle_rule {
     condition {
       age                   = 30
-      matches_prefix        = ["originais/", "dev/originais/", "paralelo/originais/"]
+      matches_prefix        = ["originais/", "dev/originais/"]
       matches_storage_class = ["STANDARD"]
     }
     action {
@@ -36,56 +36,6 @@ resource "google_storage_bucket" "dados" {
   }
 
   depends_on = [google_project_service.apis]
-}
-
-locals {
-  datasets = ["meta", "raw_camara", "raw_senado", "raw_cgu", "raw_ibge", "replay"]
-}
-
-resource "google_bigquery_dataset" "prod" {
-  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
-  delete_contents_on_destroy = true
-  for_each                   = toset(local.datasets)
-  dataset_id                 = each.value
-  location                   = var.regiao
-  description                = "Eleitorado: ${each.value}"
-  depends_on                 = [google_project_service.apis]
-}
-
-resource "google_bigquery_dataset" "dev" {
-  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
-  delete_contents_on_destroy  = true
-  for_each                    = toset(local.datasets)
-  dataset_id                  = "${each.value}_dev"
-  location                    = var.regiao
-  description                 = "Eleitorado (desenvolvimento): ${each.value}"
-  default_table_expiration_ms = 2592000000 # 30 dias: dados de teste não se acumulam
-  depends_on                  = [google_project_service.apis]
-}
-
-resource "google_bigquery_dataset" "ci" {
-  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
-  delete_contents_on_destroy  = true
-  dataset_id                  = "ci"
-  location                    = var.regiao
-  description                 = "Eleitorado: relacoes temporarias dos testes unitarios do dbt"
-  default_table_expiration_ms = 86400000 # 1 dia
-  depends_on                  = [google_project_service.apis]
-}
-
-# Camadas do dbt em produção (em dev, o dbt cria dev_<usuario>_* com a conta de quem roda)
-locals {
-  datasets_dbt = ["staging", "intermediate", "marts"]
-}
-
-resource "google_bigquery_dataset" "dbt" {
-  # virada (Plano 5): os datasets saem no passo seguinte; até lá podem ser apagados com tabelas
-  delete_contents_on_destroy = true
-  for_each                   = toset(local.datasets_dbt)
-  dataset_id                 = each.value
-  location                   = var.regiao
-  description                = "Eleitorado (dbt): ${each.value}"
-  depends_on                 = [google_project_service.apis]
 }
 
 output "bucket_dados" {

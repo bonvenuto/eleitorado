@@ -28,9 +28,6 @@ resource "google_storage_bucket_iam_member" "pipeline_le_objetos" {
 # continuam só com objectCreator (sem sobrescrever nem apagar)
 locals {
   prefixos_estado = ["raw/", "meta/", "estado/"]
-  prefixos_estado_com_paralelo = concat(
-    local.prefixos_estado, [for p in local.prefixos_estado : "paralelo/${p}"]
-  )
 }
 
 resource "google_storage_bucket_iam_member" "pipeline_espelha_estado" {
@@ -40,7 +37,7 @@ resource "google_storage_bucket_iam_member" "pipeline_espelha_estado" {
   condition {
     title = "estado-do-lago"
     expression = join(" || ", [
-      for p in local.prefixos_estado_com_paralelo :
+      for p in local.prefixos_estado :
       "resource.name.startsWith(\"projects/_/buckets/${google_storage_bucket.dados.name}/objects/${p}\")"
     ])
   }
