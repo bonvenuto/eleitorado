@@ -27,17 +27,33 @@ from agente.caderno import Caderno, ConsultaChave
 from agente.config import ConfigAgente, Orcamento
 from agente.diario import Diario
 from agente.executor import Executor, Limites, PedidoSessao, ResultadoSessao
-from agente.modelos import Estado, Hipotese, Transicao
+from agente.modelos import Estado, Hipotese, Resumo, Transicao
 from agente.preparar import Preparo, _somar
 from agente.relatorio import ErroRelatorio, confianca, gerar, gerar_indice
 
 CICLOS_POR_SESSAO = 25
 RESERVA_HIPOTESE = 20  # ciclos para investigar, validar e correlacionar uma hipótese nova
 MINIMO_VALIDACAO = 12  # a validação de um achado registrado não fica sem ciclos
-CICLOS_RELATAR = 6  # o resumo executivo é escrito mesmo com o orçamento esgotado
+CICLOS_RELATAR = 10  # o resumo executivo é escrito mesmo com o orçamento esgotado
 MINUTOS_POR_SESSAO = 20
 TRAVA_ORFA = timedelta(hours=6)
 ERROS_SEGUIDOS_PARA_PAUSAR = 2
+
+
+def resumo_automatico(estado: Estado) -> Resumo:
+    """Resumo montado pelo controlador quando o agente não registrou o seu."""
+    contagem = {
+        situacao: [r for r in estado.achados if r.situacao == situacao]
+        for situacao in ("confirmado", "inconclusivo", "descartado")
+    }
+    partes = [
+        "Resumo automático (o agente não registrou o resumo executivo).",
+        f"Achados confirmados: {len(contagem['confirmado'])}; inconclusivos: "
+        f"{len(contagem['inconclusivo'])}; descartados: {len(contagem['descartado'])}.",
+    ]
+    partes += [f"Confirmado: {r.achado.titulo}." for r in contagem["confirmado"]]
+    partes += [f"Inconclusivo: {r.achado.titulo}." for r in contagem["inconclusivo"]]
+    return Resumo(texto=" ".join(partes))
 
 
 class ErroTrava(Exception):
@@ -360,6 +376,8 @@ class Controlador:
             estado = persistencia.carregar(pasta)
             if estado.situacao == "pausada":
                 return
+        if estado.resumo is None:
+            estado.resumo = resumo_automatico(estado)
         estado.situacao = "parcial" if estado.motivo_parada else "concluida"
         persistencia.salvar(pasta, estado)
         try:

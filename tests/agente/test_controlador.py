@@ -240,7 +240,7 @@ def test_orcamento_esgotado_relata_parcial(montar):
     assert estado.situacao == "parcial"
     assert "ciclos" in estado.motivo_parada
     assert [p.fase for p in executor.pedidos] == ["explorar", "relatar"]  # o resumo sempre sai
-    assert executor.limites[-1].ciclos == 6
+    assert executor.limites[-1].ciclos == 10
     assert (config.investigacoes / estado.id / "relatorio.html").exists()
 
 
@@ -317,3 +317,21 @@ def test_achado_registrado_e_validado_mesmo_com_o_orcamento_no_fim(montar):
     ]  # sem ciclos para correlacionar
     assert executor.limites[2].ciclos == 12  # mínimo da validação, acima do que restava (2)
     assert estado.achado("a1").situacao == "confirmado"
+
+
+def test_resumo_automatico_quando_o_agente_nao_registra(montar):
+    roteiro = {
+        "explorar": lambda f: f.hipoteses_registrar(
+            [NovaHipotese(texto="Concentração de pagamentos", lente="c", prioridade=1)]
+        ),
+        ("investigar", "h1"): investigar_h1,
+        "validar": lambda f: f.veredito_registrar(veredito("confirmado")),
+        "relatar": lambda f: "orcamento_ciclos",  # gasta a sessão e não registra o resumo
+    }
+    controlador, executor, _ = montar(roteiro)
+    estado = controlador.executar(controlador.nova(None))
+    assert executor.limites[-1].ciclos == 10
+    assert "relatar" in executor.pedidos[-1].fase and "q1" in executor.pedidos[-1].prompt
+    assert estado.resumo is not None
+    assert estado.resumo.texto.startswith("Resumo automático")
+    assert "Empresa 7 concentra os pagamentos" in estado.resumo.texto
