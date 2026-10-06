@@ -1,7 +1,7 @@
 # Agente investigador (L1): design
 
 Data: 2026-10-06
-Status: em revisão
+Status: aprovada; revisada depois do protótipo (seção 11 prevalece sobre o texto anterior)
 
 ## 1. Objetivo
 
@@ -334,3 +334,52 @@ instruções dos agentes; consome a assinatura, por isso não roda no CI.
 | Limite de uso da assinatura | orçamentos; estado `pausada` e retomada |
 | Custo de tempo do PREPARAR | sincronização incremental; dbt só quando o lago mudou |
 | Consulta pesada travando a máquina | tempo máximo por consulta; limite de memória do DuckDB (4 GB, como o profile) |
+
+## 11. Revisões depois do protótipo (2026-10-06)
+
+O protótipo (branch `proto/agente`) foi executado de ponta a ponta com o `claude -p` real, o lago de
+produção e o banco local. Estas decisões substituem o texto anterior onde houver conflito.
+
+1. **Ferramentas do agente por MCP, sem shell.** No modo `dontAsk`, o Claude Code libera sozinho
+   comandos que considera só de leitura (`ls`, `cat`...): com `Bash` disponível, o agente leria
+   qualquer arquivo da máquina, inclusive credenciais. As ferramentas (consultar, caderno,
+   hipóteses, achados, veredito, resumo) passam a ser um servidor MCP em Python
+   (`agente/servidor.py`, `python -m agente.servidor`), e os agentes só têm essas ferramentas,
+   `WebSearch` e `WebFetch`. Não há `Bash`, `Read` nem `Write`. O servidor expõe só as ferramentas
+   do papel (investigador ou validador) e recusa escrita fora da fase e do alvo da sessão, que o
+   controlador passa por variáveis de ambiente. Os comandos `agente consultar/caderno/achado/
+   hook-web` da seção 3 não existem; o hook é `python -m agente.hook_web`.
+2. **Mensagens de erro ao agente:** só exceções `ToolError` do MCP chegam ao cliente com a
+   mensagem; o servidor usa `ErroFerramenta(ToolError)` para o agente poder corrigir.
+3. **O validador registra o veredito** pela ferramenta `veredito_registrar` (estruturado). Ele
+   continua sem poder registrar achados.
+4. **Valores só nos fatos:** título, indícios, hipóteses e recomendações de um achado não podem ter
+   R$, porcentagem ou número com 3 ou mais dígitos (anos e números de lei não contam). É a forma de
+   garantir que todo número do relatório aponte para uma consulta.
+5. **Reabertura de casos:** confirmados e descartados são reabertos quando o resultado das
+   consultas-chave muda (linhas ou soma das colunas numéricas com variação acima de 10%). Isso
+   substitui a comparação por versão das fontes, que o lago não registra por caso.
+6. **Views particionadas:** o dbt-duckdb cria as views dos marts particionados sem
+   `hive_partitioning`, e as colunas de partição (`casa`, `ano`...) somem. O `preparar` recria essas
+   views no banco do agente.
+7. **Recursos reais:** lago local com cerca de 4 GB (`dados-agente/`, com o `agente.duckdb` de
+   3 GB); a primeira preparação levou cerca de 7 minutos.
+8. **Agendamento:** dia e hora são parâmetros de `agente/agendar.ps1` (padrão segunda, 09:00), não
+   do `config.toml`.
+9. **Avaliação:** a armadilha de homônimo usa uma empresa com o mesmo nome de uma sancionada e
+   outro CNPJ (não pode ser confirmada), além de dois parlamentares com o mesmo nome. A avaliação
+   usa um `config.toml` próprio (`avaliacao/`), para não tocar no lago real. Os dados são fictícios mas verossímeis
+   (nomes plausíveis, CNPJs com dígitos verificadores válidos) e o contexto avisa o agente de que
+   é uma avaliação: na primeira rodada real, com nomes genéricos e CNPJs inválidos, o agente
+   concluiu, com razão, que a base era de teste e descartou os casos. A armadilha só falha se o homônimo for
+   confirmado como situação suspeita: apontá-lo como problema de qualidade de dado ("mesmo nome,
+   CNPJ diferente") é o comportamento correto, e foi o que o agente fez na avaliação real.
+12. **Avaliação real (terceira rodada):** os três critérios passaram, com 104 ciclos, 71 consultas,
+    11 sessões e 24 minutos.
+10. **Relatório recusado:** se a validação do relatório falhar, a investigação termina `parcial`,
+    com o motivo em `relatorio-recusado.txt`.
+11. **Orçamento medido na avaliação real:** explorar gasta cerca de 13 ciclos e cada hipótese
+    cerca de 25 (investigar, validar, correlacionar). Os padrões passam a 120 ciclos (livre) e 80
+    (tema). Uma hipótese nova só começa com pelo menos 20 ciclos sobrando; a validação de um achado
+    já registrado sempre roda, com no mínimo 12 ciclos, mesmo que passe do orçamento; o resumo
+    executivo sempre é escrito (até 6 ciclos).
