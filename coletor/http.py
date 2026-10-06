@@ -17,6 +17,16 @@ import httpx
 STATUS_RETENTAVEIS = frozenset({429, 500, 502, 503, 504})
 USER_AGENT = "eleitorado-coletor/0.1"
 
+# Fontes oficiais: toda requisição (inclusive o destino de um redirecionamento ou o link "next"
+# de uma API) precisa ir para um destes domínios, o que impede a coleta de ser desviada para
+# outro host.
+SUFIXOS_OFICIAIS = (".gov.br", ".leg.br")
+
+
+def host_permitido(host: str, sufixos: tuple[str, ...]) -> bool:
+    return any(host == sufixo.lstrip(".") or host.endswith(sufixo) for sufixo in sufixos)
+
+
 T = TypeVar("T")
 
 
@@ -59,16 +69,19 @@ class ClienteHttp:
         espera_maxima: float = 60.0,
         dormir: Callable[[float], None] = time.sleep,
         transporte: httpx.BaseTransport | None = None,
+        sufixos_permitidos: tuple[str, ...] | None = None,
     ) -> None:
         self._tentativas = tentativas
         self._espera_base = espera_base
         self._espera_maxima = espera_maxima
         self._dormir = dormir
+        self.sufixos_permitidos = sufixos_permitidos
         self._cliente = httpx.Client(
             timeout=httpx.Timeout(120.0, connect=10.0),
             follow_redirects=True,
             headers={"User-Agent": USER_AGENT},
             transport=transporte,
+            event_hooks={"request": [self._verificar_host]},
         )
 
     def fechar(self) -> None:
@@ -122,6 +135,13 @@ class ClienteHttp:
     def _verificar(resposta: httpx.Response) -> None:
         if resposta.status_code >= 400:
             raise _RespostaComErro(resposta)
+
+    def _verificar_host(self, requisicao: httpx.Request) -> None:
+        if self.sufixos_permitidos is None:
+            return
+        host = requisicao.url.host
+        if not host_permitido(host, self.sufixos_permitidos):
+            raise ErroHttp(str(requisicao.url), None, f"host não permitido: {host}")
 
     def _com_retentativas(self, url: str, tentativa: Callable[[], T]) -> T:
         ultimo: ErroHttp | None = None

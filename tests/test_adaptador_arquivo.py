@@ -153,3 +153,12 @@ def test_curinga_ambiguo_falha(tmp_path):
     regra = recurso(formato={"tipo": "csv", "compressao": "zip", "arquivo": "{anomes}_*.csv"})
     with pytest.raises(ErroColeta, match="2 arquivos"):
         preparar(regra, Competencia.de_mes(2024, 4), original, tmp_path)
+
+
+def test_zip_acima_do_teto_e_recusado(tmp_path, monkeypatch):
+    monkeypatch.setattr(arquivo, "LIMITE_DESCOMPACTADO", 10)
+    rec = recurso(formato={"tipo": "csv", "compressao": "zip"})
+    original = tmp_path / "original.zip"
+    original.write_bytes(zip_com({"a.csv": b"x" * 11}))
+    with pytest.raises(ErroColeta, match="excede o teto"):
+        arquivo.preparar(rec, Competencia.de_ano(2026), original, tmp_path)

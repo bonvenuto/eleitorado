@@ -9,7 +9,7 @@ from typing import Any
 from coletor.armazenamento import GcsArmazenamento
 from coletor.coleta import Dependencias
 from coletor.config import Config
-from coletor.http import ClienteHttp
+from coletor.http import SUFIXOS_OFICIAIS, ClienteHttp
 from coletor.lago import LagoWarehouse
 
 
@@ -38,7 +38,7 @@ def montar_dependencias(config: Config) -> Dependencias:
     credenciais = credenciais_do_ambiente(config.projeto)
     return Dependencias(
         config=config,
-        http=ClienteHttp(),
+        http=ClienteHttp(sufixos_permitidos=SUFIXOS_OFICIAIS),
         armazenamento=GcsArmazenamento(config.bucket, config.projeto, credenciais),
         warehouse=LagoWarehouse(config.lago),
         agora=agora_utc,

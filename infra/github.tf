@@ -35,11 +35,6 @@ resource "google_service_account_iam_member" "pipeline_wif" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.ref/refs/heads/main"
 }
 
-resource "google_service_account_iam_member" "ci_wif" {
-  service_account_id = google_service_account.ci.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
-}
 
 resource "google_artifact_registry_repository_iam_member" "deployer_publica" {
   location   = var.regiao
