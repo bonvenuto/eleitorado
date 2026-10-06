@@ -5,7 +5,7 @@ lago = "dados-agente"          # cópia local do lago de produção (raw, meta, 
 investigacoes = "investigacoes" # diários, relatórios e caderno de casos (fora do git)
 
 [coleta]
-prefixo_gcs = "paralelo/"       # prefixo do lago de produção no bucket; vazio depois da virada (Plano 5)
+prefixo_gcs = ""                # prefixo do lago de produção no bucket (vazio desde a virada)
 
 [modelo]
 nome = ""                       # vazio: o modelo padrão do Claude Code

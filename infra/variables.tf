@@ -25,9 +25,3 @@ variable "orcamento_mensal_brl" {
   type        = number
   default     = 30
 }
-
-variable "imagem_inicial" {
-  description = "Imagem usada so na criacao do job; o deploy do GitHub Actions troca pela imagem real"
-  type        = string
-  default     = "us-docker.pkg.dev/cloudrun/container/job:latest"
-}

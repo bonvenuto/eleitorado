@@ -8,7 +8,7 @@ def test_config_padrao(tmp_path: Path):
     assert config.lago == (tmp_path / "dados-agente").resolve()
     assert config.banco == config.lago / "agente.duckdb"
     assert config.investigacoes == (tmp_path / "investigacoes").resolve()
-    assert config.prefixo_gcs == "paralelo/"
+    assert config.prefixo_gcs == ""
     assert config.modelo is None
     assert config.diretorios_permitidos() == [
         config.lago / "raw",
