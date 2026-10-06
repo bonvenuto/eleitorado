@@ -25,6 +25,10 @@ log = logging.getLogger("coletor")
 Fabrica = Callable[[Config], Dependencias]
 RodarDbt = Callable[..., ResultadoDbt]
 
+# Saída do `pipeline` quando só coletas falharam e o dbt passou: os marts podem ser publicados (o
+# workflow publica com 0 ou 3), mas o job termina vermelho para a falha ficar visível.
+SAIDA_SO_COLETAS_FALHARAM = 3
+
 # recursos cujos snapshots alimentam os históricos (fonte_snapshot no dbt)
 RECURSOS_HISTORICO = ("cgu.ceis", "cgu.cnep", "camara.deputados", "senado.senadores")
 SELECAO_HISTORICOS = ["+int_cgu__sancoes_eventos+", "+int_parlamentares__eventos+"]
@@ -107,7 +111,11 @@ def _rodar_tarefas(
         )
     log.info("resumo: %s dbt: %s", resumo, resultado_dbt)
     dbt_ok = resultado_dbt is None or resultado_dbt.status == "sucesso"
-    return 0 if resumo.sucesso and dbt_ok else 1
+    if resumo.sucesso and dbt_ok:
+        return 0
+    if dbt is not None and dbt_ok:
+        return SAIDA_SO_COLETAS_FALHARAM
+    return 1
 
 
 def _fontes(manifesto: Manifesto, repo: RepositorioMeta) -> int:

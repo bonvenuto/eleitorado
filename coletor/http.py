@@ -14,7 +14,8 @@ from typing import Any, TypeVar
 
 import httpx
 
-STATUS_RETENTAVEIS = frozenset({429, 500, 502, 503, 504})
+# 422: o PNCP devolve 422 transitório numa página que responde 200 logo depois
+STATUS_RETENTAVEIS = frozenset({422, 429, 500, 502, 503, 504})
 USER_AGENT = "eleitorado-coletor/0.1"
 
 # Fontes oficiais: toda requisição (inclusive o destino de um redirecionamento ou o link "next"
