@@ -1,7 +1,7 @@
 # Onda C1: cadastro de empresas da Receita Federal (CNPJ): design
 
 Data: 2026-10-06
-Status: em revisão
+Status: aprovado (com os ajustes do protótipo, seção 10)
 
 ## 1. Objetivo
 
@@ -94,10 +94,17 @@ de cada raiz.
 
 - Manifesto novo `fontes/rfb.yaml`, com um recurso por grupo (`empresas`, `estabelecimentos`,
   `socios`, `simples`) e um por tabela de apoio, competência mensal (`AAAA-MM` = pasta da Receita).
-- Adaptador novo `webdav_zip`: lista a pasta da competência, baixa cada ZIP do grupo em streaming
-  calculando o SHA-256, e passa o CSV do ZIP pelo DuckDB com um semi-join contra as raízes de
-  interesse (`cnpj_basico in (select raiz from raizes)`), gravando só o recorte em Parquet. O ZIP é
-  apagado em seguida: o disco nunca guarda mais que um arquivo.
+- Adaptador novo `webdav_zip`: lista a pasta da competência e baixa cada ZIP do grupo calculando o
+  SHA-256. O servidor da Receita derruba conexões no meio de arquivos grandes (visto no protótipo),
+  então o download retoma de onde parou com `Range: bytes=<recebido>-` (exige resposta 206), com até
+  20 tentativas e espera crescente.
+- O recorte é feito em fluxo sobre o CSV dentro do ZIP, sem extraí-lo: registro a registro em
+  bytes (um registro termina quando o número de aspas acumulado é par, para aguentar quebra de linha
+  dentro de campo), mantendo só os que têm `cnpj_basico` (bytes 2 a 9) no conjunto de raízes. Só os
+  mantidos são decodificados de Latin-1, sem os bytes NUL, e regravados em UTF-8. Em seguida o DuckDB
+  lê esse CSV pequeno e grava o Parquet. Não dá para usar o leitor Latin-1 do DuckDB direto: os
+  arquivos da Receita têm bytes NUL e 0x8F soltos, que ele recusa. O ZIP é apagado em seguida: o
+  disco nunca guarda mais que um ZIP e o seu recorte.
 - Cada ZIP do grupo é uma coleta própria (retomada por arquivo). As tabelas de apoio vão inteiras.
 - O número de colunas do CSV é conferido contra o layout; diferente, a coleta falha com erro claro
   e não grava nada parcial.
@@ -167,14 +174,22 @@ Todos excluem registros marcados com problema de qualidade (`valor_suspeito`,
 Fatos: despesa de cota (`data_emissao`), pagamento de emenda (`data_documento`, fase
 `Pagamento`) e contrato (`data_assinatura`). Situação do **estabelecimento exato** (CNPJ de 14
 posições) ou, sem ele, da matriz. Dispara quando a situação é baixada, inapta, suspensa ou nula e
-`data_situacao_cadastral <= data do fato`. Colunas: origem, identificador do fato, data, valor,
-CNPJ, razão social, situação, data e motivo da situação, dias entre a irregularidade e o fato.
+`data_situacao_cadastral <= data do fato`. **Não dispara** quando o motivo da situação é sucessão
+(02 incorporação, 03 fusão, 04 cisão total): a empresa sucessora existe, e no protótipo esses casos
+eram TIM Nordeste, GOL, NET e Embratel nas notas da cota, ruído. Colunas: origem, identificador do
+fato, data, valor, CNPJ, razão social, situação, data e motivo da situação, dias entre a
+irregularidade e o fato.
 
 ### 5.2 `alerta_empresa_recem_aberta`
 
-Dispara quando a empresa (início de atividade da matriz) foi aberta até 180 dias antes do fato,
-com valor de pelo menos R$ 50 mil (contrato ou pagamento de emenda) ou R$ 10 mil (despesa de
-cota). Um fato **anterior** à abertura sai como tipo próprio (`fato_antes_da_abertura`). Colunas:
+Dispara quando a empresa foi aberta até 180 dias antes do fato, com valor de pelo menos R$ 50 mil
+(contrato ou pagamento de emenda) ou R$ 10 mil (despesa de cota). A data de abertura é o **menor
+início de atividade entre todos os estabelecimentos** da raiz, não o da matriz atual: quando a
+matriz muda, a nova tem data recente (no protótipo, isso gerava 255 falsos "fato antes da
+abertura" em emendas). **Consórcio de Sociedades** (natureza 2151) fica de fora: é criado para o
+contrato, e no protótipo respondia por R$ 2,8 bi dos R$ 3,2 bi do alerta. Um fato **anterior** à
+abertura sai como tipo próprio (`fato_antes_da_abertura`), em geral contrato transferido para uma
+empresa sucessora. Colunas:
 origem, fato, data, valor, CNPJ, razão social, data de abertura, dias desde a abertura, tipo.
 
 ### 5.3 `alerta_licitacao_socios_em_comum`
@@ -214,14 +229,18 @@ nome nem o CPF de sócio pessoa física.
   `valor_suspeito` excluído.
 - **LGPD:** `sem_cpf_completo` em `dim_empresa`, `dim_estabelecimento` e nos alertas novos; um
   teste que falha se um mart público tiver coluna de endereço, contato ou sócio pessoa física.
-- **Protótipo antes do plano:** coleta real de uma competência inteira (medir download e filtro
-  no runner), coleta do detalhe dos deputados e os quatro alertas sobre os dados reais, para medir
-  quantos casos cada um gera e ajustar os limites antes de publicar.
+- **Coletor (do protótipo):** registro com quebra de linha dentro de campo entre aspas; byte NUL e
+  0x8F no meio do CSV; download interrompido que retoma por `Range`; servidor que ignora o `Range`
+  (resposta 200) falha em vez de corromper o arquivo.
+- **dbt (do protótipo):** baixa por incorporação não dispara; matriz nova com filial antiga não é
+  "recém-aberta"; consórcio de sociedades não dispara.
 
 ## 8. Operação
 
-- Se a coleta mensal medir mais de 90 minutos, os grupos se dividem em semanas (Estabelecimentos
-  numa execução, o resto na outra), com o mecanismo de limite por execução que já existe.
+- A coleta medida no protótipo levou ~50 minutos (download de 33 min a ~4 MB/s, recorte de ~15
+  min). Cabe numa execução só. A primeira execução no runner registra a medição real; se passar de
+  90 minutos, os grupos se dividem em semanas (Estabelecimentos numa execução, o resto na outra),
+  com o mecanismo de limite por execução que já existe.
 - O token do compartilhamento fica no manifesto; se a Receita trocar o link, a coleta falha com
   mensagem clara (o histórico do lago não é afetado).
 - Recursos: o lago cresce poucos MB por mês; o runner baixa 7,6 GB por mês (sem custo).
@@ -236,3 +255,24 @@ nome nem o CPF de sócio pessoa física.
 | Homônimos | exigir os 6 dígitos do CPF quando há; marcar `só nome` quando não há |
 | Sócio atual não é o sócio da época | data de entrada contra a data do fato; histórico mensal daqui em diante |
 | Empresa nova fica um mês sem cadastro | aceito: entra no recorte do mês seguinte |
+
+## 10. Protótipo (2026-10-06, competência 2026-09, na máquina local)
+
+| Medida | Resultado |
+|---|---|
+| Raízes de interesse | 250.822; 250.810 achadas na Receita (todas com matriz) |
+| Download | 7,8 GB em 33 min (3,6 a 4,2 MB/s); 1 conexão derrubada pelo servidor |
+| Recorte | 250 mil empresas, 657 mil estabelecimentos, 388 mil sócios, 159 mil no Simples: 86 MB em Parquet |
+| Detalhe de deputados | 1.814 em 5 min, sem erro; todos com CPF e nome civil |
+
+Casos por alerta, já com as regras ajustadas (todo o histórico; entre parênteses, desde 2024):
+
+| Alerta | Casos |
+|---|---|
+| 1 empresa irregular | cota 2.854 notas de 501 empresas, R$ 1,4 mi (634); emenda 299 pagamentos de 79, R$ 19 mi (47); contrato 12, R$ 10,5 mi (10) |
+| 2 recém-aberta | contrato 442 de 371 empresas, R$ 391 mi (302); cota 1.522 de 560, R$ 23,6 mi (320); emenda 18, R$ 1,7 mi (10); fato antes da abertura: 13 contratos (sucessões; um de R$ 7,6 bi) |
+| 3 sócios em comum | 613 licitações com sócio pessoa física em comum, 109 com sócio empresa (de 90 mil licitações) |
+| 4 parlamentar sócio | 216 vínculos de 122 deputados (nome e CPF), 11 com cota paga à própria empresa (R$ 0,6 mi); 129 vínculos de 80 senadores (só nome) |
+
+Os limites de 180 dias, R$ 50 mil e R$ 10 mil ficam: os volumes são investigáveis. Com 90 dias
+cairiam para cerca de 40%; com 365, mais que dobrariam.
