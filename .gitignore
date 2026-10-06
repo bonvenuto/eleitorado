@@ -32,3 +32,7 @@ dbt/tests/lago_vazio/**/*.parquet
 dados-agente/
 investigacoes/
 avaliacao/
+
+# Claude Code: só as definições de agentes vão para o git (o resto é configuração pessoal)
+.claude/*
+!.claude/agents/
