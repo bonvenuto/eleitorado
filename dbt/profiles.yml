@@ -17,6 +17,14 @@ eleitorado:
       threads: 4
       settings:
         memory_limit: 4GB
+    # agente: cópia local do lago de produção para o agente investigador (agente/preparar.py)
+    agente:
+      type: duckdb
+      path: "{{ env_var('ELEITORADO_LAGO', 'dados-agente') }}/agente.duckdb"
+      external_root: "{{ env_var('ELEITORADO_PUBLICO', 'dados-agente/publico') }}/marts"
+      threads: 4
+      settings:
+        memory_limit: 4GB
     # ci: lê o lago vazio de dbt/tests/lago_vazio (só esquemas, sem dados)
     ci:
       type: duckdb

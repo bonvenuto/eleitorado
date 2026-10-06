@@ -66,6 +66,7 @@ def test_targets_usam_duckdb_com_arquivos_separados():
     assert {nome: saida["type"] for nome, saida in saidas.items()} == {
         "dev": "duckdb",
         "prod": "duckdb",
+        "agente": "duckdb",
         "ci": "duckdb",
     }
-    assert len({saida["path"] for saida in saidas.values()}) == 3
+    assert len({saida["path"] for saida in saidas.values()}) == 4
