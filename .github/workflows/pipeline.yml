@@ -32,24 +32,39 @@ env:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - run: uv sync --frozen --no-dev --extra migracao
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_SA_PIPELINE }}
-      - name: cache do lago
-        uses: actions/cache/restore@v4
+      # O lago tem o raw com CPFs completos: no cache do Actions ele vai sempre cifrado, porque
+      # workflows de pull request (inclusive de forks) conseguem restaurar caches da main.
+      - name: cache do lago (cifrado)
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: |
-            dados/raw
-            dados/meta
-            dados/estado
-          key: lago-${{ github.run_id }}
-          restore-keys: lago-
+          path: lago.tar.gpg
+          key: lago-cifrado-${{ github.run_id }}
+          restore-keys: lago-cifrado-
+      - name: decifrar o lago
+        env:
+          LAGO_CHAVE: ${{ secrets.LAGO_CHAVE }}
+        run: |
+          set -o pipefail
+          test -n "$LAGO_CHAVE" || { echo "::error::secret LAGO_CHAVE ausente"; exit 1; }
+          if [ -f lago.tar.gpg ]; then
+            if gpg --batch --quiet --pinentry-mode loopback --passphrase-fd 3 \
+                --decrypt lago.tar.gpg 3<<<"$LAGO_CHAVE" | tar -xf -; then
+              echo "lago restaurado do cache"
+            else
+              echo "::warning::cache do lago ilegível; o estado vem inteiro do GCS"
+              rm -rf dados/raw dados/meta dados/estado
+            fi
+            rm -f lago.tar.gpg
+          fi
       - name: estado restaurar
         id: restaurar
         run: uv run coletor estado restaurar
@@ -62,15 +77,24 @@ jobs:
       - name: estado salvar
         if: always() && steps.restaurar.outcome == 'success'
         run: uv run coletor estado salvar
-      - name: guardar cache do lago
+      - name: cifrar o lago
+        id: cifrar
         if: always() && steps.restaurar.outcome == 'success'
-        uses: actions/cache/save@v4
+        env:
+          LAGO_CHAVE: ${{ secrets.LAGO_CHAVE }}
+        run: |
+          set -o pipefail
+          test -n "$LAGO_CHAVE" || { echo "::error::secret LAGO_CHAVE ausente"; exit 1; }
+          mkdir -p dados/raw dados/meta dados/estado
+          tar -cf - dados/raw dados/meta dados/estado \
+            | gpg --batch --quiet --yes --pinentry-mode loopback --passphrase-fd 3 \
+                --symmetric --cipher-algo AES256 --compress-algo none -o lago.tar.gpg 3<<<"$LAGO_CHAVE"
+      - name: guardar cache do lago (cifrado)
+        if: always() && steps.cifrar.outcome == 'success'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: |
-            dados/raw
-            dados/meta
-            dados/estado
-          key: lago-${{ github.run_id }}
+          path: lago.tar.gpg
+          key: lago-cifrado-${{ github.run_id }}
       - name: publicar
         run: uv run coletor publicar
         env:
