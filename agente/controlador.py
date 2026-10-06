@@ -32,6 +32,8 @@ from agente.preparar import Preparo, _somar
 from agente.relatorio import ErroRelatorio, confianca, gerar, gerar_indice
 
 CICLOS_POR_SESSAO = 25
+CICLOS_EXPLORAR = 40  # a exploração faz um panorama antes de registrar as hipóteses
+CICLOS_REGISTRO = 12  # sessão curta quando a exploração termina sem registrar
 RESERVA_HIPOTESE = 20  # ciclos para investigar, validar e correlacionar uma hipótese nova
 MINIMO_VALIDACAO = 12  # a validação de um achado registrado não fica sem ciclos
 CICLOS_RELATAR = 10  # o resumo executivo é escrito mesmo com o orçamento esgotado
@@ -262,9 +264,20 @@ class Controlador:
         prompt = prompts.explorar(
             estado, contexto, aprendizados, maximo, self._ultima_investigacao(estado.id), pendentes
         )
-        self._sessao(pasta, "investigador", "explorar", None, prompt)
-        if persistencia.carregar(pasta).situacao != "pausada":
-            self._transicao(pasta, "investigar")
+        antes = len(estado.hipoteses)
+        self._sessao(pasta, "investigador", "explorar", None, prompt, maximo=CICLOS_EXPLORAR)
+        estado = persistencia.carregar(pasta)
+        if estado.situacao == "pausada":
+            return
+        sem_fila = not any(h.situacao == "pendente" for h in estado.hipoteses)
+        if len(estado.hipoteses) == antes and sem_fila and not self._esgotado(estado):
+            consultas = list(Diario(pasta).consultas().values())
+            prompt = prompts.registrar_hipoteses(estado, consultas, maximo)
+            limite = CICLOS_REGISTRO
+            self._sessao(pasta, "investigador", "explorar", None, prompt, limite, limite)
+            if persistencia.carregar(pasta).situacao == "pausada":
+                return
+        self._transicao(pasta, "investigar")
 
     def _proxima(self, estado: Estado) -> Hipotese | None:
         """Próxima hipótese a investigar: até N por investigação, as do caderno primeiro."""

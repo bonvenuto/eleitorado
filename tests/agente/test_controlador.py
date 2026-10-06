@@ -346,3 +346,22 @@ def test_descarta_investigacao_que_nao_comecou(montar):
     controlador.executar(outra)  # já passou da preparação: não é descartada
     assert not controlador.descartar_se_nao_comecou(outra)
     assert outra.exists()
+
+
+def test_exploracao_sem_hipoteses_ganha_sessao_de_registro(montar):
+    def explorar_sem_registrar(f):
+        f.consultar("select 1 as um")
+        return "orcamento_ciclos"
+
+    roteiro = {
+        "explorar": [explorar_sem_registrar, explorar],
+        ("investigar", "h1"): lambda f: f.hipotese_descartar("sem dados"),
+        ("investigar", "h2"): lambda f: f.hipotese_descartar("sem dados"),
+    }
+    controlador, executor, _ = montar(roteiro)
+    estado = controlador.executar(controlador.nova(None))
+    assert [p.fase for p in executor.pedidos][:3] == ["explorar", "explorar", "investigar"]
+    assert executor.limites[0].ciclos == 40
+    assert executor.limites[1].ciclos == 12
+    assert "q1" in executor.pedidos[1].prompt and "select 1 as um" in executor.pedidos[1].prompt
+    assert [h.id for h in estado.hipoteses] == ["h1", "h2"]
