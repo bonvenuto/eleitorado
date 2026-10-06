@@ -72,7 +72,8 @@ def test_contexto_lista_tabelas_colunas_e_linhas(config):
 def test_preparar_roda_restaurar_e_dbt_so_quando_muda(config):
     chamadas = []
 
-    def rodar(comando, env):
+    def rodar(comando, env, cwd):
+        assert cwd == config.raiz  # sempre da raiz, de qualquer pasta que o usuário rode
         chamadas.append(comando[3] if comando[2] == "coletor" else comando[2])
         assert env["ELEITORADO_AMBIENTE"] == "prod"
         return 0
@@ -89,7 +90,7 @@ def test_preparar_roda_restaurar_e_dbt_so_quando_muda(config):
 
 def test_preparar_falha_se_o_restaurar_falha(config):
     with pytest.raises(ErroPreparo, match="restaurar"):
-        preparar(config, {}, lambda comando, env: 1, lambda: AGORA)
+        preparar(config, {}, lambda comando, env, cwd: 1, lambda: AGORA)
 
 
 def test_revisar_caderno_acha_casos_que_mudaram(config):

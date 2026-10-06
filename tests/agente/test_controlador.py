@@ -335,3 +335,14 @@ def test_resumo_automatico_quando_o_agente_nao_registra(montar):
     assert estado.resumo is not None
     assert estado.resumo.texto.startswith("Resumo automático")
     assert "Empresa 7 concentra os pagamentos" in estado.resumo.texto
+
+
+def test_descarta_investigacao_que_nao_comecou(montar):
+    controlador, _, config = montar({})
+    pasta = controlador.nova("tema qualquer")
+    assert controlador.descartar_se_nao_comecou(pasta)
+    assert not pasta.exists()
+    outra = controlador.nova(None)
+    controlador.executar(outra)  # já passou da preparação: não é descartada
+    assert not controlador.descartar_se_nao_comecou(outra)
+    assert outra.exists()

@@ -22,7 +22,7 @@ from agente.config import ConfigAgente
 from agente.consulta import ErroConsulta, abrir, executar
 from agente.diario import Diario
 
-Rodar = Callable[[list[str], Mapping[str, str]], int]
+Rodar = Callable[[list[str], Mapping[str, str], Path], int]
 SCHEMAS = ("marts", "intermediate", "staging")
 PASTAS_LAGO = ("raw", "meta", "estado")
 
@@ -38,8 +38,8 @@ class Preparo:
     revisar: list[Caso]  # casos confirmados ou descartados cujas consultas-chave mudaram
 
 
-def _rodar_subprocesso(comando: list[str], env: Mapping[str, str]) -> int:
-    return subprocess.run(comando, env=dict(env), check=False).returncode
+def _rodar_subprocesso(comando: list[str], env: Mapping[str, str], cwd: Path) -> int:
+    return subprocess.run(comando, env=dict(env), cwd=cwd, check=False).returncode
 
 
 def ler_env(arquivo: Path) -> dict[str, str]:
@@ -220,7 +220,8 @@ def preparar(
 ) -> Preparo:
     env = ambiente(config, base)
     restaurar = ["uv", "run", "coletor", "--target", "agente", "estado", "restaurar"]
-    if rodar(restaurar, env) != 0:
+    # da raiz do repositório: o coletor e o dbt usam caminhos relativos (fontes/, dbt/)
+    if rodar(restaurar, env, config.raiz) != 0:
         raise ErroPreparo("coletor estado restaurar falhou (credenciais do GCS no .env?)")
     impressao = impressao_lago(config.lago)
     marca = config.lago / "preparo.json"
@@ -232,7 +233,7 @@ def preparar(
             "uv", "run", "dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt",
             "--target", "agente", "--exclude-resource-type", "unit_test",
         ]  # fmt: skip
-        codigo = rodar(dbt, env)
+        codigo = rodar(dbt, env, config.raiz)
         if not config.banco.exists():
             raise ErroPreparo("dbt build não gerou o banco do agente")
         corrigir_particoes(config.banco)

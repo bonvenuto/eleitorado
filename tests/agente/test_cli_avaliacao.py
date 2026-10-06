@@ -108,3 +108,21 @@ def test_cnpjs_com_digitos_verificadores_validos_e_aviso():
     texto = contexto_de_avaliacao("# Contexto dos dados")
     assert texto.startswith("## Aviso: ambiente de avaliação")
     assert texto.endswith("# Contexto dos dados")
+
+
+def test_falha_no_preparo_nao_deixa_investigacao_vazia(monkeypatch, tmp_path, capsys):
+    from agente.controlador import Controlador, Dependencias
+    from agente.preparar import ErroPreparo
+
+    config = carregar(raiz=tmp_path)
+
+    def preparar_falha():
+        raise ErroPreparo("coletor estado restaurar falhou")
+
+    monkeypatch.setattr(cli, "carregar", lambda *a, **k: config)
+    monkeypatch.setattr(
+        cli, "_controlador", lambda c, a=None: Controlador(Dependencias(c, None, preparar_falha))
+    )
+    assert cli.main(["investigar", "--tema", "emendas"]) == cli.SAIDA_PREPARO
+    assert "restaurar falhou" in capsys.readouterr().err
+    assert [p for p in config.investigacoes.iterdir() if p.is_dir()] == []
