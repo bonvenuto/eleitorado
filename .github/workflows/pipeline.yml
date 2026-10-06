@@ -69,7 +69,14 @@ jobs:
         id: restaurar
         run: uv run coletor estado restaurar
       - name: coleta e dbt
-        run: uv run coletor pipeline
+        id: pipeline
+        # 0: tudo certo; 3: só coletas falharam (o dbt passou e os marts podem ser publicados)
+        run: |
+          set +e
+          uv run coletor pipeline
+          codigo=$?
+          echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
+          exit $codigo
       - name: reconstruir históricos
         if: inputs.reconstruir
         run: uv run coletor reconstruir --origem-prefixo ""
@@ -96,6 +103,7 @@ jobs:
           path: lago.tar.gpg
           key: lago-cifrado-${{ github.run_id }}
       - name: publicar
+        if: always() && (steps.pipeline.outputs.codigo == '0' || steps.pipeline.outputs.codigo == '3')
         run: uv run coletor publicar
         env:
           R2_CONTA: ${{ secrets.R2_CONTA }}
@@ -103,4 +111,5 @@ jobs:
           R2_SEGREDO: ${{ secrets.R2_SEGREDO }}
           R2_BUCKET: ${{ vars.R2_BUCKET }}
       - name: reconciliar com o BigQuery (só no paralelo)
+        if: always() && (steps.pipeline.outputs.codigo == '0' || steps.pipeline.outputs.codigo == '3')
         run: uv run coletor reconciliar

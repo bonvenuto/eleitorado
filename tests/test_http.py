@@ -96,3 +96,12 @@ def test_host_oficial_passa(respx_mock):
     cliente = ClienteHttp(dormir=lambda s: None, sufixos_permitidos=SUFIXOS_OFICIAIS)
     respx_mock.get("https://pncp.gov.br/a").mock(return_value=httpx.Response(200, json=[1]))
     assert cliente.obter_json("https://pncp.gov.br/a").dados == [1]
+
+
+def test_422_e_repetido_como_transitorio(respx_mock):
+    cliente = ClienteHttp(dormir=lambda s: None)
+    rota = respx_mock.get("https://fonte/a").mock(
+        side_effect=[httpx.Response(422), httpx.Response(200, json=[1])]
+    )
+    assert cliente.obter_json("https://fonte/a").dados == [1]
+    assert rota.call_count == 2

@@ -65,7 +65,9 @@ def test_pipeline_roda_o_dbt_mesmo_com_falha_de_coleta(respx_mock, deps, warehou
         chamadas.append(target)
         return ResultadoDbt("sucesso", 0)
 
-    assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
+    assert (
+        _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 3
+    )  # só coletas falharam: publicável
     assert chamadas == ["prod"]
     [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["coletas_falha"], execucao["dbt_status"]) == (
@@ -84,3 +86,12 @@ def test_pipeline_registra_a_execucao_mesmo_se_o_dbt_explodir(respx_mock, deps, 
     assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
     [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["dbt_status"]) == ("falha", "falha")
+
+
+def test_pipeline_com_falha_de_coleta_e_de_dbt_sai_com_1(respx_mock, deps):
+    respx_mock.get(url__startswith=PAGINA).mock(return_value=httpx.Response(403))
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        return ResultadoDbt("falha", 2)
+
+    assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
