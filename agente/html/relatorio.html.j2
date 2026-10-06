@@ -1,0 +1,134 @@
+{%- macro refs(ids) -%}
+{%- for c in ids %}<a class="ref" href="#{{ c }}">{{ c }}</a>{% endfor -%}
+{%- endmacro -%}
+{%- macro selo_tipo(tipo) -%}
+<span class="selo {{ 'suspeita' if tipo == 'situação suspeita' else ('insight' if tipo == 'insight estratégico' else 'dado') }}">{{ tipo }}</span>
+{%- endmacro -%}
+{%- macro bloco_visual(g) -%}
+<h4>{{ g.titulo }} {{ refs([g.consulta]) }}</h4>
+{%- if g.erro %}<p class="erro">Gráfico não gerado: {{ g.erro }}</p>
+{%- elif g.svg %}<div class="grafico">{{ g.svg }}</div>
+{%- elif g.tipo == 'tabela' %}
+<div class="rolagem"><table><thead><tr>{% for c in g.colunas %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+<tbody>{% for linha in g.linhas %}<tr>{% for c in g.colunas %}<td>{{ linha[c] }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+{%- elif g.tipo == 'cartoes' %}
+<div class="cartoes">{% for c in g.colunas %}<div class="cartao"><div class="valor">{{ g.linhas[0][c] if g.linhas else '' }}</div><div class="rotulo">{{ c }}</div></div>{% endfor %}</div>
+{%- else %}
+<div class="grafico" id="{{ g.id }}"></div>
+<script type="application/json" id="{{ g.id }}-spec">{{ g.spec | tojson }}</script>
+{%- endif %}
+{%- endmacro -%}
+{%- macro bloco_achado(r) -%}
+<article class="achado" id="{{ r.id }}">
+  <div class="selos">
+    {{ selo_tipo(r.achado.tipo) }}
+    {%- if r.confianca %}<span class="selo {{ 'alta' if r.confianca == 'alta' else 'media' }}">confiança {{ r.confianca }}</span>{% endif %}
+    <span class="selo neutro">{{ r.situacao.replace('_', ' ') }}</span>
+    <span class="selo neutro">{{ r.id }} · hipótese {{ r.achado.hipotese_id }}</span>
+  </div>
+  <h3>{{ r.achado.titulo }}</h3>
+  <p class="meta">{% for chave, valores in r.achado.entidades.items() %}{{ chave }}: {{ valores | join(', ') }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <h4>O que os dados mostram</h4>
+  <ul>{% for f in r.achado.fatos %}<li>{{ f.texto }} {{ refs(f.consultas) }}</li>{% endfor %}</ul>
+  {%- if r.achado.indicios %}<h4>O que pode indicar</h4><ul>{% for i in r.achado.indicios %}<li>{{ i }}</li>{% endfor %}</ul>{% endif %}
+  {%- if r.achado.hipoteses %}<h4>O que não se sabe</h4><ul>{% for h in r.achado.hipoteses %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+  {%- for g in visuais[r.id] %}{{ bloco_visual(g) }}{% endfor %}
+  {%- if r.vereditos %}
+  {%- set v = r.vereditos[-1] %}
+  <h4>Validação independente: {{ v.decisao }}</h4>
+  <p>{{ v.justificativa }}</p>
+  {%- if v.alternativas %}<ul>{% for a in v.alternativas %}<li><strong>{{ a.explicacao }}</strong>: {{ a.resultado }} {{ refs(a.consultas) }}</li>{% endfor %}</ul>{% endif %}
+  {%- if v.pendencias %}<h4>O que falta checar</h4><ul>{% for p in v.pendencias %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+  {%- endif %}
+  {%- if r.correlacionados %}<h4>Casos relacionados</h4><ul>{% for c in r.correlacionados %}<li>{{ c.descricao }} {{ refs(c.consultas) }}</li>{% endfor %}</ul>{% endif %}
+  {%- set fontes = r.achado.fontes_web + (r.vereditos[-1].fontes_web if r.vereditos else []) %}
+  {%- if fontes %}<h4>Fontes na web</h4><ul>{% for f in fontes %}<li><a href="{{ f.url }}" rel="noreferrer noopener">{{ f.titulo }}</a> (acesso em {{ f.acessado_em }}): “{{ f.trecho }}”</li>{% endfor %}</ul>{% endif %}
+  {%- if r.achado.recomendacoes %}<h4>Recomendações (decisão sua)</h4><ul>{% for rec in r.achado.recomendacoes %}<li>{{ rec }}</li>{% endfor %}</ul>{% endif %}
+</article>
+{%- endmacro -%}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Investigação {{ rel.id }}</title>
+<style>{% include "estilo.css" %}</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>{{ rel.tema or 'Investigação livre' }}</h1>
+  <p class="meta">Investigação {{ rel.id }} · gerado em {{ rel.gerado_em }} · situação: {{ rel.situacao }}{% if rel.motivo_parada %} ({{ rel.motivo_parada }}){% endif %}</p>
+  <p class="meta">Dados: {% for chave, valor in rel.versao_dados.items() %}{{ chave }} {{ valor }}{% if not loop.last %} · {% endif %}{% else %}versão não registrada{% endfor %}
+  · uso: {{ rel.uso.ciclos }} ciclos, {{ rel.uso.consultas }} consultas, {{ (rel.uso.segundos / 60) | round(1) }} min, {{ rel.uso.sessoes }} sessões</p>
+  <p class="meta">Relatório interno do agente investigador L1: recomenda, não decide. Alertas são indícios para investigar, não constatação de irregularidade.</p>
+</header>
+
+<section>
+  <h2>Resumo</h2>
+  {%- if rel.resumo %}
+  <p>{{ rel.resumo.texto }}</p>
+  {%- if rel.resumo.destaques %}<div class="cartoes">{% for d in rel.resumo.destaques %}<div class="cartao"><div class="valor">{{ d.texto }}</div><div class="rotulo">{{ refs(d.consultas) }}</div></div>{% endfor %}</div>{% endif %}
+  {%- else %}<p class="meta">Sem resumo executivo.</p>{% endif %}
+  <div class="cartoes">
+    <div class="cartao"><div class="valor">{{ rel.achados | length }}</div><div class="rotulo">achados confirmados</div></div>
+    <div class="cartao"><div class="valor">{{ rel.inconclusivos | length }}</div><div class="rotulo">inconclusivos</div></div>
+    <div class="cartao"><div class="valor">{{ rel.descartados | length + rel.hipoteses_descartadas | length }}</div><div class="rotulo">descartados</div></div>
+    <div class="cartao"><div class="valor">{{ rel.hipoteses | length }}</div><div class="rotulo">hipóteses examinadas</div></div>
+  </div>
+  {%- if rel.achados %}<ul>{% for r in rel.achados %}<li><a href="#{{ r.id }}">{{ r.achado.titulo }}</a> — {{ r.achado.tipo }}, confiança {{ r.confianca }}</li>{% endfor %}</ul>{% endif %}
+</section>
+
+<section>
+  <h2>Achados</h2>
+  {%- for r in rel.achados %}{{ bloco_achado(r) }}{% else %}<p class="meta">Nenhum achado confirmado nesta investigação.</p>{% endfor %}
+</section>
+
+<section>
+  <h2>Inconclusivos</h2>
+  {%- for r in rel.inconclusivos %}{{ bloco_achado(r) }}{% else %}<p class="meta">Nenhum.</p>{% endfor %}
+</section>
+
+<section>
+  <h2>Descartados</h2>
+  {%- for r in rel.descartados %}{{ bloco_achado(r) }}{% endfor %}
+  {%- if rel.hipoteses_descartadas %}
+  <div class="rolagem"><table><thead><tr><th>Hipótese</th><th>Lente</th><th>Por que foi descartada</th></tr></thead><tbody>
+  {%- for h in rel.hipoteses_descartadas %}<tr><td>{{ h.id }}: {{ h.texto }}</td><td>{{ h.lente }}</td><td>{{ h.motivo }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {%- endif %}
+  {%- if not rel.descartados and not rel.hipoteses_descartadas %}<p class="meta">Nenhum.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Apêndices</h2>
+  <details open><summary>Consultas ({{ rel.consultas | length }})</summary>
+  {%- for id, c in rel.consultas.items() %}
+  <div id="{{ id }}"><h4>{{ id }} · {{ c.linhas }} linha(s){% if c.truncada %} (truncado){% endif %} · {{ c.papel }} · {{ c.executada_em }}</h4><pre>{{ c.sql }}</pre></div>
+  {%- endfor %}
+  </details>
+  <details><summary>Linha do tempo (Sense → Think → Act)</summary>
+  <div class="rolagem"><table><thead><tr><th>Início</th><th>Fase</th><th>Alvo</th><th>Agente</th><th>Think</th><th>Act</th><th>Sense</th><th>Ferramentas</th></tr></thead><tbody>
+  {%- for s in rel.ciclos %}<tr><td>{{ s.inicio }}</td><td>{{ s.fase }}</td><td>{{ s.alvo or '' }}</td><td>{{ s.agente }}</td><td>{{ s.think }}</td><td>{{ s.act }}</td><td>{{ s.sense }}</td><td>{% for f, n in s.ferramentas.items() %}{{ f }} ×{{ n }}{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  </details>
+  <details><summary>Limitações</summary>
+  <ul>
+    <li>O histórico de sanções e parlamentares começa na primeira coleta do projeto.</li>
+    <li>Cargas históricas em andamento podem deixar anos antigos incompletos.</li>
+    <li>Os dados são os publicados pelas fontes oficiais, que podem republicar ou corrigir registros.</li>
+  </ul>
+  </details>
+</section>
+</main>
+{{ scripts }}
+<script>
+document.querySelectorAll('script[type="application/json"][id$="-spec"]').forEach(function (el) {
+  var alvo = document.getElementById(el.id.slice(0, -5));
+  vegaEmbed(alvo, JSON.parse(el.textContent), {actions: false, renderer: 'svg'}).catch(function (e) {
+    alvo.textContent = 'Gráfico não gerado: ' + e.message;
+  });
+});
+</script>
+</body>
+</html>
