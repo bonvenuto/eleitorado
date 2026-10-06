@@ -54,6 +54,9 @@ terraform -chdir=infra apply "-var=projeto=$env:ELEITORADO_PROJETO" "-var=conta_
 
 ## Modelagem (dbt)
 
+Documentação completa dos dados publicados (cada mart, coluna, regra e como acessar):
+[docs/modelos-de-dados.md](docs/modelos-de-dados.md).
+
 - DuckDB: `dbt/profiles.yml` tem um arquivo `.duckdb` por target (`dev`, `prod`, `ci`), dentro de
   `ELEITORADO_LAGO`. O arquivo é descartável: os históricos são restaurados de Parquet
   (`estado/historicos/`) antes de cada execução.
