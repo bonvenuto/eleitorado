@@ -35,5 +35,7 @@ select
     {{ mascarar_cpfs_em_texto('camara_passageiro') }} as camara_passageiro,
     camara_trecho,
     {{ mascarar_cpfs_em_texto('senado_detalhamento') }} as senado_detalhamento,
+    -- data impossível (ex.: ano 2105 ou 5015): erro de digitação na fonte; a data fica como veio
+    data_emissao between date '2008-01-01' and current_date as data_emissao_valida,
     _coleta_id
 from {{ ref('int_cota__despesas') }}

@@ -1,0 +1,46 @@
+version: 2
+
+unit_tests:
+  - name: contrato_com_valor_suspeito
+    description: >
+      Valor de R$ 10 bi ou mais é suspeito; acima de R$ 1 bi, também quando passa de 30 mil vezes
+      a mediana da unidade gestora. Contrato grande numa UG de contratos grandes não é marcado.
+    model: fct_contrato_federal
+    given:
+      - input: ref('int_contratos_federais')
+        rows:
+          - {contrato_id: a1, ug_codigo: '160001', valor_final: 200000}
+          - {contrato_id: a2, ug_codigo: '160001', valor_final: 200000}
+          - {contrato_id: a3, ug_codigo: '160001', valor_final: 6400000000}
+          - {contrato_id: b1, ug_codigo: '250005', valor_final: 3000000000}
+          - {contrato_id: b2, ug_codigo: '250005', valor_final: 1500000000}
+          - {contrato_id: b3, ug_codigo: '250005', valor_final: 1200000000}
+          - {contrato_id: c1, ug_codigo: '440001', valor_final: 58840000000}
+          - {contrato_id: d1, ug_codigo: '160001', valor_final: null}
+    expect:
+      rows:
+        - {contrato_id: a1, valor_suspeito: false, valor_suspeito_motivo: null}
+        - {contrato_id: a2, valor_suspeito: false, valor_suspeito_motivo: null}
+        - {contrato_id: a3, valor_suspeito: true, valor_suspeito_motivo: 'acima de 30 mil vezes a mediana da unidade gestora'}
+        - {contrato_id: b1, valor_suspeito: false, valor_suspeito_motivo: null}
+        - {contrato_id: b2, valor_suspeito: false, valor_suspeito_motivo: null}
+        - {contrato_id: b3, valor_suspeito: false, valor_suspeito_motivo: null}
+        - {contrato_id: c1, valor_suspeito: true, valor_suspeito_motivo: 'R$ 10 bilhões ou mais'}
+        - {contrato_id: d1, valor_suspeito: false, valor_suspeito_motivo: null}
+
+  - name: despesa_com_data_impossivel
+    description: Data de emissão antes de 2008 ou no futuro não é válida (erro de digitação na fonte).
+    model: fct_despesa_cota_parlamentar
+    given:
+      - input: ref('int_cota__despesas')
+        rows:
+          - {despesa_id: 'senado:1', data_emissao: '2024-05-10'}
+          - {despesa_id: 'senado:2', data_emissao: '2105-03-18'}
+          - {despesa_id: 'senado:3', data_emissao: '1999-12-31'}
+          - {despesa_id: 'senado:4', data_emissao: null}
+    expect:
+      rows:
+        - {despesa_id: 'senado:1', data_emissao_valida: true}
+        - {despesa_id: 'senado:2', data_emissao_valida: false}
+        - {despesa_id: 'senado:3', data_emissao_valida: false}
+        - {despesa_id: 'senado:4', data_emissao_valida: null}
