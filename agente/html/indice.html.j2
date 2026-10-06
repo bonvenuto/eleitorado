@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Investigações</title>
+<style>{% include "estilo.css" %}</style>
+</head>
+<body>
+<main>
+<h1>Investigações</h1>
+<p class="meta">Agente investigador L1: recomenda, não decide.</p>
+
+<h2>Investigações</h2>
+{%- if itens %}
+<div class="rolagem"><table><thead><tr><th>Data</th><th>Tema</th><th>Situação</th><th>Achados</th><th>Relatório</th></tr></thead><tbody>
+{%- for i in itens %}<tr><td>{{ i.criada_em }}</td><td>{{ i.tema or 'livre' }}</td><td>{{ i.situacao }}</td><td>{{ i.achados }}</td><td>{% if i.tem_relatorio %}<a href="{{ i.id }}/relatorio.html">abrir</a>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{%- else %}<p class="meta">Nenhuma investigação ainda.</p>{% endif %}
+
+<h2>Caderno de casos</h2>
+{%- for situacao in ['confirmado', 'inconclusivo', 'aberto', 'descartado'] %}
+{%- set lista = casos | selectattr('situacao', 'equalto', situacao) | list %}
+{%- if lista %}
+<h4>{{ situacao }} ({{ lista | length }})</h4>
+<div class="rolagem"><table><thead><tr><th>Caso</th><th>Título</th><th>Entidades</th><th>Última investigação</th></tr></thead><tbody>
+{%- for c in lista %}<tr><td>{{ c.caso_id }}</td><td>{{ c.titulo }}</td><td>{% for chave, valores in c.entidades.items() %}{{ chave }}: {{ valores | join(', ') }}{% if not loop.last %}; {% endif %}{% endfor %}</td><td>{% if c.historico %}{% set h = c.historico[-1] %}<a href="{{ h.relatorio }}">{{ h.data }}</a> ({{ h.veredito }}){% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{%- endif %}
+{%- else %}{% endfor %}
+{%- if not casos %}<p class="meta">Caderno vazio.</p>{% endif %}
+</main>
+</body>
+</html>

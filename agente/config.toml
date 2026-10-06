@@ -1,0 +1,28 @@
+# Configuração do agente investigador. Caminhos relativos à raiz do repositório.
+
+[caminhos]
+lago = "dados-agente"          # cópia local do lago de produção (raw, meta, estado) e marts
+investigacoes = "investigacoes" # diários, relatórios e caderno de casos (fora do git)
+
+[coleta]
+prefixo_gcs = "paralelo/"       # prefixo do lago de produção no bucket; vazio depois da virada (Plano 5)
+
+[modelo]
+nome = ""                       # vazio: o modelo padrão do Claude Code
+
+[consulta]
+tempo_maximo_s = 60
+linhas_exibidas = 200
+linhas_salvas = 100000
+
+[orcamento.livre]
+ciclos = 120  # medido: explorar ~13 ciclos; cada hipótese ~25 (investigar, validar, correlacionar)
+minutos = 90
+hipoteses = 5
+rodadas_validacao = 2
+
+[orcamento.tema]
+ciclos = 80
+minutos = 60
+hipoteses = 3
+rodadas_validacao = 2

@@ -27,3 +27,12 @@ dados/
 dados-b1/
 *.duckdb
 dbt/tests/lago_vazio/**/*.parquet
+
+# agente investigador: lago local de produção e investigações (dados pessoais; nunca no git)
+dados-agente/
+investigacoes/
+avaliacao/
+
+# Claude Code: só as definições de agentes vão para o git (o resto é configuração pessoal)
+.claude/*
+!.claude/agents/

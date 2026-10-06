@@ -74,6 +74,27 @@ Documentação completa dos dados publicados (cada mart, coluna, regra e como ac
 - Alertas são indícios para investigar, não constatações: a cota reembolsa gastos do parlamentar
   (não é contratação pública) e só aparecem sanções vistas desde a primeira coleta.
 
+## Agente investigador (L1)
+
+Agente que investiga os dados por conta própria, valida o que encontra com um validador
+independente (e pesquisa na web) e gera relatórios HTML. É L1: recomenda, não decide nem age.
+Desenho em `docs/superpowers/specs/2026-10-06-agente-investigador-design.md`.
+
+- **Motor:** Claude Code local (`claude -p`), pela assinatura de quem roda; nenhuma chave de API.
+- **Dados:** `uv run agente preparar` copia o lago de produção para `dados-agente/` (cerca de 4 GB,
+  com CPF completo: nunca vai para o git) e roda o dbt no target `agente`.
+- **Investigar:** `uv run agente investigar` (livre, ou retoma a pausada) ou
+  `uv run agente investigar --tema "emendas pagas a empresas sancionadas no PI"`. Relatórios,
+  diários e caderno de casos ficam em `investigacoes/` (fora do git); `investigacoes/index.html`
+  lista tudo.
+- **Agendar:** `.\agente\agendar.ps1` registra a execução semanal no Agendador do Windows (segunda,
+  09:00; parâmetros `-Dia` e `-Hora`).
+- **Avaliar:** `uv run agente avaliar` roda o agente sobre casos plantados (consome a assinatura);
+  rode ao mudar as instruções em `.claude/agents/`.
+- **Travas:** o agente só tem as ferramentas do servidor MCP (`agente/servidor.py`: consultas
+  `SELECT` num DuckDB só de leitura, caderno, registro de achados), `WebSearch` e `WebFetch`; não
+  tem shell nem acesso a arquivos. Um hook bloqueia buscas na web com CPF.
+
 ## Operação
 
 - **Execução diária:** `.github/workflows/pipeline.yml`, às 07:30 (Brasília): restaura o lago (cache
