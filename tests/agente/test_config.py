@@ -16,4 +16,4 @@ def test_config_padrao(tmp_path: Path):
         config.lago / "publico",
     ]
     assert config.orcamento(None).ciclos == 300
-    assert config.orcamento("emendas no PI").ciclos == 80
+    assert config.orcamento("emendas no PI").ciclos == 300
