@@ -108,6 +108,11 @@ class Ferramentas:
         Tabelas: schemas `staging`, `intermediate` e `marts` (veja o contexto). Cada consulta
         recebe um id (q1, q2...) que deve ser citado nos fatos e gráficos.
         """
+        if self.sessao.fase == "relatar":
+            raise ErroFerramenta(
+                "na fase relatar não há consulta nova: use as consultas já feitas (listadas no "
+                "pedido) e registre o resumo"
+            )
         if self._conexao is None:
             self._conexao = self._abrir()
         config = self.sessao.config

@@ -143,3 +143,9 @@ def test_caderno_buscar_e_aprender(config, pasta):
     assert f.caderno_buscar("11222333") == "nenhum caso com '11222333'"
     assert f.caderno_aprender("CODIGO_CAMARA não é CNPJ") == "aprendizado registrado"
     assert "inv1" in (config.caderno / "aprendizados.md").read_text(encoding="utf-8")
+
+
+def test_na_fase_relatar_nao_ha_consulta_nova(config, pasta):
+    f = ferramentas(config, pasta, fase="relatar", alvo=None)
+    with pytest.raises(ErroFerramenta, match="já feitas"):
+        f.consultar("select 1")

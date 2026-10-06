@@ -163,12 +163,24 @@ def relatar(estado: Estado) -> str:
         if hipotese.situacao == "descartada":
             linhas.append(f"- {hipotese.id} descartada: {hipotese.motivo}")
     resultados = "\n".join(linhas) or "- nenhum achado nem descarte"
+    fatos = "\n".join(
+        f"- {', '.join(fato.consultas)}: {fato.texto}"
+        for registro in estado.achados
+        if registro.situacao == "confirmado"
+        for fato in registro.achado.fatos
+    )
     return f"""FASE: RELATAR (investigação {estado.id})
 
-Escreva o resumo executivo do relatório com resumo_registrar: 3 a 6 frases para quem vai decidir o
-que fazer, sem repetir números que não estejam em destaques (cada destaque cita as consultas).
-Diga também o que a investigação não conseguiu cobrir. Termine logo depois.
+Sua PRIMEIRA e única ação: chamar resumo_registrar. Não há consulta nova nesta fase (a ferramenta
+recusa): use só os fatos abaixo, que já têm as consultas.
+
+O resumo: 3 a 6 frases para quem vai decidir o que fazer, sem números no texto. Os números vão em
+destaques (até 4), cada um copiando o valor de um fato abaixo e citando as mesmas consultas. Diga
+também o que a investigação não conseguiu cobrir.
 
 Resultados:
 {resultados}
+
+Fatos confirmados (consultas: texto):
+{fatos or "- nenhum"}
 """
