@@ -381,6 +381,7 @@ flowchart LR
 | `camara_passageiro` | VARCHAR | Câmara: passageiro da passagem aérea (CPF em texto mascarado). |
 | `camara_trecho` | VARCHAR | Câmara: trecho da passagem aérea. |
 | `senado_detalhamento` | VARCHAR | Senado: detalhamento da despesa (CPFs no texto mascarados). |
+| `data_emissao_valida` | BOOLEAN | Falso quando a data de emissão é anterior a 2008 ou futura (erro de digitação na fonte, ex.: ano 2105); a data fica como publicada. |
 | `_coleta_id` | VARCHAR | Coleta que trouxe a linha (rastreia até o arquivo original arquivado; ver `meta.coletas`). |
 | `ano` | BIGINT | Ano de competência. |
 | `casa` | VARCHAR | `camara` ou `senado`. |
@@ -562,6 +563,8 @@ flowchart LR
 | `compra_pncp_id` | VARCHAR | Número de controle da compra (licitação) no PNCP. |
 | `licitacao_numero` | VARCHAR | Número da licitação. |
 | `emenda_parlamentar` | VARCHAR | PNCP: indica se o contrato é custeado por emenda parlamentar (`true`/`false`; nulo no Portal). |
+| `valor_suspeito` | BOOLEAN | Valor implausível, provável erro de digitação na fonte: R$ 10 bilhões ou mais, ou R$ 1 bilhão ou mais e acima de 30 mil vezes a mediana da unidade gestora. O valor fica como publicado; exclua das somas ou confira na fonte. |
+| `valor_suspeito_motivo` | VARCHAR | Qual das duas regras marcou o contrato (nulo quando não é suspeito). |
 | `_coleta_id` | VARCHAR | Coleta que trouxe a linha (rastreia até o arquivo original arquivado; ver `meta.coletas`). |
 
 #### fct_licitacao_federal
@@ -1764,6 +1767,9 @@ Toda execução roda os testes do dbt **antes** de publicar; um teste com erro i
 - **Licitações** só vão até abril de 2024: a CGU encerrou a série; licitações posteriores estão no PNCP (compras), ainda não modeladas.
 - **`dim_autor_emenda`** não liga autores que passaram pela Câmara e pelo Senado (nomes repetidos).
 - **PNCP:** só o Executivo federal é modelado; estados e municípios ficam no lago privado. O campo `emenda_parlamentar` ainda não está ligado às emendas.
+- **Erros de digitação nas fontes:** contratos do PNCP com valores impossíveis (centenas de bilhões
+  para serviços médicos) e despesas de cota com datas futuras. Ficam como publicados e marcados
+  (`valor_suspeito`, `data_emissao_valida`); exclua-os de somas e séries.
 - **Republicação nas fontes:** as fontes reescrevem dados antigos (ex.: a Câmara republicou a CEAP de 2008–2021 em 2026-10-05). O `alerta_fonte_reduzida` registra quando isso diminui o volume.
 - Alertas são **indícios para investigar**, não constatação de irregularidade.
 

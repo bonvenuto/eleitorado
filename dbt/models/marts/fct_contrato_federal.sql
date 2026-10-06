@@ -26,5 +26,20 @@ select
     compra_pncp_id,
     licitacao_numero,
     emenda_parlamentar,
+    -- Valor implausível: erro de digitação na fonte (o PNCP publica contratos de serviços médicos
+    -- com valores na casa de centenas de bilhões). Marcado, não corrigido: o valor é o publicado.
+    coalesce(
+        valor_final >= 10000000000
+        or (valor_final >= 1000000000 and valor_final >= 30000 * mediana_ug),
+        false
+    ) as valor_suspeito,
+    case
+        when valor_final >= 10000000000 then 'R$ 10 bilhões ou mais'
+        when valor_final >= 1000000000 and valor_final >= 30000 * mediana_ug
+            then 'acima de 30 mil vezes a mediana da unidade gestora'
+    end as valor_suspeito_motivo,
     _coleta_id
-from {{ ref('int_contratos_federais') }}
+from (
+    select *, median(valor_final) over (partition by ug_codigo) as mediana_ug
+    from {{ ref('int_contratos_federais') }}
+)

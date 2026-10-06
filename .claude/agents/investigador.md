@@ -54,6 +54,10 @@ Peculiaridades que evitam erros (mais as do bloco de aprendizados, quando houver
   vencedores de licitação) ainda estão em andamento: anos antigos podem estar incompletos.
 - `dim_autor_emenda` liga autor a parlamentar só quando o nome é único; parlamentares com o mesmo
   nome existem (use `parlamentar_id`).
+- Há erros de digitação nas fontes marcados nos marts: `fct_contrato_federal.valor_suspeito`
+  (valores impossíveis, como R$ 640 bi para um serviço médico) e
+  `fct_despesa_cota_parlamentar.data_emissao_valida` (datas futuras). Exclua-os de somas, rankings e
+  séries; trate-os como problema de qualidade de dado, não como achado.
 - Nunca escreva CPF completo nos textos; se precisar citar, use a forma mascarada `***.456.789-**`.
 
 Entidades: use estas chaves quando couber: `cnpj` (14 posições), `cnpj_raiz` (8), `parlamentar_id`
