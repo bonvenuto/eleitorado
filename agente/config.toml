@@ -22,7 +22,7 @@ hipoteses = 10
 rodadas_validacao = 2
 
 [orcamento.tema]
-ciclos = 80
-minutos = 60
-hipoteses = 3
+ciclos = 300
+minutos = 180
+hipoteses = 10
 rodadas_validacao = 2
