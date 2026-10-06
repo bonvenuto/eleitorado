@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__agente__consultar",
+      "mcp__agente__caderno_buscar",
+      "mcp__agente__caderno_aprender",
+      "mcp__agente__hipoteses_registrar",
+      "mcp__agente__hipotese_descartar",
+      "mcp__agente__achado_registrar",
+      "mcp__agente__correlacionados_registrar",
+      "mcp__agente__resumo_registrar",
+      "mcp__agente__veredito_registrar",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "defaultMode": "dontAsk"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch",
+        "hooks": [{"type": "command", "command": "uv run python -m agente.hook_web"}]
+      }
+    ]
+  }
+}
