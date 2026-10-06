@@ -74,6 +74,7 @@ def executar(
     tempo_maximo_s: float = 60,
     linhas_exibidas: int = 200,
     linhas_salvas: int = 100_000,
+    caracteres_maximos: int = 12_000,
 ) -> ResultadoConsulta:
     texto_sql = validar_sql(sql)
     consulta_id = diario.proximo_id()
@@ -116,13 +117,25 @@ def executar(
     linhas = list(
         zip(*(exibidas.column(c).to_pylist() for c in exibidas.column_names), strict=True)
     )
+    # o texto volta inteiro para o agente: resultados largos demais são cortados por linhas
+    corpo = _markdown(tabela.column_names, linhas)
+    cortado = False
+    while len(corpo) > caracteres_maximos and len(linhas) > 1:
+        linhas = linhas[: max(1, len(linhas) // 2)]
+        corpo = _markdown(tabela.column_names, linhas)
+        cortado = True
     total = f"mais de {linhas_salvas}" if truncada else str(tabela.num_rows)
     cabecalho = f"Consulta {consulta_id}: {total} linha(s)"
-    if tabela.num_rows > linhas_exibidas:
+    if cortado:
+        cabecalho += (
+            f", mostrando as primeiras {len(linhas)} (limite de texto: agregue ou selecione "
+            "menos colunas)"
+        )
+    elif tabela.num_rows > linhas_exibidas:
         cabecalho += f", mostrando as primeiras {linhas_exibidas}"
     return ResultadoConsulta(
         id=consulta_id,
         linhas=tabela.num_rows,
         truncada=truncada,
-        texto=cabecalho + "\n\n" + _markdown(tabela.column_names, linhas),
+        texto=cabecalho + "\n\n" + corpo,
     )

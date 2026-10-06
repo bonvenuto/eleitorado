@@ -113,3 +113,16 @@ def test_comentario_no_fim_nao_quebra_a_consulta(conexao, tmp_path):
         conexao, "select 1 as um -- comentário", Diario(tmp_path / "inv"), "investigador"
     )
     assert resultado.linhas == 1
+
+
+def test_texto_longo_e_cortado_com_aviso(conexao, tmp_path):
+    resultado = executar(
+        conexao,
+        "select range as id, repeat('x', 300) as texto from range(200)",
+        Diario(tmp_path / "inv"),
+        "investigador",
+        caracteres_maximos=5000,
+    )
+    assert len(resultado.texto) <= 5000 + 300
+    assert "limite de texto" in resultado.texto
+    assert resultado.linhas == 200  # o resultado salvo continua completo

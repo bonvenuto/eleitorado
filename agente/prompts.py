@@ -48,9 +48,29 @@ Sua tarefa nesta sessão:
    casos descartados, a não ser que os dados tenham mudado.
 3. Registre de 1 a {maximo} hipóteses com hipoteses_registrar, da mais para a menos promissora,
    cada uma com entidades concretas (CNPJ, raiz, órgão, parlamentar_id...) quando houver.
-4. Termine a sessão logo depois de registrar. Não investigue a fundo agora.
+4. Registre as hipóteses até a sua 15ª ação: a sessão tem limite de ações e é encerrada sem
+   aviso. Termine logo depois de registrar. Não investigue a fundo agora (isso é a próxima fase).
 
 {_contexto(contexto, aprendizados)}
+"""
+
+
+def registrar_hipoteses(estado: Estado, consultas: list, maximo: int) -> str:
+    """Sessão curta quando a exploração acabou sem registrar hipóteses."""
+    feitas = "\n".join(
+        f"- {c.id} ({c.linhas} linhas): {' '.join(c.sql.split())[:300]}" for c in consultas
+    )
+    foco = f"TEMA: {estado.tema}" if estado.tema else "Investigação LIVRE."
+    return f"""FASE: EXPLORAR — REGISTRO (investigação {estado.id})
+
+{foco}
+
+A sessão de exploração terminou sem registrar hipóteses. Estas consultas já foram feitas:
+{feitas or "- (nenhuma)"}
+
+Sua PRIMEIRA ação deve ser hipoteses_registrar, com 1 a {maximo} hipóteses tiradas dessas consultas
+(da mais para a menos promissora, com entidades concretas). Se precisar confirmar um detalhe, faça
+no máximo duas consultas antes. Termine logo depois de registrar.
 """
 
 
