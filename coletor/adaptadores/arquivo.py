@@ -15,6 +15,9 @@ from coletor.hashes import sha256_arquivo
 from coletor.http import ClienteHttp, ErroHttp
 from coletor.manifesto import Recurso
 
+# Teto do arquivo descompactado: um ZIP malformado ou malicioso não enche o disco do runner.
+LIMITE_DESCOMPACTADO = 10 * 1024**3
+
 
 def extrair(
     recurso: Recurso, competencia: Competencia | None, pasta: Path, http: ClienteHttp, hoje: date
@@ -91,6 +94,11 @@ def preparar(recurso: Recurso, competencia: Competencia, original: Path, pasta: 
             escolhido = membros[0]
         else:
             raise ErroColeta(f"ZIP com {len(membros)} arquivos: defina formato.arquivo")
+        if escolhido.file_size > LIMITE_DESCOMPACTADO:
+            raise ErroColeta(
+                f"{escolhido.filename}: {escolhido.file_size} bytes descompactado excede o teto "
+                f"de {LIMITE_DESCOMPACTADO} bytes"
+            )
         with compactado.open(escolhido) as origem, destino.open("wb") as saida:
             shutil.copyfileobj(origem, saida, 1 << 20)
     return Preparado(sha256_conteudo=sha256_arquivo(destino), csv=destino)
