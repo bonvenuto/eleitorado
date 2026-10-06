@@ -3,7 +3,7 @@ import hashlib
 import httpx
 import pytest
 
-from coletor.http import ClienteHttp, ErroHttp
+from coletor.http import SUFIXOS_OFICIAIS, ClienteHttp, ErroHttp, host_permitido
 
 
 def test_baixar_grava_o_arquivo_e_calcula_o_hash(respx_mock, http, tmp_path):
@@ -71,3 +71,28 @@ def test_obter_json_com_204_devolve_dados_vazios(respx_mock, http):
     respx_mock.get("https://api.exemplo/x").mock(return_value=httpx.Response(204))
     resposta = http.obter_json("https://api.exemplo/x")
     assert (resposta.status, resposta.dados) == (204, None)
+
+
+def test_host_permitido_por_sufixo():
+    assert host_permitido("pncp.gov.br", SUFIXOS_OFICIAIS)
+    assert host_permitido("dadosabertos.camara.leg.br", SUFIXOS_OFICIAIS)
+    assert not host_permitido("169.254.169.254", SUFIXOS_OFICIAIS)
+    assert not host_permitido("gov.br.exemplo.com", SUFIXOS_OFICIAIS)
+    assert not host_permitido("exemplogov.br", SUFIXOS_OFICIAIS)
+
+
+def test_redirecionamento_para_host_nao_oficial_e_bloqueado(respx_mock, tmp_path):
+    cliente = ClienteHttp(dormir=lambda s: None, sufixos_permitidos=SUFIXOS_OFICIAIS)
+    respx_mock.get("https://pncp.gov.br/a").mock(
+        return_value=httpx.Response(302, headers={"Location": "http://169.254.169.254/x"})
+    )
+    destino = respx_mock.get("http://169.254.169.254/x").mock(return_value=httpx.Response(200))
+    with pytest.raises(ErroHttp, match="host não permitido"):
+        cliente.obter_json("https://pncp.gov.br/a")
+    assert destino.call_count == 0
+
+
+def test_host_oficial_passa(respx_mock):
+    cliente = ClienteHttp(dormir=lambda s: None, sufixos_permitidos=SUFIXOS_OFICIAIS)
+    respx_mock.get("https://pncp.gov.br/a").mock(return_value=httpx.Response(200, json=[1]))
+    assert cliente.obter_json("https://pncp.gov.br/a").dados == [1]

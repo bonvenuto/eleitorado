@@ -22,3 +22,14 @@ def test_conta_de_servico_e_wif_nao_recebem_quota_project():
     credenciais = credenciais_do_ambiente("meu-projeto", obter=lambda **_: (conta, None))
     assert credenciais is conta
     assert getattr(credenciais, "quota_project_id", None) is None
+
+
+def test_dependencias_reais_restringem_hosts(monkeypatch, config):
+    from coletor import gcp
+    from coletor.http import SUFIXOS_OFICIAIS
+
+    monkeypatch.setattr(gcp, "credenciais_do_ambiente", lambda projeto: None)
+    monkeypatch.setattr(gcp, "GcsArmazenamento", lambda *args, **kwargs: None)
+    deps = gcp.montar_dependencias(config)
+    assert deps.http.sufixos_permitidos == SUFIXOS_OFICIAIS
+    deps.http.fechar()
