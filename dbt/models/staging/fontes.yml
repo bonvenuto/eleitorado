@@ -80,3 +80,14 @@ sources:
     tables:
       - name: coletas
       - name: fontes
+
+  # Cadastro para linhagem; a leitura usa exclusivamente fonte_tse e vars fixadas.
+  - name: raw_tse
+    description: Fontes privadas enumeradas por seleção TSE, sem localização glob.
+    tables:
+      - name: candidaturas
+      - name: bens
+      - name: receitas
+      - name: contratadas
+      - name: pagamentos
+      - name: doador_originario

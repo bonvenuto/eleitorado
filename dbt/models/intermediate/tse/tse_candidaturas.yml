@@ -1,0 +1,122 @@
+version: 2
+models:
+- name: int_tse__candidaturas
+  columns:
+  - name: candidatura_id
+    data_tests:
+    - unique
+    - not_null
+unit_tests:
+- name: recorte_data_real
+  model: int_tse__candidaturas
+  given:
+  - input: ref('stg_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2026-10-04'
+      data_eleicao: '2026-10-04'
+      ano_arquivo: 2022
+    - cd_eleicao: '2'
+      sq_candidato: '20'
+      dt_eleicao: '2024-10-06'
+      data_eleicao: '2024-10-06'
+      ano_arquivo: 2020
+  expect:
+    rows:
+    - candidatura_id: tse:2:20
+- name: eleicoes_distintas
+  model: int_tse__candidaturas
+  given:
+  - input: ref('stg_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '10'
+      data_eleicao: '2020-11-15'
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+    - candidatura_id: tse:2:10
+- name: conflito_cadastral_preservado
+  model: int_tse__candidaturas
+  given:
+  - input: ref('stg_tse__candidaturas')
+    rows:
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: A
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: B
+  expect:
+    rows:
+    - candidatura_id: tse:2:10
+      nm_candidato: null
+      conflito_cadastral: true
+      candidatura_elegivel: false
+      quantidade_registros: 2
+- name: ausencia_nao_e_consenso
+  model: int_tse__candidaturas
+  given:
+  - input: ref('stg_tse__candidaturas')
+    rows:
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: null
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: A
+  expect:
+    rows:
+    - candidatura_id: tse:2:10
+      nm_candidato: null
+      conflito_cadastral: true
+      candidatura_elegivel: false
+      quantidade_registros: 2
+- name: duplicatas_consensuais
+  model: int_tse__candidaturas
+  given:
+  - input: ref('stg_tse__candidaturas')
+    rows:
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: A
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: A
+  expect:
+    rows:
+    - candidatura_id: tse:2:10
+      nm_candidato: A
+      conflito_cadastral: false
+      candidatura_elegivel: true
+      quantidade_registros: 2
+- name: ausencia_consensual_preservada
+  model: int_tse__candidaturas
+  given:
+  - input: ref('stg_tse__candidaturas')
+    rows:
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: null
+    - cd_eleicao: '2'
+      sq_candidato: '10'
+      data_eleicao: '2024-10-06'
+      nm_candidato: null
+  expect:
+    rows:
+    - candidatura_id: tse:2:10
+      nm_candidato: null
+      conflito_cadastral: false
+      candidatura_elegivel: true
+      quantidade_registros: 2

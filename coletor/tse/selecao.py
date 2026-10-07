@@ -249,12 +249,20 @@ def inventario_entradas(lago: Path, selecao: SelecaoTse) -> dict:
 def vars_selecao(lago: Path, selecao: SelecaoTse, execucao_id: str) -> dict:
     """Caminhos absolutos explícitos para dbt; lista por família ordenada por ano."""
     fontes: dict[str, list[str]] = {}
+    proveniencia: dict[str, dict] = {}
     for _chave, versao_id in sorted(selecao.versoes.items()):
         _, dados = _descritor(lago, versao_id)
         for familia, caminho in sorted(dados["familias"].items()):
-            fontes.setdefault(familia, []).append(_confinado(lago, caminho).resolve().as_posix())
+            absoluto = _confinado(lago, caminho).resolve().as_posix()
+            fontes.setdefault(familia, []).append(absoluto)
+            proveniencia[absoluto] = {
+                "ano_arquivo": dados["ano"],
+                "versao_id": versao_id,
+                "layout_id": dados["layouts"][familia],
+            }
     return {
         "tse_fontes": fontes,
+        "tse_proveniencia": proveniencia,
         "tse_saida": (_pasta_execucao(lago, execucao_id) / "marts").resolve().as_posix(),
     }
 

@@ -23,11 +23,17 @@ def macro(nome, variaveis, lago, *args, target="prod"):
     def erro(mensagem):
         raise ValueError(mensagem)
 
+    def consultar(sql):
+        with duckdb.connect() as conexao:
+            return SimpleNamespace(rows=conexao.execute(sql).fetchall())
+
     ambiente = Environment(extensions=["jinja2.ext.do"])
     modulo = ambiente.from_string(
         Path("dbt/macros/tse.sql").read_text(encoding="utf-8")
     ).make_module(
         {
+            "execute": True,
+            "run_query": consultar,
             "var": lambda chave, default=None: variaveis.get(chave, default),
             "env_var": lambda chave, default=None: str(lago).replace("\\", "/"),
             "target": SimpleNamespace(name=target),
@@ -161,6 +167,9 @@ def test_defaults_ci_tipados_privados(tmp_path):
     assert colunas["vr_bem_candidato"] == "VARCHAR"
     assert colunas["_competencia_data"] == "DATE"
     assert colunas["_linha"] == "BIGINT"
+    assert colunas["ano_arquivo"] == "INTEGER"
+    assert colunas["versao_id"] == "VARCHAR"
+    assert colunas["layout_id"] == "VARCHAR"
     assert not (tmp_path / "raw/tse").exists()
     with pytest.raises(ValueError):
         macro("fonte_tse", {}, tmp_path, "bens")
@@ -177,3 +186,66 @@ def test_saida_mart_explicita_e_confinada(tmp_path):
         macro("tse_saida_mart", {}, tmp_path, "resumo")
     with pytest.raises(ValueError):
         macro("tse_saida_mart", {"tse_saida": str(tmp_path)}, tmp_path, "../fora")
+
+
+def test_macro_proveniencia_selecionada(tmp_path):
+    lago, selecao = montar_vetor(tmp_path / "d'agua")
+    execucao = preparar(lago, "proveniencia", "prod", selecao)
+    sql = macro("fonte_tse", execucao.vars_dbt, lago, "bens")
+    with duckdb.connect() as conexao:
+        linhas = conexao.execute(
+            f"select ano_arquivo, versao_id, layout_id from {sql} order by ano_arquivo"
+        ).fetchall()
+    assert [r[0] for r in linhas] == [2018, 2020, 2022, 2024]
+    assert [r[1] for r in linhas] == [
+        selecao.versoes[f"tse.bens:{a}"] for a in (2018, 2020, 2022, 2024)
+    ]
+    assert [r[2] for r in linhas] == [f"tse:bens:{a}:v1" for a in (2018, 2020, 2022, 2024)]
+
+
+def test_macro_recusa_selecao_sem_proveniencia(tmp_path):
+    with pytest.raises(ValueError, match="proveniência"):
+        macro("fonte_tse", {"tse_fontes": {"bens": ["arquivo.parquet"]}}, tmp_path, "bens")
+
+
+@pytest.mark.parametrize("alteracao", ["ausente", "ano", "versao", "layout", "extra"])
+def test_macro_recusa_proveniencia_invalida(tmp_path, alteracao):
+    arquivo = (tmp_path / "bens.parquet").as_posix()
+    with duckdb.connect() as conexao:
+        conexao.execute("copy (select '100' vr_bem_candidato) to ? (format parquet)", [arquivo])
+    meta = {"ano_arquivo": 2024, "versao_id": "a" * 64, "layout_id": "tse:bens:2024:v1"}
+    mapa = {arquivo: meta}
+    if alteracao == "ausente":
+        mapa = {}
+    elif alteracao == "ano":
+        meta["ano_arquivo"] = "2024"
+    elif alteracao == "versao":
+        meta["versao_id"] = "z" * 64
+    elif alteracao == "layout":
+        meta["layout_id"] = "tse:bens:2022:v1"
+    else:
+        mapa["arquivo-nao-selecionado.parquet"] = dict(meta)
+    with pytest.raises(ValueError):
+        macro(
+            "fonte_tse",
+            {"tse_fontes": {"bens": [arquivo]}, "tse_proveniencia": mapa},
+            tmp_path,
+            "bens",
+        )
+
+
+@pytest.mark.parametrize("reservado", ["ano_arquivo", "versao_id", "layout_id"])
+def test_macro_recusa_colisao_raw_proveniencia(tmp_path, reservado):
+    arquivo = (tmp_path / "colisao.parquet").as_posix()
+    with duckdb.connect() as conexao:
+        conexao.execute(
+            f"copy (select null::varchar as {reservado}) to ? (format parquet)", [arquivo]
+        )
+    variaveis = {
+        "tse_fontes": {"bens": [arquivo]},
+        "tse_proveniencia": {
+            arquivo: {"ano_arquivo": 2024, "versao_id": "a" * 64, "layout_id": "tse:bens:2024:v1"}
+        },
+    }
+    with pytest.raises(ValueError, match="colide"):
+        macro("fonte_tse", variaveis, tmp_path, "bens")

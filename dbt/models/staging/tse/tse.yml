@@ -1,0 +1,131 @@
+version: 2
+models:
+- name: stg_tse__candidaturas
+  description: Cadastro privado TSE.
+  columns:
+  - name: linha_original
+    description: JSON privado de todas as colunas fonte antes de casts, incluindo geração; exclui
+      controles coletor e proveniência injetada.
+  - name: data_eleicao
+    description: Data real DT_ELEICAO, restringe os quatro anos aprovados.
+- name: stg_tse__bens
+  description: Fonte privada TSE tipada, sem deduplicação de itens.
+  columns:
+  - name: linha_original
+    description: JSON privado de todas as colunas fonte antes de casts, incluindo geração; exclui
+      controles coletor e proveniência injetada.
+  - name: data_eleicao
+    description: Data real DT_ELEICAO, restringe os quatro anos aprovados.
+- name: stg_tse__receitas
+  description: Fonte privada TSE tipada, sem deduplicação de itens.
+  columns:
+  - name: linha_original
+    description: JSON privado de todas as colunas fonte antes de casts, incluindo geração; exclui
+      controles coletor e proveniência injetada.
+  - name: data_eleicao
+    description: Data real DT_ELEICAO, restringe os quatro anos aprovados.
+- name: stg_tse__contratadas
+  description: Fonte privada TSE tipada, sem deduplicação de itens.
+  columns:
+  - name: linha_original
+    description: JSON privado de todas as colunas fonte antes de casts, incluindo geração; exclui
+      controles coletor e proveniência injetada.
+  - name: data_eleicao
+    description: Data real DT_ELEICAO, restringe os quatro anos aprovados.
+- name: stg_tse__pagamentos
+  description: Fonte privada TSE tipada, sem deduplicação de itens.
+  columns:
+  - name: linha_original
+    description: JSON privado de todas as colunas fonte antes de casts, incluindo geração; exclui
+      controles coletor e proveniência injetada.
+  - name: data_eleicao
+    description: Data real DT_ELEICAO, restringe os quatro anos aprovados.
+- name: stg_tse__doador_originario
+  description: Fonte privada TSE tipada, sem deduplicação de itens.
+  columns:
+  - name: linha_original
+    description: JSON privado de todas as colunas fonte antes de casts, incluindo geração; exclui
+      controles coletor e proveniência injetada.
+  - name: data_eleicao
+    description: Data real DT_ELEICAO, restringe os quatro anos aprovados.
+unit_tests:
+- name: sentinela_menos4
+  model: stg_tse__candidaturas
+  overrides:
+    macros:
+      fonte_tse: (select null::VARCHAR as dt_geracao, null::VARCHAR as hh_geracao, null::VARCHAR
+        as ano_eleicao, null::VARCHAR as cd_tipo_eleicao, null::VARCHAR as nm_tipo_eleicao, null::VARCHAR
+        as nr_turno, '1'::VARCHAR as cd_eleicao, null::VARCHAR as ds_eleicao, '06/10/2024'::VARCHAR
+        as dt_eleicao, null::VARCHAR as tp_abrangencia, null::VARCHAR as sg_uf, null::VARCHAR as
+        sg_ue, null::VARCHAR as nm_ue, null::VARCHAR as cd_cargo, null::VARCHAR as ds_cargo, '10'::VARCHAR
+        as sq_candidato, null::VARCHAR as nr_candidato, null::VARCHAR as nm_candidato, null::VARCHAR
+        as nm_urna_candidato, null::VARCHAR as nm_social_candidato, '-4'::VARCHAR as nr_cpf_candidato,
+        null::VARCHAR as ds_email, null::VARCHAR as cd_situacao_candidatura, null::VARCHAR as ds_situacao_candidatura,
+        null::VARCHAR as tp_agremiacao, null::VARCHAR as nr_partido, null::VARCHAR as sg_partido,
+        null::VARCHAR as nm_partido, null::VARCHAR as nr_federacao, null::VARCHAR as nm_federacao,
+        null::VARCHAR as sg_federacao, null::VARCHAR as ds_composicao_federacao, null::VARCHAR as
+        sq_coligacao, null::VARCHAR as nm_coligacao, null::VARCHAR as ds_composicao_coligacao, null::VARCHAR
+        as sg_uf_nascimento, null::VARCHAR as dt_nascimento, null::VARCHAR as nr_titulo_eleitoral_candidato,
+        null::VARCHAR as cd_genero, null::VARCHAR as ds_genero, null::VARCHAR as cd_grau_instrucao,
+        null::VARCHAR as ds_grau_instrucao, null::VARCHAR as cd_estado_civil, null::VARCHAR as ds_estado_civil,
+        null::VARCHAR as cd_cor_raca, null::VARCHAR as ds_cor_raca, null::VARCHAR as cd_ocupacao,
+        null::VARCHAR as ds_ocupacao, null::VARCHAR as cd_sit_tot_turno, null::VARCHAR as ds_sit_tot_turno,
+        null::VARCHAR as _coleta_id, null::VARCHAR as _competencia, null::DATE as _competencia_data,
+        null::BIGINT as _linha, null::VARCHAR as _arquivo_original, null::TIMESTAMP WITH TIME ZONE
+        as _carregado_em, null::INTEGER as ano_arquivo, null::VARCHAR as versao_id, null::VARCHAR
+        as layout_id)
+  given:
+  - input: source('raw_tse', 'candidaturas')
+    format: sql
+    rows: select 1 as unused
+  expect:
+    rows:
+    - cpf_candidato: null
+      cpf_candidato_ausencia: sentinela_menos4
+      cpf_candidato_valido: null
+- name: pagamento_preserva_original_lexical
+  description: Valores tipados iguais não tornam originais distintos idênticos; geração e zeros permanecem.
+  model: stg_tse__pagamentos
+  overrides:
+    macros:
+      fonte_tse: (select '01/10/2024'::VARCHAR as dt_geracao, '12:00:00'::VARCHAR as hh_geracao,
+        null::VARCHAR as aa_eleicao, null::VARCHAR as cd_tipo_eleicao, null::VARCHAR as nm_tipo_eleicao,
+        null::VARCHAR as cd_eleicao, null::VARCHAR as ds_eleicao, '06/10/2024'::VARCHAR as dt_eleicao,
+        null::VARCHAR as st_turno, null::VARCHAR as tp_prestacao_contas, null::VARCHAR as dt_prestacao_contas,
+        null::VARCHAR as sq_prestador_contas, null::VARCHAR as sg_uf, null::VARCHAR as ds_tipo_documento,
+        null::VARCHAR as nr_documento, null::VARCHAR as cd_fonte_despesa, null::VARCHAR as ds_fonte_despesa,
+        null::VARCHAR as cd_origem_despesa, null::VARCHAR as ds_origem_despesa, null::VARCHAR as
+        cd_natureza_despesa, null::VARCHAR as ds_natureza_despesa, null::VARCHAR as cd_especie_recurso,
+        null::VARCHAR as ds_especie_recurso, '0007'::VARCHAR as sq_despesa, '0009'::VARCHAR as sq_parcelamento_despesa,
+        null::VARCHAR as dt_pagto_despesa, null::VARCHAR as ds_despesa, '1.000,00'::VARCHAR as vr_pagto_despesa,
+        null::VARCHAR as _coleta_id, null::VARCHAR as _competencia, null::DATE as _competencia_data,
+        null::BIGINT as _linha, null::VARCHAR as _arquivo_original, null::TIMESTAMP WITH TIME ZONE
+        as _carregado_em, null::INTEGER as ano_arquivo, null::VARCHAR as versao_id, null::VARCHAR
+        as layout_id union all select '01/10/2024'::VARCHAR as dt_geracao, '12:00:00'::VARCHAR as
+        hh_geracao, null::VARCHAR as aa_eleicao, null::VARCHAR as cd_tipo_eleicao, null::VARCHAR
+        as nm_tipo_eleicao, null::VARCHAR as cd_eleicao, null::VARCHAR as ds_eleicao, '06/10/2024'::VARCHAR
+        as dt_eleicao, null::VARCHAR as st_turno, null::VARCHAR as tp_prestacao_contas, null::VARCHAR
+        as dt_prestacao_contas, null::VARCHAR as sq_prestador_contas, null::VARCHAR as sg_uf, null::VARCHAR
+        as ds_tipo_documento, null::VARCHAR as nr_documento, null::VARCHAR as cd_fonte_despesa, null::VARCHAR
+        as ds_fonte_despesa, null::VARCHAR as cd_origem_despesa, null::VARCHAR as ds_origem_despesa,
+        null::VARCHAR as cd_natureza_despesa, null::VARCHAR as ds_natureza_despesa, null::VARCHAR
+        as cd_especie_recurso, null::VARCHAR as ds_especie_recurso, '0007'::VARCHAR as sq_despesa,
+        '0009'::VARCHAR as sq_parcelamento_despesa, null::VARCHAR as dt_pagto_despesa, null::VARCHAR
+        as ds_despesa, '1000,00'::VARCHAR as vr_pagto_despesa, null::VARCHAR as _coleta_id, null::VARCHAR
+        as _competencia, null::DATE as _competencia_data, null::BIGINT as _linha, null::VARCHAR as
+        _arquivo_original, null::TIMESTAMP WITH TIME ZONE as _carregado_em, null::INTEGER as ano_arquivo,
+        null::VARCHAR as versao_id, null::VARCHAR as layout_id)
+  given:
+  - input: source('raw_tse', 'pagamentos')
+    format: sql
+    rows: select 1 as unused
+  expect:
+    rows:
+    - sq_despesa: '0007'
+      sq_parcelamento_despesa: 0009
+      vr_pagto_despesa: 1000
+      linha_original: '{"dt_geracao":"01/10/2024","hh_geracao":"12:00:00","aa_eleicao":null,"cd_tipo_eleicao":null,"nm_tipo_eleicao":null,"cd_eleicao":null,"ds_eleicao":null,"dt_eleicao":"06/10/2024","st_turno":null,"tp_prestacao_contas":null,"dt_prestacao_contas":null,"sq_prestador_contas":null,"sg_uf":null,"ds_tipo_documento":null,"nr_documento":null,"cd_fonte_despesa":null,"ds_fonte_despesa":null,"cd_origem_despesa":null,"ds_origem_despesa":null,"cd_natureza_despesa":null,"ds_natureza_despesa":null,"cd_especie_recurso":null,"ds_especie_recurso":null,"sq_despesa":"0007","sq_parcelamento_despesa":"0009","dt_pagto_despesa":null,"ds_despesa":null,"vr_pagto_despesa":"1.000,00"}'
+    - sq_despesa: '0007'
+      sq_parcelamento_despesa: 0009
+      vr_pagto_despesa: 1000
+      linha_original: '{"dt_geracao":"01/10/2024","hh_geracao":"12:00:00","aa_eleicao":null,"cd_tipo_eleicao":null,"nm_tipo_eleicao":null,"cd_eleicao":null,"ds_eleicao":null,"dt_eleicao":"06/10/2024","st_turno":null,"tp_prestacao_contas":null,"dt_prestacao_contas":null,"sq_prestador_contas":null,"sg_uf":null,"ds_tipo_documento":null,"nr_documento":null,"cd_fonte_despesa":null,"ds_fonte_despesa":null,"cd_origem_despesa":null,"ds_origem_despesa":null,"cd_natureza_despesa":null,"ds_natureza_despesa":null,"cd_especie_recurso":null,"ds_especie_recurso":null,"sq_despesa":"0007","sq_parcelamento_despesa":"0009","dt_pagto_despesa":null,"ds_despesa":null,"vr_pagto_despesa":"1000,00"}'

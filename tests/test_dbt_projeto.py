@@ -20,6 +20,27 @@ def projeto(tmp_path):
 
 
 def _schemas(projeto, target: str) -> dict[str, str]:
+    # Listagem apenas compila: seleção sintética explícita mantém os gates produtivos.
+    familias = [
+        "candidaturas",
+        "bens",
+        "receitas",
+        "contratadas",
+        "pagamentos",
+        "doador_originario",
+    ]
+    fontes = {familia: [(projeto / f"{familia}.parquet").as_posix()] for familia in familias}
+    variaveis = {
+        "tse_fontes": fontes,
+        "tse_proveniencia": {
+            caminhos[0]: {
+                "ano_arquivo": 2024,
+                "versao_id": "a" * 64,
+                "layout_id": f"tse:{familia}:2024:v1",
+            }
+            for familia, caminhos in fontes.items()
+        },
+    }
     saida = subprocess.run(
         [
             "dbt",
@@ -30,6 +51,8 @@ def _schemas(projeto, target: str) -> dict[str, str]:
             str(projeto),
             "--target",
             target,
+            "--vars",
+            json.dumps(variaveis),
             "--resource-type",
             "model",
             "--output",

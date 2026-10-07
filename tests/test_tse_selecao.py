@@ -619,3 +619,14 @@ def test_primeira_promocao_falha_preserva_marcador_e_bloqueia(tmp_path, monkeypa
     assert validar_selecao(lago, selecao)
     with pytest.raises(ErroRecuperacaoTse):
         conferir_recuperacao(lago)
+
+
+def test_proveniencia_trocada_rejeitada_mesmo_com_hashes_recalculados(vetor):
+    lago, selecao = vetor
+    variaveis = vars_selecao(lago, selecao, "trocada")
+    mapa = variaveis["tse_proveniencia"]
+    caminhos = variaveis["tse_fontes"]["bens"]
+    mapa[caminhos[0]], mapa[caminhos[1]] = mapa[caminhos[1]], mapa[caminhos[0]]
+    # execucao recalcula vars_digest e todos os artefatos/evidências usando o mapa adulterado.
+    with pytest.raises(ValueError, match="vars obrigatórias divergentes"):
+        execucao(lago, selecao, "trocada", vars_extras={"tse_proveniencia": mapa})

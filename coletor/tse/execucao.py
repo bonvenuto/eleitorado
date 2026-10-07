@@ -82,6 +82,11 @@ def preparar_execucao_tse(
             },
             "tse_saida": (pasta / "marts").as_posix(),
         }
+        variaveis["tse_proveniencia"] = {
+            caminho: {"ano_arquivo": None, "versao_id": None, "layout_id": None}
+            for caminhos in variaveis["tse_fontes"].values()
+            for caminho in caminhos
+        }
         entradas, entradas_digest, selecao_digest = {}, None, None
     # A pasta exclusiva impede reuso de saída, preparação ou artefatos de outra invocação.
     pasta.parent.mkdir(parents=True, exist_ok=True)
