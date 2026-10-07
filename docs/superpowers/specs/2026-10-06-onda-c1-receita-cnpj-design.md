@@ -89,7 +89,10 @@ de cada raiz.
 > lago próprio, e sobe ao bucket com `coletor estado salvar --aditivo` (só arquivos novos;
 > nunca apaga nem sobrescreve), sempre com o pipeline parado. A cadência dos recursos da
 > Receita passou a mensal (o monitor só acusa atraso depois de 40 dias), e o detalhe de
-> deputados foi para o pipeline diário. O texto abaixo é o desenho original.
+> deputados foi para o pipeline diário. As raízes de interesse passaram para
+> `<lago>/estado/rfb_raizes_interesse.parquet`: o pipeline diário as gera e sincroniza, e a
+> coleta local só as restaura (o dbt dos intermediários não cabe na memória da máquina local).
+> O texto abaixo é o desenho original.
 
 - Toda segunda às 06:00 UTC e por `workflow_dispatch`; limite de 3 horas; o mesmo grupo de
   concorrência do `pipeline.yml` (os dois nunca escrevem no lago ao mesmo tempo), as mesmas

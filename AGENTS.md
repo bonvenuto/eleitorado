@@ -133,7 +133,8 @@ uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
 - **Fonte com defeito conhecido:** o ZIP de licitações da CGU de 2018-12 vem truncado na própria
   fonte e falha todo dia (ver o roteiro).
 - **Receita:** a base mensal tem 7,6 GB; o adaptador `webdav_zip` recorta em fluxo só as raízes de
-  CNPJ que aparecem nos dados (`<lago>/rfb_raizes_interesse.parquet`, gerado pelo dbt). O
+  CNPJ que aparecem nos dados (`<lago>/estado/rfb_raizes_interesse.parquet`, gerado pelo dbt no pipeline diário e
+  sincronizado com o bucket). O
   servidor da Receita derruba a conexão de IPs do GitHub Actions (diagnóstico de 2026-10-07, PR
   #35), por isso a coleta é local, num lago próprio (`dados-receita/`), e sobe ao bucket com
   `coletor estado salvar --aditivo` (só arquivos novos de `raw/` e `meta/`; nunca apaga nem

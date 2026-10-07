@@ -1478,7 +1478,7 @@ Documentos de despesa de emendas com o documento completo do favorecido e a vali
 
 ### Receita Federal (onda C1)
 
-- `int_rfb__raizes_interesse`: raízes de CNPJ que aparecem em cota, contratos, emendas (pagamentos e favorecidos), participantes de licitação e sanções, com as origens. Vai para `<lago>/rfb_raizes_interesse.parquet`, que o coletor usa para recortar a base da Receita.
+- `int_rfb__raizes_interesse`: raízes de CNPJ que aparecem em cota, contratos, emendas (pagamentos e favorecidos), participantes de licitação e sanções, com as origens. Vai para `<lago>/estado/rfb_raizes_interesse.parquet` (sincronizado com o bucket pelo pipeline diário), que o coletor usa para recortar a base da Receita.
 - `int_rfb__municipios`: código de município da Receita para o código IBGE, por nome sem acentos e UF (só correspondências únicas; ~99,9% dos estabelecimentos).
 - `int_rfb__estabelecimentos`: estabelecimentos da competência mais recente, com endereço e contato (privado).
 - `int_rfb__socios`: sócios da competência mais recente, como a Receita publica (CPF de pessoa física mascarado, sócio empresa só com a raiz). Privado.

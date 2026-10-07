@@ -42,6 +42,8 @@ def extrair(lago: Path) -> dict[str, dict[str, str]]:
 
 
 def gerar(esquemas: dict[str, dict[str, str]]) -> None:
+    # o dbt grava as raízes de CNPJ em estado/ e não cria a pasta sozinho
+    (PASTA / "estado").mkdir(parents=True, exist_ok=True)
     for tabela, colunas in esquemas.items():
         destino = PASTA / tabela / "vazio" / "vazio.parquet"
         if destino.parent.exists():

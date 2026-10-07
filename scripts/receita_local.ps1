@@ -3,7 +3,9 @@
 # quando a cadência mensal vence); também roda à mão, na raiz do repositório:
 #   .\scripts\receita_local.ps1
 #
-# Usa as credenciais do .env (gcloud isolado em .gcloud\) e grava no bucket de produção, a partir
+# As raízes de CNPJ de interesse vêm do bucket (estado/rfb_raizes_interesse.parquet, que o
+# pipeline diário gera). Usa as credenciais do .env (gcloud isolado em .gcloud\) e grava no
+# bucket de produção, a partir
 # de um lago próprio (dados-receita\). Para não brigar com o pipeline diário, que espelha o lago no
 # bucket: só roda com ele parado, e só acrescenta arquivos ao bucket (estado salvar --aditivo),
 # nunca apaga nem sobrescreve. Log em dados-receita\receita.log.
@@ -49,10 +51,12 @@ try {
     if ((Rodar @("uv", "run", "coletor", "estado", "restaurar")) -ne 0) {
         throw "coletor estado restaurar falhou"
     }
-    # uma thread: os intermediários grandes em paralelo estouram os 4 GB do DuckDB nesta máquina
-    $dbt = @("uv", "run", "dbt", "run", "--project-dir", "dbt", "--profiles-dir", "dbt",
-        "--target", "prod", "--select", "+int_rfb__raizes_interesse", "--threads", "1")
-    if ((Rodar $dbt) -ne 0) { throw "dbt das raízes de interesse falhou" }
+    # as raízes de CNPJ vêm do pipeline diário (estado/), sem rodar o dbt aqui: os intermediários
+    # grandes não cabem na memória desta máquina
+    $raizes = Join-Path $raiz "dados-receita\estado\rfb_raizes_interesse.parquet"
+    if (-not (Test-Path $raizes)) {
+        throw "sem $raizes (o pipeline diário ainda não gerou as raízes de interesse?)"
+    }
     $codigo = Rodar @("uv", "run", "coletor", "executar", "--grupo", "receita")
     # duas passadas: se um pipeline rodou entre a primeira e o fim dela, ele pode ter apagado o
     # que acabou de subir; a segunda (depois de esperá-lo) devolve o que faltar
