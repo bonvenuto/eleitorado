@@ -78,7 +78,12 @@ def _parser() -> argparse.ArgumentParser:
         help="salvar: só envia arquivos novos de raw/ e meta/ (nunca apaga nem sobrescreve)",
     )
 
-    sub.add_parser("publicar", help="gera a linhagem e envia marts e linhagem ao bucket público")
+    site = sub.add_parser("site", help="gera os arquivos do site público a partir do dbt")
+    site.add_argument(
+        "--esquemas", type=Path, default=Path("site/esquemas"), help="JSON Schemas do site"
+    )
+
+    sub.add_parser("publicar", help="gera a linhagem e envia marts, linhagem e site ao R2")
 
     reconstruir = sub.add_parser(
         "reconstruir", help="refaz os históricos a partir dos originais no bucket"
@@ -263,6 +268,21 @@ def _publicar(args: argparse.Namespace, deps: Dependencias, env: Mapping[str, st
     return 0
 
 
+def _site(args: argparse.Namespace, env: Mapping[str, str]) -> int:
+    """Lê o banco do dbt e grava `ELEITORADO_PUBLICO/site`; não usa o GCP."""
+    from coletor.site import ErroSite, gerar_site
+
+    lago = Path(env.get("ELEITORADO_LAGO", "dados"))
+    publico = Path(env.get("ELEITORADO_PUBLICO", "dados/publico"))
+    try:
+        quantidade = gerar_site(banco_do_target(lago, args.target), publico, args.esquemas)
+    except ErroSite as erro:
+        log.error("site não gerado: %s", erro)
+        return 1
+    log.info("site: %d arquivo(s) em %s", quantidade, publico / "site")
+    return 0
+
+
 def _reconstruir(
     args: argparse.Namespace,
     manifesto: Manifesto,
@@ -340,6 +360,8 @@ def main(
     args = _parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     env = os.environ if env is None else env
+    if args.comando == "site":
+        return _site(args, env)
     deps: Dependencias | None = None
     try:
         config = carregar_config(env)
