@@ -101,6 +101,9 @@ Regras de agregação:
 
 ### 4.2 Arquivos
 
+Os nomes de arquivo de busca e de empresa levam um prefixo fixo (`p_`, `b_`): `con`, `prn`,
+`aux` e `nul` são nomes reservados no Windows (revisão do plano 10).
+
 Todo arquivo tem `"esquema": 1`. Só o `resumo.json` tem `"gerado_em"` (ISO 8601): com a data
 em todo arquivo, todos mudariam todo dia e o envio incremental não serviria (protótipo).
 
@@ -108,16 +111,16 @@ em todo arquivo, todos mudariam todo dia e o envio incremental não serviria (pr
 |---|---|---|
 | `resumo.json` | `gerado_em`, `dados_ate` (última data de cada fonte), `totais`, `alerta_tipos` (do seed, com a quantidade de cada um), `alertas_recentes` (20, só correspondência `forte` e data até hoje), `fontes` (`monitor_fontes`), `fontes_reduzidas` (`alerta_fonte_reduzida`) | 1 |
 | `busca/parlamentares.json` | `parlamentares`: `id`, `nome`, `casa`, `uf`, `partido`, `foto`, `legislaturas` | 1 |
-| `busca/empresas/<abc>.json` | `prefixo`, `empresas`: `raiz`, `nome`, `uf`, `situacao` das empresas com alguma palavra da razão social começando por `<abc>` (3 primeiros caracteres, sem acento, minúsculos) | alguns milhares |
+| `busca/empresas/p_<abc>.json` | `prefixo`, `empresas`: `raiz`, `nome`, `uf`, `situacao` das empresas com alguma palavra da razão social começando por `<abc>` (3 primeiros caracteres, sem acento, minúsculos) | alguns milhares |
 | `parlamentar/<casa>-<id>.json` | `parlamentar` (de `dim_parlamentar` + `url_oficial`), `cota` (`total`, `por_ano`, `por_categoria`, `fornecedores`), `emendas` (`total_pago`, `por_ano`, `favorecidos`), `alertas` | ~2.500 |
-| `empresa/<abc>.json` | `bloco`, `empresas`: objeto por raiz com `cadastro`, `cota`, `emendas`, `contratos`, `licitacoes`, `sancoes`, `alertas`, das raízes que começam por `<abc>` | ~1.000 |
+| `empresa/b_<abc>.json` | `bloco`, `empresas`: objeto por raiz com `cadastro`, `cota`, `emendas`, `contratos`, `licitacoes`, `sancoes`, `alertas`, das raízes que começam por `<abc>` | ~1.000 |
 | `alertas/<tipo>/<n>.json` | `tipo`, `pagina`, `paginas`, `total`, `alertas` (500 por página, do mais recente ao mais antigo) | dezenas |
 
 Busca de empresa:
 - Palavras ignoradas no índice: `ltda`, `me`, `epp`, `eireli`, `sa`, `s/a`, `cia`, `de`, `da`, `do`, `das`, `dos`, `e`, `comercio`, `servicos`, `industria`.
 - Só palavras com 3 caracteres ou mais entram no índice.
 - O site baixa o bloco das 3 primeiras letras da primeira palavra digitada (com 3 ou mais caracteres e fora da lista) e filtra no navegador por todas as palavras digitadas (prefixo, sem acento).
-- Bloco com mais de 5.000 empresas é subdividido: o arquivo de 3 caracteres traz só `"subdividido": true`, e as empresas vão para blocos de 4 caracteres (`busca/empresas/<abcd>.json`); o site então usa as 4 primeiras letras. O arquivo subdividido mantém as empresas com uma palavra de exatamente 3 caracteres; com só 3 letras digitadas, o site mostra essas e pede mais uma letra.
+- Bloco com mais de 5.000 empresas é subdividido: o arquivo de 3 caracteres traz só `"subdividido": true`, e as empresas vão para blocos de 4 caracteres (`busca/empresas/p_<abcd>.json`); o site então usa as 4 primeiras letras. O arquivo subdividido mantém as empresas com uma palavra de exatamente 3 caracteres; com só 3 letras digitadas, o site mostra essas e pede mais uma letra.
 - Consulta com 8 ou 14 caracteres de CNPJ (com ou sem pontuação) vai direto para `/empresa/<raiz>`.
 
 Limites de tamanho (seção 11):

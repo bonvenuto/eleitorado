@@ -37,6 +37,10 @@ boto3 (R2), GitHub Actions.
   `Content-Encoding: gzip` e `Cache-Control: public, max-age=600`.
 - O `manifesto.json` continua listando só `marts/` e `linhagem/`.
 - Mensagens de erro não podem conter o texto onde um CPF foi achado (o log do Actions é público).
+- Nomes de arquivo com prefixo fixo: `busca/empresas/p_<prefixo>.json` e `empresa/b_<bloco>.json`.
+  `con`, `prn`, `aux`, `nul` (e `CON` num bloco de CNPJ alfanumérico) são nomes reservados no
+  Windows: sem o prefixo, o git não grava o arquivo e o `coletor site` quebraria numa máquina
+  Windows.
 
 ## Review Focus
 
@@ -45,7 +49,7 @@ boto3 (R2), GitHub Actions.
   `test_sem_site_local_o_site_do_bucket_fica` (tarefa 7); o passo do `pipeline.yml` (tarefa 8)
   roda o `publicar` mesmo com o site falhando.
 - **CNPJ alfanumérico (desde 07/2026):** raiz com letras precisa funcionar no bloco
-  (`empresa/1AB.json`), nas chaves e nos esquemas. Testes: `site_empresa_em_blocos_com_socios_nas_duas`
+  (`empresa/b_1AB.json`), nas chaves e nos esquemas. Testes: `site_empresa_em_blocos_com_socios_nas_duas`
   (tarefa 4), `test_esquema_aceita_cnpj_alfanumerico` (tarefa 1) e
   `test_bloco_de_cnpj_alfanumerico` (tarefa 6).
 - **Falso positivo de CPF:** valores com 11 dígitos na parte inteira (R$ 10 bi a R$ 100 bi) e MD5
@@ -102,9 +106,9 @@ Para um teste unitário só: `uv run dbt test --project-dir dbt --profiles-dir d
 - Create: `site/esquemas/comum.schema.json`, `resumo.schema.json`,
   `busca-parlamentares.schema.json`, `busca-empresas.schema.json`, `parlamentar.schema.json`,
   `empresa.schema.json`, `alertas.schema.json`
-- Create: `site/exemplos/resumo.json`, `busca/parlamentares.json`, `busca/empresas/emp.json`,
-  `busca/empresas/exe.json`, `busca/empresas/con.json`, `busca/empresas/cons.json`,
-  `parlamentar/camara-900001.json`, `parlamentar/senado-900002.json`, `empresa/112.json`,
+- Create: `site/exemplos/resumo.json`, `busca/parlamentares.json`, `busca/empresas/p_emp.json`,
+  `busca/empresas/p_exe.json`, `busca/empresas/p_con.json`, `busca/empresas/p_cons.json`,
+  `parlamentar/camara-900001.json`, `parlamentar/senado-900002.json`, `empresa/b_112.json`,
   `alertas/cota_fornecedor_sancionado/1.json`
 - Create: `coletor/site.py` (parcial; a tarefa 6 completa)
 - Create: `tests/test_site.py` (parcial; a tarefa 6 acrescenta)
@@ -839,7 +843,7 @@ empresas reais nos exemplos.
 }
 ```
 
-`site/exemplos/busca/empresas/emp.json`:
+`site/exemplos/busca/empresas/p_emp.json`:
 
 ```json
 {
@@ -863,7 +867,7 @@ empresas reais nos exemplos.
 }
 ```
 
-`site/exemplos/busca/empresas/exe.json`:
+`site/exemplos/busca/empresas/p_exe.json`:
 
 ```json
 {
@@ -881,7 +885,7 @@ empresas reais nos exemplos.
 }
 ```
 
-`site/exemplos/busca/empresas/con.json` (bloco subdividido: só a empresa de palavra com
+`site/exemplos/busca/empresas/p_con.json` (bloco subdividido: só a empresa de palavra com
 exatamente 3 letras):
 
 ```json
@@ -900,7 +904,7 @@ exatamente 3 letras):
 }
 ```
 
-`site/exemplos/busca/empresas/cons.json`:
+`site/exemplos/busca/empresas/p_cons.json`:
 
 ```json
 {
@@ -1066,7 +1070,7 @@ exatamente 3 letras):
 }
 ```
 
-`site/exemplos/empresa/112.json`:
+`site/exemplos/empresa/b_112.json`:
 
 ```json
 {
@@ -1266,7 +1270,7 @@ def test_esquema_recusa_campo_que_nao_existe():
 
 def test_esquema_aceita_cnpj_alfanumerico():
     validadores = carregar_validadores(ESQUEMAS)
-    documento = _exemplos()["empresa/112.json"]
+    documento = _exemplos()["empresa/b_112.json"]
     documento["bloco"] = "1AB"
     documento["empresas"] = {"1AB2C3D4": documento["empresas"]["11222333"]}
     assert list(validadores["empresa"].iter_errors(documento)) == []
@@ -2059,9 +2063,9 @@ unit_tests:
           - {alerta_id: s1, tipo: licitacao_socios_em_comum, data_fato: '2023-05-05', cnpj_raiz: '11222333', cnpj_raiz_2: '44555666', descricao: x, correspondencia: forte, regra: r}
     expect:
       rows:
-        - {caminho: empresa/112.json, empresas_no_arquivo: 2, alertas_total: 1}
-        - {caminho: empresa/1AB.json, empresas_no_arquivo: 1, alertas_total: 0}
-        - {caminho: empresa/445.json, empresas_no_arquivo: 1, alertas_total: 1}
+        - {caminho: empresa/b_112.json, empresas_no_arquivo: 2, alertas_total: 1}
+        - {caminho: empresa/b_1AB.json, empresas_no_arquivo: 1, alertas_total: 0}
+        - {caminho: empresa/b_445.json, empresas_no_arquivo: 1, alertas_total: 1}
 ```
 
 - [ ] **Step 2: Veja falhar**
@@ -2389,7 +2393,7 @@ uma as (
 )
 
 select
-    'empresa/' || left(cnpj_raiz, 3) || '.json' as caminho,
+    'empresa/b_' || left(cnpj_raiz, 3) || '.json' as caminho,
     to_json({
         'esquema': 1,
         'bloco': left(cnpj_raiz, 3),
@@ -2472,11 +2476,11 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {caminho: busca/empresas/alf.json, subdividido: false, empresas_no_arquivo: 1}
-        - {caminho: busca/empresas/bet.json, subdividido: false, empresas_no_arquivo: 1}
-        - {caminho: busca/empresas/con.json, subdividido: true, empresas_no_arquivo: 1}
-        - {caminho: busca/empresas/cons.json, subdividido: false, empresas_no_arquivo: 2}
-        - {caminho: busca/empresas/eng.json, subdividido: false, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_alf.json, subdividido: false, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_bet.json, subdividido: false, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_con.json, subdividido: true, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_cons.json, subdividido: false, empresas_no_arquivo: 2}
+        - {caminho: busca/empresas/p_eng.json, subdividido: false, empresas_no_arquivo: 1}
         - {caminho: busca/parlamentares.json, subdividido: null, empresas_no_arquivo: 0}
 
   - name: site_alertas_em_paginas
@@ -2572,7 +2576,7 @@ prefixos as (
 )
 
 select
-    'busca/empresas/' || x.prefixo || '.json' as caminho,
+    'busca/empresas/p_' || x.prefixo || '.json' as caminho,
     to_json({
         'esquema': 1,
         'prefixo': x.prefixo,
@@ -2780,7 +2784,7 @@ Expected: `[('busca/parlamentares.json',), ('resumo.json',)]`.
 Em `site_arquivos_busca.sql`, no CTE `entradas`, troque `left(p.palavra, 4)` por
 `left(p.palavra, 3)`. Rode `dbt run --select site_arquivos_busca` e
 `dbt test --select "test_name:site_busca_subdivide_blocos_grandes"`.
-Expected: FAIL (`cons.json` some e `con.json` fica com 3 empresas). Desfaça e confirme o PASS.
+Expected: FAIL (`p_cons.json` some e `p_con.json` fica com 3 empresas). Desfaça e confirme o PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -2878,7 +2882,7 @@ def test_esquema_recusa_campo_que_nao_existe():
 
 def test_esquema_aceita_cnpj_alfanumerico():
     validadores = carregar_validadores(ESQUEMAS)
-    documento = _exemplos()["empresa/112.json"]
+    documento = _exemplos()["empresa/b_112.json"]
     documento["bloco"] = "1AB"
     documento["empresas"] = {"1AB2C3D4": documento["empresas"]["11222333"]}
     assert list(validadores["empresa"].iter_errors(documento)) == []
@@ -2895,7 +2899,7 @@ def test_grava_os_arquivos_em_gzip_deterministico(tmp_path):
     assert gerar_site(banco, publico, ESQUEMAS) == len(exemplos)
     primeiro = (publico / "site" / "resumo.json").read_bytes()
     assert _ler(publico, "resumo.json") == exemplos["resumo.json"]
-    assert _ler(publico, "empresa/112.json") == exemplos["empresa/112.json"]
+    assert _ler(publico, "empresa/b_112.json") == exemplos["empresa/b_112.json"]
 
     gerar_site(banco, publico, ESQUEMAS)
     assert (publico / "site" / "resumo.json").read_bytes() == primeiro
@@ -2916,9 +2920,9 @@ def test_cpf_completo_num_texto_impede_tudo_sem_mostrar_o_cpf(tmp_path):
     (publico / "site").mkdir(parents=True)
     (publico / "site" / "resumo.json").write_bytes(b"anterior")
     arquivos = _exemplos()
-    arquivos["busca/empresas/emp.json"]["empresas"][0]["nome"] = "JOSE DA SILVA 12345678909"
+    arquivos["busca/empresas/p_emp.json"]["empresas"][0]["nome"] = "JOSE DA SILVA 12345678909"
 
-    with pytest.raises(ErroSite, match="busca/empresas/emp.json") as erro:
+    with pytest.raises(ErroSite, match="busca/empresas/p_emp.json") as erro:
         gerar_site(_banco(tmp_path, arquivos), publico, ESQUEMAS)
 
     assert "12345678909" not in str(erro.value)
@@ -2967,13 +2971,13 @@ def test_sem_banco_falha(tmp_path):
 
 def test_bloco_de_cnpj_alfanumerico(tmp_path):
     arquivos = _exemplos()
-    empresa = arquivos.pop("empresa/112.json")
+    empresa = arquivos.pop("empresa/b_112.json")
     empresa["bloco"] = "1AB"
     empresa["empresas"] = {"1AB2C3D4": empresa["empresas"]["11222333"]}
-    arquivos["empresa/1AB.json"] = empresa
+    arquivos["empresa/b_1AB.json"] = empresa
     publico = tmp_path / "publico"
     gerar_site(_banco(tmp_path, arquivos), publico, ESQUEMAS)
-    assert _ler(publico, "empresa/1AB.json")["bloco"] == "1AB"
+    assert _ler(publico, "empresa/b_1AB.json")["bloco"] == "1AB"
 
 
 # ---- comando `coletor site`
@@ -3729,9 +3733,9 @@ Ficam no R2 em `site/`, em gzip (`Content-Encoding: gzip`), fora do `manifesto.j
 |---|---|
 | `site/resumo.json` | Números da capa, tipos de alerta (texto do seed `site_alerta_tipos`), alertas recentes, situação das fontes |
 | `site/busca/parlamentares.json` | Todos os parlamentares |
-| `site/busca/empresas/<abc>.json` | Empresas com uma palavra da razão social começando por `<abc>` (blocos grandes subdivididos em 4 letras) |
+| `site/busca/empresas/p_<abc>.json` | Empresas com uma palavra da razão social começando por `<abc>` (blocos grandes subdivididos em 4 letras) |
 | `site/parlamentar/<casa>-<id>.json` | Cota, emendas e alertas de um parlamentar |
-| `site/empresa/<abc>.json` | Empresas cuja raiz do CNPJ começa por `<abc>`: cadastro, o que recebeu, sanções e alertas |
+| `site/empresa/b_<abc>.json` | Empresas cuja raiz do CNPJ começa por `<abc>`: cadastro, o que recebeu, sanções e alertas |
 | `site/alertas/<tipo>/<n>.json` | Alertas de um tipo, 500 por página |
 
 O formato de cada arquivo está nos JSON Schemas de `site/esquemas/`; há exemplos em
