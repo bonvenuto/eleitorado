@@ -106,7 +106,7 @@ em todo arquivo, todos mudariam todo dia e o envio incremental não serviria (pr
 
 | Caminho | Conteúdo | Quantidade estimada |
 |---|---|---|
-| `resumo.json` | `gerado_em`, `dados_ate` (última data de cada fonte), `totais`, `alerta_tipos` (do seed, com a quantidade de cada um), `alertas_recentes` (20), `fontes` (`monitor_fontes`), `fontes_reduzidas` (`alerta_fonte_reduzida`) | 1 |
+| `resumo.json` | `gerado_em`, `dados_ate` (última data de cada fonte), `totais`, `alerta_tipos` (do seed, com a quantidade de cada um), `alertas_recentes` (20, só correspondência `forte` e data até hoje), `fontes` (`monitor_fontes`), `fontes_reduzidas` (`alerta_fonte_reduzida`) | 1 |
 | `busca/parlamentares.json` | `parlamentares`: `id`, `nome`, `casa`, `uf`, `partido`, `foto`, `legislaturas` | 1 |
 | `busca/empresas/<abc>.json` | `prefixo`, `empresas`: `raiz`, `nome`, `uf`, `situacao` das empresas com alguma palavra da razão social começando por `<abc>` (3 primeiros caracteres, sem acento, minúsculos) | alguns milhares |
 | `parlamentar/<casa>-<id>.json` | `parlamentar` (de `dim_parlamentar` + `url_oficial`), `cota` (`total`, `por_ano`, `por_categoria`, `fornecedores`), `emendas` (`total_pago`, `por_ano`, `favorecidos`), `alertas` | ~2.500 |
@@ -117,7 +117,7 @@ Busca de empresa:
 - Palavras ignoradas no índice: `ltda`, `me`, `epp`, `eireli`, `sa`, `s/a`, `cia`, `de`, `da`, `do`, `das`, `dos`, `e`, `comercio`, `servicos`, `industria`.
 - Só palavras com 3 caracteres ou mais entram no índice.
 - O site baixa o bloco das 3 primeiras letras da primeira palavra digitada (com 3 ou mais caracteres e fora da lista) e filtra no navegador por todas as palavras digitadas (prefixo, sem acento).
-- Bloco com mais de 5.000 empresas é subdividido: o arquivo de 3 caracteres traz só `"subdividido": true`, e as empresas vão para blocos de 4 caracteres (`busca/empresas/<abcd>.json`); o site então usa as 4 primeiras letras (com 3 letras digitadas, pede mais uma).
+- Bloco com mais de 5.000 empresas é subdividido: o arquivo de 3 caracteres traz só `"subdividido": true`, e as empresas vão para blocos de 4 caracteres (`busca/empresas/<abcd>.json`); o site então usa as 4 primeiras letras. O arquivo subdividido mantém as empresas com uma palavra de exatamente 3 caracteres; com só 3 letras digitadas, o site mostra essas e pede mais uma letra.
 - Consulta com 8 ou 14 caracteres de CNPJ (com ou sem pontuação) vai direto para `/empresa/<raiz>`.
 
 Limites de tamanho (seção 11):
@@ -136,6 +136,7 @@ Cada item de `alertas` (em qualquer arquivo):
 | `valor` | Valor do fato (R$), quando houver |
 | `parlamentar_id`, `parlamentar_nome` | Quando houver (cota, emenda via autor, sócio) |
 | `cnpj_raiz`, `empresa_nome` | Quando houver |
+| `cnpj_raiz_2`, `empresa_nome_2` | A segunda empresa, só em `licitacao_socios_em_comum` (o alerta aparece no arquivo das duas) |
 | `descricao` | Frase curta montada no SQL (ex.: "Despesa de R$ 1.200,00 com EMPRESA X, sancionada no CEIS por Órgão Y desde 2025-03-01") |
 | `correspondencia` | `forte` ou `fraca` (`fraca`: senador sócio só pelo nome; correspondência por `cnpj_raiz` em vez do CNPJ completo) |
 | `regra` | A coluna `regra` do mart |
@@ -154,10 +155,16 @@ Cada item de `alertas` (em qualquer arquivo):
 
 - **`coletor site`:**
   - lê `site_arquivos` do DuckDB e grava cada linha em `<ELEITORADO_PUBLICO>/site/<caminho>`, em UTF-8 comprimido com gzip (`mtime=0`);
-  - falha se algum arquivo passar dos limites da seção 4.2;
+  - falha se algum arquivo passar dos limites da seção 4.2, tiver CPF completo em algum texto
+    ou não seguir o JSON Schema do seu tipo (todos os arquivos, menos `empresa/` e
+    `busca/empresas/`, validados por amostra de 20 de cada, para não pesar no pipeline);
+  - grava numa pasta temporária e só troca `site/` no fim: em caso de falha, nada muda;
   - antes, apaga `site/` inteira, para que um arquivo que deixou de existir não fique para trás;
   - recusa caminhos com `..` ou absolutos.
-- **`pipeline.yml`:** os modelos `site_*` rodam no mesmo `dbt build`. O `coletor site` roda logo depois, só se o dbt passou (inclusive na saída 3, em que os marts são publicados).
+- **`pipeline.yml`:** os modelos `site_*` rodam no mesmo `dbt build`. O `coletor site` roda no
+  passo de publicação, antes do `coletor publicar`. Se ele falhar, os marts são publicados mesmo
+  assim e o job fica vermelho; sem `site/` local, o `publicar` não apaga o `site/` do R2, que
+  continua com os dados da véspera.
 - **`publicacao.py`:**
   - `PERMITIDOS` ganha `site/`;
   - o `manifesto.json` continua listando só `marts/` e `linhagem/`;
@@ -208,6 +215,11 @@ Cada item de `alertas` (em qualquer arquivo):
   `site_arquivos`, `conteudo` é VARCHAR (o JSON como texto), para que o `sem_cpf_completo`
   percorra também o JSON; o `sem_dados_pessoais` (que olha os nomes de coluna) vale nos modelos
   de agregados, onde as colunas ainda têm nome.
+- **Revisão (plano 10):** o `sem_cpf_completo` no JSON como texto daria falso positivo em valores
+  com 11 dígitos na parte inteira (R$ 10 bi a R$ 100 bi, possível em totais de contratos). Por
+  isso ele vale nos modelos de colunas (`site_alertas`, `site_cota`, `site_emendas`,
+  `site_contratos`), e o `coletor site` procura CPF só nos **textos** de cada JSON, depois de
+  lê-lo.
 - Sócios aparecem só como contagem (`dim_empresa.socios`); nome e CPF de sócio nunca.
 - O site não usa cookies, analytics de terceiros nem fontes externas.
 
