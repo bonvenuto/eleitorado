@@ -1,0 +1,106 @@
+orgao: tse
+nome: Tribunal Superior Eleitoral
+portal: https://dadosabertos.tse.jus.br/
+recursos:
+- id: candidaturas
+  descricao: 'Dados eleitorais oficiais: candidaturas'
+  fonte_oficial: https://dadosabertos.tse.jus.br/
+  condicoes_uso: Dados publicos oficiais; creditar o TSE como fonte.
+  adaptador: tse_zip
+  url: https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_{ano}.zip
+  parametros: {}
+  publicacao: por_competencia
+  competencia:
+    tipo: ano
+    anos:
+    - 2018
+    - 2020
+    - 2022
+    - 2024
+  cadencia:
+    corrente: mensal
+    anteriores: mensal
+  formato:
+    tipo: csv
+    compressao: zip
+    encoding: cp1252
+    delimitador: ;
+    linhas_a_pular: 0
+  paginacao: nenhuma
+  pagina_parametro: pagina
+  total_paginas_campo: totalPaginas
+  pausa_pagina_segundos: 0
+  pausa_segundos: 0
+  acesso: publico
+  grupo: tse
+  familias:
+    candidaturas: consulta_cand_{ano}_BRASIL.csv
+- id: bens
+  descricao: 'Dados eleitorais oficiais: bens'
+  fonte_oficial: https://dadosabertos.tse.jus.br/
+  condicoes_uso: Dados publicos oficiais; creditar o TSE como fonte.
+  adaptador: tse_zip
+  url: https://cdn.tse.jus.br/estatistica/sead/odsele/bem_candidato/bem_candidato_{ano}.zip
+  parametros: {}
+  publicacao: por_competencia
+  competencia:
+    tipo: ano
+    anos:
+    - 2018
+    - 2020
+    - 2022
+    - 2024
+  cadencia:
+    corrente: mensal
+    anteriores: mensal
+  formato:
+    tipo: csv
+    compressao: zip
+    encoding: cp1252
+    delimitador: ;
+    linhas_a_pular: 0
+  paginacao: nenhuma
+  pagina_parametro: pagina
+  total_paginas_campo: totalPaginas
+  pausa_pagina_segundos: 0
+  pausa_segundos: 0
+  acesso: publico
+  grupo: tse
+  familias:
+    bens: bem_candidato_{ano}_BRASIL.csv
+- id: contas
+  descricao: 'Dados eleitorais oficiais: contas'
+  fonte_oficial: https://dadosabertos.tse.jus.br/
+  condicoes_uso: Dados publicos oficiais; creditar o TSE como fonte.
+  adaptador: tse_zip
+  url: https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/prestacao_de_contas_eleitorais_candidatos_{ano}.zip
+  parametros: {}
+  publicacao: por_competencia
+  competencia:
+    tipo: ano
+    anos:
+    - 2018
+    - 2020
+    - 2022
+    - 2024
+  cadencia:
+    corrente: mensal
+    anteriores: mensal
+  formato:
+    tipo: csv
+    compressao: zip
+    encoding: cp1252
+    delimitador: ;
+    linhas_a_pular: 0
+  paginacao: nenhuma
+  pagina_parametro: pagina
+  total_paginas_campo: totalPaginas
+  pausa_pagina_segundos: 0
+  pausa_segundos: 0
+  acesso: publico
+  grupo: tse
+  familias:
+    receitas: receitas_candidatos_{ano}_BRASIL.csv
+    contratadas: despesas_contratadas_candidatos_{ano}_BRASIL.csv
+    pagamentos: despesas_pagas_candidatos_{ano}_BRASIL.csv
+    doador_originario: receitas_candidatos_doador_originario_{ano}_BRASIL.csv

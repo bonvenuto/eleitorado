@@ -1,0 +1,983 @@
+version: 2
+models:
+- name: int_tse__vinculos_parlamentares
+  description: Ponte privada por candidatura, parlamentar, origem e evidência. Nomes isolados
+    nunca confirmam; Senado sem CPF permanece pendente. Não juntar diretamente aos fatos.
+  columns:
+  - name: estado
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - confirmado
+          - ambiguo
+          - ausente
+  - name: evidencias_privadas
+    description: Lista privada ordenada de evidências oficiais, com coleta, referência,
+      nome e documento.
+  - name: regra_versao
+    data_tests:
+    - not_null
+- name: int_tse__patrimonio
+  columns:
+  - name: candidatura_id
+    data_tests:
+    - unique
+    - not_null
+  - name: patrimonio
+    description: DECIMAL(38,2) apenas da declaração efetiva. Ausência, valor ilegível ou
+      origem concorrente resultam NULL.
+  - name: patrimonio_observado
+    description: Soma física privada somente de origem única; pode ser incompleta por item
+      ilegível. Auditoria; nunca substitui patrimonio. Múltiplas origens resultam NULL.
+  - name: pessoa_id
+    description: CPF completo com namespace pessoa; exclusivamente privado.
+  - name: cobertura_evolucao
+    description: Motivo privado de pendência ou comparável. Empate de datas exclui todas
+      as declarações empatadas.
+  description: Uma linha privada por candidatura/eleição real. Sem itens não comprova declaração
+    de zero. Origens de bens múltiplas bloqueiam o total mesmo se iguais; itens e multiplicidade
+    são preservados. Pessoa exige CPF válido e nome civil não vazio coerente.
+- name: int_tse__evolucao_patrimonial
+  description: Todos os pares cronológicos de declarações efetivas da mesma pessoa privada
+    coerente, sem janela. Datas empatadas excluídas; base zero tem percentual NULL. Variação
+    declarada não equivale a renda.
+  data_tests:
+  - unique:
+      arguments:
+        column_name: to_json(struct_pack(anterior := candidatura_anterior_id, posterior
+          := candidatura_posterior_id))
+unit_tests:
+- name: cpf_inequivoco
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - &id002
+      candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - &id001
+      id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      parlamentar_id: camara:10
+      metodo: cpf_nome_coerente
+      origem: camara_detalhe
+      estado: confirmado
+- name: homonimos_nao_unem
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: null
+      cpf_candidato_valido: null
+      cpf_candidato_ausencia: nao_informado
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - *id001
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+- name: cpf_ausente_menos4
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: null
+      cpf_candidato_valido: null
+      cpf_candidato_ausencia: sentinela_menos4
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - *id001
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+- name: nome_divergente_pendente
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Outra Pessoa
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+- name: cpf_cadastral_divergente_pendente
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+    - candidatura_id: tse:2:20
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Outra Pessoa
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '2'
+      sq_candidato: '20'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - *id001
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      estado: ambiguo
+    - candidatura_id: tse:2:20
+      estado: ambiguo
+- name: ceap_origem_explicita
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_camara__deputados_detalhe')
+    rows: []
+  - input: ref('stg_camara__ceap')
+    rows:
+    - id_deputado: '10'
+      cpf_parlamentar: 529.982.247-25
+      nome_beneficiario: Pessoa Teste
+      _coleta_id: ceap
+      _competencia: '2020'
+      _linha: 1
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - origem: camara_ceap
+      estado: confirmado
+      parlamentar_id: camara:10
+- name: senado_nome_pendente
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_camara__deputados_detalhe')
+    rows: []
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows:
+    - id_senador: '10'
+      nome_completo: Pessoa Teste
+      _coleta_id: senado
+      data_referencia: '2024-01-01'
+  expect:
+    rows:
+    - parlamentar_id: senado:10
+      estado: ambiguo
+- name: ausencia_evidencia
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_camara__deputados_detalhe')
+    rows: []
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - parlamentar_id: null
+      estado: ausente
+- name: dois_vinculos_oficiais_preservados
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - *id001
+    - id_deputado: '20'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - parlamentar_id: camara:10
+      estado: confirmado
+    - parlamentar_id: camara:20
+      estado: confirmado
+- name: sem_declaracao_nao_zero
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows: []
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      patrimonio: null
+      declaracao_efetiva: false
+      cobertura: sem_declaracao
+- name: cpf_invalido_pendente
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '11111111111'
+      cpf_candidato_valido: false
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+- name: parlamentar_documentos_divergentes
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+    - id_deputado: '10'
+      cpf: '11144477735'
+      nome_civil: Outra Pessoa
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+- name: oficial_nomes_divergentes
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Outra Pessoa
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+    - estado: ambiguo
+- name: zero_explicito_valido
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 0
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: 0
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      pessoa_confirmada: true
+- name: item_ilegivel_misturado
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 0
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '2'
+      vr_bem_candidato: null
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: itens_invalidos
+      quantidade_itens: 2
+- name: sentinela_valor_nao_totaliza
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: -4
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"vr_bem_candidato":"-4"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: itens_invalidos
+- name: origens_multiplas_iguais
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - &id003
+      candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 10
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 10
+      ano_arquivo: 2020
+      versao_id: b
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: origem_ambigua
+      quantidade_origens: 2
+      quantidade_itens: 2
+      patrimonio_observado: null
+- name: origens_multiplas_diferentes
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - *id003
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 20
+      ano_arquivo: 2020
+      versao_id: b
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: origem_ambigua
+      quantidade_origens: 2
+      quantidade_itens: 2
+      patrimonio_observado: null
+- name: origens_layout_distinto
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - *id003
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 10
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2022
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: origem_ambigua
+      quantidade_origens: 2
+      quantidade_itens: 2
+      patrimonio_observado: null
+- name: itens_repetidos_preservados
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - *id003
+    - *id003
+  expect:
+    rows:
+    - patrimonio: 20
+      declaracao_efetiva: true
+      quantidade_itens: 2
+- name: data_bem_incompativel
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2024-10-06'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 10
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: data_incompativel
+- name: origem_bem_incompleta
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - *id002
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 10
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: null
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - patrimonio: null
+      declaracao_efetiva: false
+      cobertura: metadados_incompletos
+- name: nome_vazio_pessoa_pendente
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: ' '
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_tse__bens')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - declaracao_efetiva: true
+      pessoa_confirmada: false
+      pessoa_id: null
+- name: suplementar_outra_origem
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2018-10-07'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+    - candidatura_id: tse:2:20
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2024-04-28'
+      cd_eleicao: '2'
+      sq_candidato: '20'
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2018-10-07'
+      data_eleicao: '2018-10-07'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 10
+      ano_arquivo: 2018
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+    - candidatura_id: tse:2:20
+      cd_eleicao: '2'
+      sq_candidato: '20'
+      dt_eleicao: '2024-04-28'
+      data_eleicao: '2024-04-28'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 25
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      data_eleicao: '2018-10-07'
+      patrimonio: 10
+      declaracao_efetiva: true
+      pessoa_confirmada: true
+    - candidatura_id: tse:2:20
+      data_eleicao: '2024-04-28'
+      patrimonio: 25
+      declaracao_efetiva: true
+      pessoa_confirmada: true
+- name: evolucao_tres_declaracoes_tres_pares
+  model: int_tse__evolucao_patrimonial
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - &id004
+      candidatura_id: tse:1:10
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2018-10-07'
+      patrimonio: 10
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: false
+    - &id005
+      candidatura_id: tse:2:20
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2022-10-02'
+      patrimonio: 25
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: false
+    - &id006
+      candidatura_id: tse:3:30
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2024-04-28'
+      patrimonio: 30
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: false
+  expect:
+    rows:
+    - candidatura_anterior_id: tse:1:10
+      candidatura_posterior_id: tse:2:20
+      variacao_absoluta: 15
+    - candidatura_anterior_id: tse:1:10
+      candidatura_posterior_id: tse:3:30
+      variacao_absoluta: 20
+    - candidatura_anterior_id: tse:2:20
+      candidatura_posterior_id: tse:3:30
+      variacao_absoluta: 5
+- name: evolucao_ausencia_nao_entra
+  model: int_tse__evolucao_patrimonial
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - *id004
+    - candidatura_id: tse:2:20
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2022-10-02'
+      patrimonio: null
+      declaracao_efetiva: false
+      cobertura: sem_declaracao
+      empate_data_evolucao: false
+  expect:
+    rows: []
+- name: evolucao_base_zero
+  model: int_tse__evolucao_patrimonial
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - candidatura_id: tse:1:10
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2018-10-07'
+      patrimonio: 0
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: false
+    - *id005
+  expect:
+    rows:
+    - variacao_absoluta: 25
+      variacao_percentual: null
+      base_zero: true
+- name: evolucao_empate_excluido
+  model: int_tse__evolucao_patrimonial
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - candidatura_id: tse:1:10
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2018-10-07'
+      patrimonio: 10
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: true
+    - candidatura_id: tse:2:20
+      pessoa_id: pessoa:teste
+      pessoa_confirmada: true
+      data_eleicao: '2018-10-07'
+      patrimonio: 25
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: true
+    - *id006
+  expect:
+    rows: []
+- name: evolucao_pessoa_pendente
+  model: int_tse__evolucao_patrimonial
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - candidatura_id: tse:1:10
+      pessoa_id: null
+      pessoa_confirmada: false
+      data_eleicao: '2018-10-07'
+      patrimonio: 10
+      declaracao_efetiva: true
+      cobertura: declaracao_efetiva
+      empate_data_evolucao: false
+    - *id005
+  expect:
+    rows: []
+- name: patrimonio_empate_data_pendente
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+    - candidatura_id: tse:2:20
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '2'
+      sq_candidato: '20'
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 0
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+    - candidatura_id: tse:2:20
+      cd_eleicao: '2'
+      sq_candidato: '20'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 0
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      declaracao_efetiva: true
+      empate_data_evolucao: true
+      cobertura_evolucao: empate_data
+    - candidatura_id: tse:2:20
+      declaracao_efetiva: true
+      empate_data_evolucao: true
+      cobertura_evolucao: empate_data
+- name: patrimonio_nome_divergente_pendente
+  model: int_tse__patrimonio
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+    - candidatura_id: tse:2:20
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Outra Pessoa
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '2'
+      sq_candidato: '20'
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:10
+      cd_eleicao: '1'
+      sq_candidato: '10'
+      dt_eleicao: '2020-11-15'
+      data_eleicao: '2020-11-15'
+      nr_ordem_bem_candidato: '1'
+      vr_bem_candidato: 0
+      ano_arquivo: 2020
+      versao_id: a
+      layout_id: bens-2020
+      linha_original: '{"VR_BEM_CANDIDATO":"10"}'
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      pessoa_confirmada: false
+      pessoa_id: null
+    - candidatura_id: tse:2:20
+      pessoa_confirmada: false
+      pessoa_id: null
+- name: nome_vazio_vinculo_pendente
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: ' '
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - estado: ambiguo
+- name: cpf_duas_candidaturas_coerentes
+  model: int_tse__vinculos_parlamentares
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:10
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '1'
+      sq_candidato: '10'
+    - candidatura_id: tse:2:20
+      cpf_candidato: '52998224725'
+      cpf_candidato_valido: true
+      cpf_candidato_ausencia: null
+      candidatura_elegivel: true
+      nm_candidato: Pessoa Teste
+      data_eleicao: '2020-11-15'
+      cd_eleicao: '2'
+      sq_candidato: '20'
+  - input: ref('stg_camara__deputados_detalhe')
+    rows:
+    - id_deputado: '10'
+      cpf: '52998224725'
+      nome_civil: Pessoa Teste
+      _coleta_id: coleta
+      data_referencia: '2024-01-01'
+  - input: ref('stg_camara__ceap')
+    rows: []
+  - input: ref('stg_senado__senadores')
+    rows: []
+  expect:
+    rows:
+    - candidatura_id: tse:1:10
+      estado: confirmado
+    - candidatura_id: tse:2:20
+      estado: confirmado

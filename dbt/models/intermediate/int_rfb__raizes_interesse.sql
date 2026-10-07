@@ -21,6 +21,11 @@ with origens as (
     select participante_cnpj_raiz, 'licitacao' from {{ ref('int_cgu__licitacao_participantes') }}
     union all
     select {{ cnpj_raiz('documento') }}, 'sancao' from {{ ref('int_cgu__sancoes_eventos') }}
+    union all
+    select {{ cnpj_raiz('fornecedor_cnpj') }}, 'tse_' || tipo_fato
+    from {{ ref('fct_despesa_campanha_pj') }}
+    where tipo_fato in ('contratacao', 'pagamento') and data is not null
+        and valor is not null and valor <> -4
 )
 
 select raiz, list(distinct origem order by origem) as origens

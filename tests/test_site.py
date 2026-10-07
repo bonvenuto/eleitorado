@@ -169,10 +169,16 @@ class DbtFalso:
     def __init__(self, status: str = "sucesso") -> None:
         self.status = status
         self.chamadas: list[tuple[str, list[str]]] = []
+        self.ambientes = []
 
     def __call__(self, diretorio, target, publico, argumentos=()):
+        import os
+
         from coletor.dbt import ResultadoDbt
 
+        self.ambientes.append(
+            (os.environ.get("ELEITORADO_LAGO"), os.environ.get("ELEITORADO_PUBLICO"))
+        )
         self.chamadas.append((target, list(argumentos)))
         return ResultadoDbt(self.status, 0)
 
@@ -198,7 +204,18 @@ def test_comando_site_roda_o_dbt_do_site_e_grava_sem_credenciais(tmp_path):
     codigo, publico = _comando_site(tmp_path, dbt)
     assert codigo == 0
     # os modelos do site rodam aqui, não no dbt build do pipeline (não bloqueiam os marts)
-    assert dbt.chamadas == [("ci", ["--select", "path:models/site", "site_alerta_tipos"])]
+    [(target, argumentos)] = dbt.chamadas
+    assert target == "ci"
+    assert dbt.ambientes == [((tmp_path / "lago").as_posix(), publico.as_posix())]
+    assert argumentos[:3] == ["--select", "path:models/site", "site_alerta_tipos"]
+    variaveis = json.loads(argumentos[argumentos.index("--vars") + 1])
+    assert set(variaveis) == {"tse_contexto", "tse_fontes", "tse_proveniencia", "tse_saida"}
+    assert variaveis["tse_contexto"] == {"selecao_id": None, "entradas_digest": None}
+    saida = Path(variaveis["tse_saida"])
+    assert saida.is_relative_to(tmp_path / "lago/estado/tse/publicacoes/preparadas")
+    assert Path(argumentos[-1]) == saida.parent / "dbt-target"
+    assert not (saida.parent / "recibo.json").exists()
+    assert not (tmp_path / "lago/estado/tse/vigente.json").exists()
     assert _ler(publico, "resumo.json")["esquema"] == 1
 
 
@@ -211,3 +228,49 @@ def test_comando_site_com_dbt_falhando_sai_com_1_sem_gravar(tmp_path):
 def test_comando_site_com_erro_sai_com_1(tmp_path):
     codigo, _ = _comando_site(tmp_path, DbtFalso(), com_banco=False)
     assert codigo == 1
+
+
+def test_site_vigente_passa_vars_integrais_uma_vez_e_restaura_ambiente(tmp_path, monkeypatch):
+    import os
+    from dataclasses import asdict
+
+    from coletor.cli import main
+    from coletor.tse import execucao
+    from tests.test_tse_selecao import montar_vetor
+
+    lago, selecao = montar_vetor(tmp_path)
+    vigente = lago / "estado/tse/vigente.json"
+    vigente.write_text(json.dumps(asdict(selecao)), encoding="utf-8")
+    anterior = vigente.read_bytes()
+    chamadas = []
+    preparar = execucao.preparar_execucao_tse
+
+    def capturar(*args, **kwargs):
+        preparada = preparar(*args, **kwargs)
+        chamadas.append(preparada)
+        return preparada
+
+    monkeypatch.setattr(execucao, "preparar_execucao_tse", capturar)
+    monkeypatch.setattr("coletor.site.gerar_site", lambda *a: 0)
+    monkeypatch.setenv("ELEITORADO_LAGO", "anterior-relativo")
+    monkeypatch.delenv("ELEITORADO_PUBLICO", raising=False)
+    dbt = DbtFalso()
+    publico = tmp_path / "publico"
+    assert (
+        main(
+            ["--target", "ci", "site"],
+            env={"ELEITORADO_LAGO": str(lago), "ELEITORADO_PUBLICO": str(publico)},
+            dbt=dbt,
+            fabrica=lambda c: pytest.fail("site nao monta GCP"),
+        )
+        == 0
+    )
+    [preparada] = chamadas
+    argumentos = dbt.chamadas[0][1]
+    assert json.loads(argumentos[argumentos.index("--vars") + 1]) == preparada.vars_dbt
+    assert preparada.vars_dbt["tse_contexto"]["selecao_id"] == selecao.selecao_id
+    assert dbt.ambientes == [(lago.as_posix(), publico.as_posix())]
+    assert os.environ["ELEITORADO_LAGO"] == "anterior-relativo"
+    assert "ELEITORADO_PUBLICO" not in os.environ
+    assert vigente.read_bytes() == anterior
+    assert not (preparada.saida.parent / "recibo.json").exists()

@@ -1,0 +1,1359 @@
+version: 2
+models:
+- name: int_tse__receitas
+  columns:
+  - name: item_id
+    data_tests:
+    - not_null
+- name: int_tse__contratadas
+  columns:
+  - name: item_id
+    data_tests:
+    - not_null
+- name: int_tse__prestacoes
+  description: 'Gate privado comum: não resolve vigência nem seleciona exportações
+    concorrentes.'
+unit_tests:
+- name: itens_preservados_contratadas
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - &id002
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - &id001
+    input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+    - vr_despesa_contratada: 20
+      item_ocorrencia: 1
+- name: geracao_nao_muda_id_contratadas_a
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: a
+      ano_arquivo: 2024
+  - *id001
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - item_id: 00e3718f5277853728f46ddfba458d6d-1
+- name: geracao_nao_muda_id_contratadas_b
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      dt_geracao: '2025-01-01'
+      hh_geracao: '13:00'
+      _coleta_id: b
+      versao_id: b
+      ano_arquivo: 2022
+  - *id001
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - item_id: 00e3718f5277853728f46ddfba458d6d-1
+- name: prestacao_ambigua_privada_contratadas
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - *id002
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Retificadora
+      data_prestacao: '2024-12-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - *id001
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: true
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - tipo_prestacao: Final
+      fato_elegivel: false
+      prestacao_ambigua: true
+    - tipo_prestacao: Retificadora
+      fato_elegivel: false
+      prestacao_ambigua: true
+- name: itens_preservados_receitas
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - &id004
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - &id003
+    input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+    - vr_receita: 20
+      item_ocorrencia: 1
+- name: geracao_nao_muda_id_receitas_a
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: a
+      ano_arquivo: 2024
+  - *id003
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - item_id: 4a038c128b6ba1b48dacc61c3681b2d0-1
+- name: geracao_nao_muda_id_receitas_b
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      dt_geracao: '2025-01-01'
+      hh_geracao: '13:00'
+      _coleta_id: b
+      versao_id: b
+      ano_arquivo: 2022
+  - *id003
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - item_id: 4a038c128b6ba1b48dacc61c3681b2d0-1
+- name: prestacao_ambigua_privada_receitas
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - *id004
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Retificadora
+      data_prestacao: '2024-12-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - *id003
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: true
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - tipo_prestacao: Final
+      fato_elegivel: false
+      prestacao_ambigua: true
+    - tipo_prestacao: Retificadora
+      fato_elegivel: false
+      prestacao_ambigua: true
+- name: prestacao_unica_multiplos_itens
+  model: int_tse__prestacoes
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - &id005
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - *id005
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - *id005
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id005
+  expect:
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+- name: prestacoes_divergentes_entre_familias
+  model: int_tse__prestacoes
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Parcial
+      data_prestacao: '2024-11-01'
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - *id005
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-12-01'
+      ano_arquivo: 2024
+      versao_id: origem-a
+  expect:
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: true
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: false
+- name: prestacao_completa_e_ausente
+  model: int_tse__prestacoes
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - *id005
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: null
+      data_prestacao: '2024-11-01'
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('stg_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__pagamentos')
+    rows: []
+  expect:
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: true
+      origem_ambigua: false
+      metadados_incompletos: true
+      prestacao_elegivel: false
+- name: origens_distintas_mesma_prestacao
+  model: int_tse__prestacoes
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - *id005
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      ano_arquivo: 2022
+      versao_id: origem-b
+  - input: ref('stg_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__pagamentos')
+    rows: []
+  expect:
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: false
+      prestacao_elegivel: false
+- name: origem_ausente
+  model: int_tse__prestacoes
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - *id005
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      ano_arquivo: 2024
+      versao_id: null
+  - input: ref('stg_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__pagamentos')
+    rows: []
+  expect:
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: true
+      prestacao_elegivel: false
+- name: prestacao_unica_itens_elegiveis_receitas
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+      fato_elegivel: true
+    - vr_receita: 20
+      item_ocorrencia: 1
+      fato_elegivel: true
+- name: duas_origens_preservadas_receitas_iguais
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: a
+      ano_arquivo: 2024
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: outra
+      ano_arquivo: 2022
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+      item_id: 4a038c128b6ba1b48dacc61c3681b2d0-1
+    - vr_receita: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+      item_id: 4a038c128b6ba1b48dacc61c3681b2d0-1
+- name: duas_origens_preservadas_receitas_diferentes
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: a
+      ano_arquivo: 2024
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 20
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: outra
+      ano_arquivo: 2022
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+    - vr_receita: 20
+      item_ocorrencia: 1
+      fato_elegivel: false
+- name: prestacao_unica_itens_elegiveis_contratadas
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+      fato_elegivel: true
+    - vr_despesa_contratada: 20
+      item_ocorrencia: 1
+      fato_elegivel: true
+- name: duas_origens_preservadas_contratadas_iguais
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: a
+      ano_arquivo: 2024
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: outra
+      ano_arquivo: 2022
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+      item_id: 00e3718f5277853728f46ddfba458d6d-1
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+      item_id: 00e3718f5277853728f46ddfba458d6d-1
+- name: duas_origens_preservadas_contratadas_diferentes
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: a
+      ano_arquivo: 2024
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      dt_geracao: '2024-11-02'
+      hh_geracao: '12:00'
+      _coleta_id: a
+      versao_id: outra
+      ano_arquivo: 2022
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+    - vr_despesa_contratada: 20
+      item_ocorrencia: 1
+      fato_elegivel: false
+- name: mapa_contratada_consensual
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      mapa_contratada_elegivel: true
+    - vr_despesa_contratada: 20
+      mapa_contratada_elegivel: true
+- name: mapa_contratada_fornecedores_divergentes
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: B
+      nr_cpf_cnpj_fornecedor_valido: true
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      mapa_contratada_elegivel: false
+    - vr_despesa_contratada: 20
+      mapa_contratada_elegivel: false
+- name: mapa_contratada_fornecedor_ausente
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: null
+      nr_cpf_cnpj_fornecedor_valido: null
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      mapa_contratada_elegivel: false
+    - vr_despesa_contratada: 20
+      mapa_contratada_elegivel: false
+- name: mapa_contratada_candidaturas_divergentes
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:5
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      mapa_contratada_elegivel: false
+    - vr_despesa_contratada: 20
+      mapa_contratada_elegivel: false
+- name: mapa_contratada_candidatura_ausente
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: null
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: true
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      mapa_contratada_elegivel: false
+    - vr_despesa_contratada: 20
+      mapa_contratada_elegivel: false
+- name: ocorrencias_identicas_preservadas_receitas
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - &id006
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - *id006
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+    - vr_receita: 10
+      item_ocorrencia: 2
+- name: fato_chave_ausente_receitas
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: null
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+- name: fato_candidatura_inelegivel_receitas
+  model: int_tse__receitas
+  given:
+  - input: ref('stg_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_receita: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_receita: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: false
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_receita: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+- name: ocorrencias_identicas_preservadas_contratadas
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - &id007
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+    - *id007
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 2
+- name: fato_chave_ausente_contratadas
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: null
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+- name: fato_candidatura_inelegivel_contratadas
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: false
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      item_ocorrencia: 1
+      fato_elegivel: false
+- name: mapa_contratada_fornecedor_invalido
+  model: int_tse__contratadas
+  given:
+  - input: ref('stg_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 10
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: false
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      tp_prestacao_contas: Final
+      dt_prestacao_contas: '2024-11-01'
+      data_eleicao: '2024-10-06'
+      vr_despesa_contratada: 20
+      ano_arquivo: 2024
+      versao_id: origem-a
+      nr_cpf_cnpj_fornecedor: A
+      nr_cpf_cnpj_fornecedor_valido: false
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - cd_eleicao: '1'
+      sq_candidato: '4'
+      candidatura_id: tse:1:4
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - vr_despesa_contratada: 10
+      mapa_contratada_elegivel: false
+    - vr_despesa_contratada: 20
+      mapa_contratada_elegivel: false

@@ -1,0 +1,2513 @@
+version: 2
+unit_tests:
+- name: fornecedor_invalido_ou_campanha_excluido
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - fornecedor_documento: '11222333000180'
+      fornecedor_documento_valido: false
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURIDICA
+    - fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: CANDIDATO
+      sq_candidato_fornecedor: '9'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: pf_nao_publicado_4_identidades
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000019'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000108'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000280'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000361'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+- name: pf_correcao_isolada_4_identidades
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000019'
+      valor: 11
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000108'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000280'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000361'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+- name: pf_nao_publicado_5_identidades
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000019'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000108'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000280'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000361'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000442'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+- name: pf_correcao_isolada_5_identidades
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000019'
+      valor: 11
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000108'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000280'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000361'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000442'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+- name: pf_nao_publicado_6_identidades
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000019'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000108'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000280'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000361'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000442'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000523'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+- name: pf_correcao_isolada_6_identidades
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000019'
+      valor: 11
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000108'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000280'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000361'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000442'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+    - candidatura_id: tse:1:4
+      nr_cpf_cnpj_doador: '10000000523'
+      valor: 10
+      fato_elegivel: true
+      ds_origem_receita: Recursos de partido político
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      data: '2024-10-01'
+      nr_cpf_cnpj_doador_valido: true
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_natureza_receita: FINANCEIRO
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+    - publicavel: false
+      motivo_privado: documento_nao_permitido
+- name: totais_nao_reconstroem_pf
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - candidatura_id: tse:1:4
+      valor: 10
+      nr_cpf_cnpj_doador: '52998224725'
+      fato_elegivel: true
+    - candidatura_id: tse:1:4
+      valor: 100
+      nr_cpf_cnpj_doador: null
+      fato_elegivel: true
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+    - publicavel: false
+- name: fornecedor_pj_declarada_valida
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: fornecedor_cnpj_invalido_mesmo_flag_true
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000180'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_flag_validade_obrigatoria
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: false
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_cpf_valido_nao_e_pj
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '52998224725'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_tipo_desconhecido
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: '#NULO'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_campanha
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      sq_candidato_fornecedor: '99'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_cargo_campanha
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      cd_cargo_fornecedor: '6'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_esfera_partido
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      cd_esfera_part_fornecedor: '1'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_partido
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      nr_partido_fornecedor: '99'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_flag_malformada
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      sq_candidato_fornecedor: texto
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_nome_partido_contraditorio
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      nm_partido_fornecedor: ABC
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_sentinelas_conhecidas
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      sq_candidato_fornecedor: '#NULO'
+      cd_cargo_fornecedor: '#NE'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: fornecedor_fato_inelegivel
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: false
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: consenso_fornecedor_tipo_divergente
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - &id001
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA FÍSICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: consenso_fornecedor_tipo_ausente
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: null
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: consenso_fornecedor_documento_divergente
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '12345678000195'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_cnpj_prestador_excluido
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__receitas')
+    rows:
+    - nr_cnpj_prestador_conta: '11222333000181'
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_doador_partidario_excluido
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__receitas')
+    rows:
+    - nr_cpf_cnpj_doador: '11222333000181'
+      ds_origem_receita: Recursos de partido político
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_fundo_partidario
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: receita_fundo_especial
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '2'
+      ds_fonte_receita: FUNDO ESPECIAL
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: receita_regra_explicita_2022
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2022
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: receita_outros_recursos_partido
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '1'
+      ds_fonte_receita: OUTROS RECURSOS
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_fonte_incoerente
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '2'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_fundo_origem_pf
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10010200'
+      ds_origem_receita: Recursos de pessoas físicas
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_outros_candidatos
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10040000'
+      ds_origem_receita: Recursos de outros candidatos
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_esfera_ausente
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: null
+      ds_esfera_partidaria_doador: Direção Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_esfera_malformada
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: texto
+      ds_esfera_partidaria_doador: Direção Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_cpf_rotulado_partido
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '52998224725'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_candidato_doador
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: '99'
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_valor_ausente
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: null
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_valor_sentinela
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: -4
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_data_ausente
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: null
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_fato_inelegivel
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: false
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_originario_grupo_identificado
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - &id002
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_originario_prestacao_ausente
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - *id002
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_originario_chaves_ausentes
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - *id002
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - {}
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_originario_originario_nao_pf
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - *id002
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tp_doador_originario: PESSOA JURIDICA
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_originario_repeticoes_sem_fanout
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - *id002
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - &id003
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+    - *id003
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_esfera_conflitante
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - *id002
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: '2'
+      ds_esfera_partidaria_doador: Direção Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+    - publicavel: false
+- name: receita_partido_conflitante
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - *id002
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '88'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+    - publicavel: false
+- name: fornecedor_esfera_alfabetica
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      cd_esfera_part_fornecedor: N
+      ds_esfera_part_fornecedor: Nacional
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_esfera_desconhecida
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      cd_esfera_part_fornecedor: X
+      ds_esfera_part_fornecedor: Nacional
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_rotulo_esfera_sem_codigo
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      cd_esfera_part_fornecedor: null
+      ds_esfera_part_fornecedor: Nacional
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: fornecedor_esfera_ausencia_demonstrada
+  model: int_tse__fornecedores_elegiveis
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      fato_elegivel: true
+      ds_tipo_fornecedor: PESSOA JURÍDICA
+      cd_esfera_part_fornecedor: '-1'
+      ds_esfera_part_fornecedor: '#NULO'
+  - input: ref('int_tse__receitas')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: receita_esfera_federal
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: F
+      ds_esfera_partidaria_doador: Federal (Estadual/Distrital)
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: receita_esfera_municipal
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: M
+      ds_esfera_partidaria_doador: Municipal
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: true
+- name: receita_esfera_rotulo_trocado
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Municipal
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_esfera_desconhecida
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: X
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_partido_ausente
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '-1'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows: []
+  expect:
+    rows:
+    - publicavel: false
+- name: receita_originario_ids_ausentes_bloqueiam_datas_diferentes
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-02'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - cd_eleicao: null
+      sq_prestador_contas: null
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: grupo_com_originarios_sem_vinculo_item_demonstrado
+    - publicavel: false
+      motivo_privado: grupo_com_originarios_sem_vinculo_item_demonstrado
+- name: receita_originario_ids_malformados_bloqueiam_datas_diferentes
+  model: int_tse__receitas_publicaveis
+  given:
+  - input: ref('int_tse__receitas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-02'
+      candidatura_id: tse:1:4
+      cd_fonte_receita: '0'
+      ds_fonte_receita: FUNDO PARTIDARIO
+      cd_origem_receita: '10020000'
+      ds_origem_receita: Recursos de partido político
+      nr_cpf_cnpj_doador: '11222333000181'
+      nr_cpf_cnpj_doador_valido: true
+      cd_esfera_partidaria_doador: N
+      ds_esfera_partidaria_doador: Nacional
+      nr_partido_doador: '99'
+      sg_partido_doador: ABC
+      sq_candidato_doador: null
+      cd_cargo_candidato_doador: null
+      ds_natureza_receita: FINANCEIRO
+      fato_elegivel: true
+      candidatura_elegivel: true
+      prestacao_elegivel: true
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      valor: 100
+      data: '2024-10-01'
+      ano_arquivo: 2024
+      nm_partido_doador: PARTIDO ABC
+  - input: ref('int_tse__contratadas')
+    rows: []
+  - input: ref('stg_tse__doador_originario')
+    rows:
+    - cd_eleicao: X
+      sq_prestador_contas: '#NULO'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+  expect:
+    rows:
+    - publicavel: false
+      motivo_privado: grupo_com_originarios_sem_vinculo_item_demonstrado
+    - publicavel: false
+      motivo_privado: grupo_com_originarios_sem_vinculo_item_demonstrado

@@ -1962,3 +1962,188 @@ Toda execução roda os testes do dbt **antes** de publicar; um teste com erro i
 - **Republicação nas fontes:** as fontes reescrevem dados antigos (ex.: a Câmara republicou a CEAP de 2008–2021 em 2026-10-05). O `alerta_fonte_reduzida` registra quando isso diminui o volume.
 - Alertas são **indícios para investigar**, não constatação de irregularidade.
 
+
+## Onda C2 — TSE: contrato de publicação e análise privada
+
+Esta seção descreve o contrato implementado da C2, ainda sujeito aos gates operacionais do
+roteiro. Não informa volumes de produção nem comprova uma carga integral. Os anos aprovados são
+2018, 2020, 2022 e 2024, todos os cargos, com filtro pela data oficial da eleição.
+
+### Fontes, versões e seleção
+
+`fontes/tse.yaml` declara três recursos (`tse.candidaturas`, `tse.bens`, `tse.contas`). Os três ZIPs
+contêm seis famílias nacionais BRASIL: candidaturas, bens, receitas, despesas contratadas,
+pagamentos e doador originário. A codificação é Windows-1252 e o delimitador é ponto e vírgula.
+Os layouts são explícitos por família/ano; cabeçalhos ou membros desconhecidos bloqueiam a
+versão, sem adivinhar um esquema. Cada ZIP e sua transformação são preservados no lago privado.
+
+O grupo exclusivo `tse` tem rechecagem mensal (intervalo existente de 30 dias), com 12 tarefas
+(três recursos × quatro anos). O grupo diário coleta zero TSE. Uma carga inicial de **um ano**
+pode ser solicitada com as três chamadas abaixo; não há expansão oculta para os demais anos:
+
+```powershell
+uv run coletor coletar tse.candidaturas --competencia 2024
+uv run coletor coletar tse.bens --competencia 2024
+uv run coletor coletar tse.contas --competencia 2024
+```
+
+Uma candidata é um JSON `SelecaoTse` com `selecao_id` e o mapa `versoes`: exatamente as 12 chaves
+`tse.<recurso>:<ano>` e IDs de versões validadas. Não basta copiar um ZIP para raw. Descritores,
+hashes e famílias são conferidos; não se escolhe versão pelo nome da pasta, glob, timestamp ou
+latest. Uma rejeição semântica identificada não autoriza fallback para a versão rejeitada.
+
+```powershell
+uv run coletor pipeline --grupo tse --selecao-tse selecao-candidata.json
+uv run coletor publicar --execucao-tse ID_EXATO_IMPRESSO_PELO_PIPELINE
+```
+
+O primeiro comando expõe `execucao_tse=<id>` e só promove com coleta bem-sucedida, build integral
+verde e evidência completa. Preparação, vars, manifest/run_results da mesma invocação real,
+selo, avaliação e recibo ficam privados em `estado/tse/publicacoes/preparadas/<id>/`. Cada
+tentativa recebe novo ID e target-path; execução anterior não é reciclada. Falha operacional,
+interrupção, artefatos incompletos ou entradas alteradas durante o build são inconclusivos.
+Rejeição semântica exige data-test fail identificado e cobertura completa.
+
+O publicador recebe a saída exata `<id>/marts` daquela preparação, exige recibo e aprovação
+persistidos e compara os bytes autorizados. Arquivos de edição são imutáveis, enviados e
+conferidos por GET antes de atualizar `marts/c2/manifesto.json`. Consumidores devem ler o
+manifesto e os caminhos/hashes que ele fixa; não misturar arquivos de duas edições. Falha antes
+do PUT final conserva o manifesto anterior; ACK/GET incerto depois dele exige inspeção.
+Rollback explícito de uma execução antiga aprovada pode repontar a edição pública sem mudar a
+seleção privada vigente, nem apagar a edição posterior. Não há rollback remoto automático.
+
+`publicar` **sem** `--execucao-tse` publica somente legado. Sua preparação TSE serve a docs
+privados e não afirma continuidade com build anterior, promoção ou publicação C2. Pipeline
+legado sem candidata prepara bootstrap privado, ou lê vigente uma vez quando inicializado.
+Marcador sem seleção, seletor inválido ou recuperação pendente bloqueiam. Nenhum desses modos
+escolhe arquivos raw arbitrários. O workflow diário atual não publica C2 automaticamente.
+
+### Cinco marts C2 e allowlist de colunas
+
+Todos são Parquet únicos sob a saída privada preparada, publicados depois sob a edição C2;
+nenhum é gravado em `ELEITORADO_PUBLICO/marts` legado. A allowlist do publicador exige os cinco
+arquivos e seus schemas exatos. Cada mart leva `sem_cpf_completo` e `sem_dados_pessoais`.
+
+| Arquivo | Grão e colunas públicas |
+|---|---|
+| `dim_candidatura.parquet` | Uma candidatura oficial `(cd_eleicao, sq_candidato)`. `candidatura_id`, `cd_eleicao`, `sq_candidato`, `data_eleicao`, `cargo_codigo`, `cargo`, `uf_sigla`, `localidade_codigo`, `localidade`, `nome_publico`, `partido_numero`, `partido_sigla`, `situacao_eleitoral`. Nome de urna consensual e textos sanitizados. Turno é atributo da fonte; não muda a chave. |
+| `fct_receita_campanha_resumo.parquet` | Candidatura × natureza × origem permitidas. `candidatura_id`, `natureza_recurso`, `origem_recurso`, `valor`, `quantidade`. Natureza fechada `financeiro`/`estimavel`; origem fechada `fundo_partidario`/`fundo_especial`. |
+| `fct_despesa_campanha_pj.parquet` | Item publicável com multiplicidade preservada. `despesa_id`, `candidatura_id`, `tipo_fato`, `fornecedor_cnpj`, `data`, `valor`. `tipo_fato` é `contratacao` ou `pagamento`; somar ambos não representa gasto único. ID público deriva somente de projeção pública + ocorrência. |
+| `fct_patrimonio_declarado.parquet` | Candidatura × código de tipo de bem. `candidatura_id`, `tipo_bem_codigo`, `quantidade`, `valor`. Não contém descrição, pessoa, CPF ou identidade de item privado. |
+| `monitor_tse.parquet` | Seleção × família/ano/versão/layout. `selecao_id`, `entradas_id`, `familia`, `ano_arquivo`, `versao_id`, `layout_id`, `rechecado_em`, `prazo_dias`, `cobertura`, `auditoria`. Somente metadados técnicos; sem células ou totalizadores financeiros de PF. |
+
+Valores monetários são `DECIMAL(38,2)`, quantidades inteiras, datas de fatos `DATE`, rechecagem
+`TIMESTAMP`, códigos/IDs/rótulos `VARCHAR`, ano e prazo inteiros. Ausência não é zero. O valor
+patrimonial conhecido de itens completos válidos pode ser zero, inclusive pela soma +10/-10;
+sem declaração, item ilegível/incompleto ou origem ambígua não produz zero público. Evolução
+patrimonial é privada: base zero dá variação percentual NULL e `base_zero=true`.
+
+Receitas PF e origens incertas são totalmente privadas, inclusive com quatro, cinco ou seis
+identidades ou correção isolada entre edições. O mínimo cinco não autoriza publicação. Não há
+total público complementar incluindo contribuições suprimidas. A cobertura pública inicial
+exige pares código/rótulo demonstrados de fundo (0/FUNDO PARTIDARIO ou 2/FUNDO ESPECIAL), origem
+10020000/Recursos de partido político, CNPJ válido, esfera N/Nacional, F/Federal
+(Estadual/Distrital) ou M/Municipal coerente, partido identificado e consenso documental.
+OUTROS RECURSOS, outros candidatos/campanhas, documento ou classificação incertos ficam fora.
+A regra de 2022 usa os mesmos pares por decisão explícita, sem alegar observação completa.
+Qualquer originário no escopo oficial bloqueia receitas do grupo sem vínculo item demonstrado,
+inclusive originário não PF. Chaves incompletas ampliam conservadoramente o bloqueio; ambas
+as chaves ausentes/malformadas bloqueiam o universo. Ausência de originário não prova cobertura
+externa. Não há join financeiro inventado por SQ_RECEITA.
+
+Fornecedor PJ exige rótulo explícito, CNPJ/documento válidos e consenso de candidatura/fornecedor,
+sem sinais de partido/campanha ou documento institucional. Esfera desconhecida não é ausência.
+Isso não comprova natureza cadastral na Receita. Valores/data e todos os gates de candidatura,
+prestação e origem continuam obrigatórios; sentinela -4 não é valor utilizável. Negativos
+legítimos não são proibidos genericamente.
+
+### Monitor estável e atualização vinculada
+
+`tse_contexto={selecao_id, entradas_digest}` é obrigatório, produzido e recalculado pelo
+controlador a partir do vetor e bytes validados. T5 exige a var inteira, não um hash extra
+livre. Bootstrap/CI conhecido vazio recebe NULL tipado; isso nunca é fallback para seleção real
+incompleta. O alias público **`entradas_id` corresponde a `tse_contexto.entradas_digest`**.
+`selecao_id`, `entradas_id` e `versao_id` são hashes técnicos hexadecimais de vetor/entradas/versão,
+não hashes individuais de CPF. A exceção `*_id` do teste LGPD é usada só para essas identidades
+validadas; um hash com 11 dígitos consecutivos é permitido, enquanto CPF em texto real continua
+falhando. `layout_id` é identificador fechado de layout. Não há exclusão genérica de textos.
+
+O monitor liga IDs de coleta DISTINCT dos raw selecionados aos eventos meta, exigindo consenso
+de recurso/competência/hash físico. Rechecagem posterior só conta se tiver o mesmo hash da
+versão selecionada, status de sucesso e vínculo comprovado. Candidata recente com bytes
+diferentes não atualiza a saúde da vigente. Família vazia ou metadados sem vínculo mantêm
+`rechecado_em=NULL`, `cobertura=pendente`; nunca atraso zero inventado. `prazo_dias=30`.
+O consumidor calcula atraso usando `gerado_em` do manifesto e esse instante factual.
+
+O Parquet não contém UUID de execução, relógio de build, própria `edicao_id`, paths locais,
+CPF, descrição livre ou auditoria financeira. A edição é externa no manifesto, evitando hash
+circular. Sem novas entradas/rechecagem factual, mudar apenas execução/relógio não altera seu
+conteúdo lógico. O monitor ordena suas linhas por família/ano/versão/layout. Isso não promete
+bytes Parquet universalmente canônicos entre motores/versões ou para os quatro marts anteriores;
+repetir a mesma edição preparada é garantido pelos bytes/hashes conferidos.
+`auditoria=financeira_privada` informa a fronteira, sem publicar valores retidos,
+removidos ou brutos da auditoria completa de pagamentos.
+
+### Camadas privadas e cruzamentos
+
+- `stg_tse__candidaturas`, `bens`, `receitas`, `contratadas`, `pagamentos`, `doador_originario`
+  tipam os layouts e mantêm `linha_original` JSON com todas as colunas originais antes de casts,
+  inclusive data/hora de geração, além de `ano_arquivo`, `versao_id`, `layout_id` e controle.
+- `int_tse__candidaturas` é cadastro privado único, com variantes/proveniências e conflito.
+  Elegibilidade cadastral não confirma identidade de pessoa física.
+- `int_tse__prestacoes` exige exatamente um par completo tipo/data observado conjuntamente em
+  receitas, contratadas e pagamentos e uma única origem ano/versão. NULL + valor ou duas origens
+  bloqueiam todos os fatos do grupo, preservando linhas; família sem linhas não prova cobertura.
+- `int_tse__receitas` e `int_tse__contratadas` preservam ocorrências e IDs privados separados de
+  fato/item. SQ repetido não autoriza dedupe nem soma de exports.
+- `int_tse__mapa_despesas`, `int_tse__pagamentos` e `int_tse__auditoria_pagamentos` usam mapa único
+  e só colapsam igualdade integral de linha original da mesma parcela oficial. Divergências
+  permanecem privadas. Valor retido na auditoria significa retenção física, não publicabilidade.
+- `int_tse__fornecedores_elegiveis` e `int_tse__receitas_publicaveis` registram classificação,
+  consenso e motivos privados, sem liberar PF/incerto.
+- `int_tse__vinculos_parlamentares` confirma apenas CPF válido + nome normalizado coerente entre
+  candidaturas elegíveis e evidência oficial da Câmara (detalhe/CEAP), com método/proveniência.
+  Senado sem CPF permanece pendente; nome sozinho nunca confirma. Relações/casas distintas não
+  expandem fatos financeiros.
+- `int_tse__patrimonio` e `int_tse__evolucao_patrimonial` separam cobertura de valor e identidade.
+  Múltiplas origens bloqueiam total, mesmo equivalentes. Patrimônio independe da ponte parlamentar;
+  evolução exige pessoa coerente, declarações efetivas e datas distintas, sem janela inventada.
+- `int_tse__cruzamentos` mantém grão fato TSE × origem/fato C1 × relação quando pertinente,
+  `cruzamento_id` privado, candidatura, raiz, IDs de item/versão/layout, datas e valores separados,
+  evidência TSE privada, referência(s) `_coleta_id` C1, qualidade, cobertura e regra. Não agregar
+  valores replicados pelos contextos como novos pagamentos.
+
+No cruzamento privado a data C1 deve ser estritamente posterior ao fato de campanha: anterior
+ou igual é excluída. Cota exige ponte confirmada DISTINCT candidatura/parlamentar antes do join,
+CNPJ válido, `data_emissao_valida` e valor reembolsado conhecido. A base de cota não possui
+`valor_suspeito`; não se inventa teto. Emenda usa somente Pagamento, valor pago conhecido,
+documento válido e elo de autor por nome explicitamente **contextual**, mesmo coincidindo com
+um ID da ponte confirmada. Contrato usa documento válido, valor final conhecido e
+`valor_suspeito=false`; contexto empresarial pode existir sem ponte, com parlamentar NULL e
+`sem_autoria_demonstrada`. Nenhum ramo inventa autoria de contrato.
+
+`versoes_entradas_c1` conserva referências de coleta observadas, não hashes físicos fabricados.
+`snapshot_legado_nao_atomico=true` explicita que os prefixos C1 são mutáveis e não pertencem à
+edição atômica C2. `competencia_receita` é a competência cadastral observada consensual; ausência
+ou conflito resulta em `cobertura_pendente`, nunca empresa inexistente, zero ou irregularidade.
+O cadastro atual não prova situação na data eleitoral. Sem janela/materialidade/autoria aprovadas,
+todos os cruzamentos continuam privados, sem novos alertas públicos.
+
+`int_rfb__raizes_interesse` acrescenta `tse_contratacao` e `tse_pagamento` somente para fatos PJ
+T12 elegíveis com data/valor utilizáveis, independentemente de ponte ou cadastro Receita. Isso
+solicita cobertura futura; não adiciona TSE a `rfb_fatos()` nem ativa os alertas C1 sobre campanhas.
+
+### Investigador, retomada e limites operacionais
+
+O investigador prepara a seleção uma vez e transporta as mesmas vars TSE ao dbt e à marca
+local. Uma seleção nova não deve ser carregada implicitamente por consulta normal. A pendência
+local `preparo-c2-pendente.json` fica fora de raw/meta/estado, sync e fingerprint; é criada antes
+do build e removida somente após sucesso integral e marca nova. Presença bloqueia consultas e
+sessões, inclusive retomar, e força reconstrução por um novo `preparar` bem-sucedido. Não apagar
+manualmente a pendência para contornar o gate. Falha preserva a marca anterior antes do commit;
+isso não promete rollback do DuckDB.
+
+Continuam pendentes: medição integral de parede/memória/disco/spill e orçamento de 120 minutos,
+carga/rechecagem real coordenada após término da Receita, cobertura cadastral utilizável e
+ativação automática. O erro Windows WinError 5 em rename documentado na T4 não foi resolvido
+por estas suites: deve conservar evidência e bloquear inconclusivamente, sem retry inventado.

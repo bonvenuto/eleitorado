@@ -5,6 +5,7 @@ from coletor.competencias import Competencia
 from coletor.manifesto import RecursoCompleto
 from coletor.meta import HistoricoColetas, RegistroColeta, Sucesso
 from tests.amostras import recurso
+from tests.amostras_tse import recurso_tse
 
 HOJE = date(2026, 10, 3)
 
@@ -136,3 +137,33 @@ def test_dias_ate_ontem():
 def test_dias_mais_recentes_primeiro_com_limite():
     tarefas = tarefas_pendentes([_diario(limite=2)], HistoricoColetas(), date(2026, 3, 1))
     assert [t.competencia.rotulo for t in tarefas] == ["2026-02-28", "2026-02-27"]
+
+
+def test_anos_eleitorais_exatos():
+    rc = RecursoCompleto("tse", recurso_tse("candidaturas"))
+    tarefas = tarefas_pendentes([rc], HistoricoColetas(), HOJE)
+    competencias = [t.competencia.rotulo for t in tarefas]
+    assert competencias == ["2018", "2020", "2022", "2024"]
+
+
+def test_rechecagem_mensal():
+    recursos = [RecursoCompleto("tse", recurso_tse(id)) for id in ("candidaturas", "contas")]
+    for dias, esperadas in ((29, []), (30, ["2018", "2020", "2022", "2024"])):
+        historico = HistoricoColetas(
+            {
+                (rc.id, rotulo): _sucesso(HOJE - timedelta(days=dias))
+                for rc in recursos
+                for rotulo in ("2018", "2020", "2022", "2024")
+            }
+        )
+        tarefas = tarefas_pendentes(recursos, historico, HOJE)
+        for rc in recursos:
+            assert [t.competencia.rotulo for t in tarefas if t.recurso.id == rc.id] == esperadas
+
+
+def test_anos_explicitos_dispensam_inicio_na_agenda():
+    dados = recurso_tse("bens").model_dump()
+    dados["competencia"].pop("inicio")
+    rc = RecursoCompleto("tse", recurso(**dados))
+    tarefas = tarefas_pendentes([rc], HistoricoColetas(), HOJE)
+    assert [t.competencia.rotulo for t in tarefas] == ["2018", "2020", "2022", "2024"]

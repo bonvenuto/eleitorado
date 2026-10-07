@@ -29,6 +29,7 @@ def extrair(lago: Path) -> dict[str, dict[str, str]]:
         {
             arquivo.parent.parent.relative_to(lago).as_posix()
             for arquivo in lago.glob("raw/*/*/*/*.parquet")
+            if arquivo.relative_to(lago).parts[1] != "tse"
         }
     )
     esquemas = {}
@@ -44,7 +45,10 @@ def extrair(lago: Path) -> dict[str, dict[str, str]]:
 def gerar(esquemas: dict[str, dict[str, str]]) -> None:
     # o dbt grava as raízes de CNPJ em estado/ e não cria a pasta sozinho
     (PASTA / "estado").mkdir(parents=True, exist_ok=True)
+    (PASTA / "estado/tse/ci/marts").mkdir(parents=True, exist_ok=True)
     for tabela, colunas in esquemas.items():
+        if tabela.startswith("raw/tse/"):
+            continue
         destino = PASTA / tabela / "vazio" / "vazio.parquet"
         if destino.parent.exists():
             shutil.rmtree(destino.parent)

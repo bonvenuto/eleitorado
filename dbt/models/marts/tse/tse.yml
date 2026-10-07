@@ -1,0 +1,103 @@
+version: 2
+models:
+- name: dim_candidatura
+  data_tests:
+  - sem_cpf_completo
+  - sem_dados_pessoais
+  columns:
+  - name: candidatura_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_receita_campanha_resumo
+  data_tests:
+  - sem_cpf_completo
+  - sem_dados_pessoais
+  columns:
+  - name: candidatura_id
+    data_tests:
+    - not_null
+- name: fct_despesa_campanha_pj
+  data_tests:
+  - sem_cpf_completo
+  - sem_dados_pessoais
+  columns:
+  - name: despesa_id
+    data_tests:
+    - not_null
+    - unique
+- name: fct_patrimonio_declarado
+  data_tests:
+  - sem_cpf_completo
+  - sem_dados_pessoais
+  columns:
+  - name: candidatura_id
+    data_tests:
+    - not_null
+- name: monitor_tse
+  description: Metadados técnicos vinculados à seleção; auditoria financeira permanece
+    privada.
+  data_tests:
+  - sem_cpf_completo
+  - sem_dados_pessoais
+unit_tests:
+- name: cpf_em_texto_nao_vaza
+  model: dim_candidatura
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:4
+      candidatura_elegivel: true
+      nm_urna_candidato: Nome 529.982.247-25 e 12345678909
+      cpf_candidato: '52998224725'
+      ds_email: privado@exemplo.invalid
+  expect:
+    rows:
+    - nome_publico: Nome ***.982.247-** e ***.456.789-**
+- name: candidatura_inelegivel_nao_publicada
+  model: dim_candidatura
+  given:
+  - input: ref('int_tse__candidaturas')
+    rows:
+    - candidatura_id: tse:1:4
+      candidatura_elegivel: false
+  expect:
+    rows: []
+- name: patrimonio_incompleto_nao_publicado
+  model: fct_patrimonio_declarado
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - candidatura_id: tse:1:4
+      declaracao_efetiva: false
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:4
+      cd_tipo_bem_candidato: '11'
+      vr_bem_candidato: 10
+    - candidatura_id: tse:1:4
+      cd_tipo_bem_candidato: '11'
+      vr_bem_candidato: -10
+  expect:
+    rows: []
+- name: patrimonio_zero_com_itens_completos
+  model: fct_patrimonio_declarado
+  given:
+  - input: ref('int_tse__patrimonio')
+    rows:
+    - candidatura_id: tse:1:4
+      declaracao_efetiva: true
+  - input: ref('stg_tse__bens')
+    rows:
+    - candidatura_id: tse:1:4
+      cd_tipo_bem_candidato: '11'
+      vr_bem_candidato: 10
+    - candidatura_id: tse:1:4
+      cd_tipo_bem_candidato: '11'
+      vr_bem_candidato: -10
+  expect:
+    rows:
+    - candidatura_id: tse:1:4
+      tipo_bem_codigo: '11'
+      quantidade: 2
+      valor: 0

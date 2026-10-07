@@ -53,7 +53,10 @@ def test_pipeline_deixa_os_modelos_do_site_para_o_coletor_site(respx_mock, deps)
         return ResultadoDbt("sucesso", 0)
 
     _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt)
-    assert argumentos_vistos == [["--exclude", "path:models/site", "site_alerta_tipos"]]
+    [argumentos] = argumentos_vistos
+    assert argumentos[:3] == ["--exclude", "path:models/site", "site_alerta_tipos"]
+    assert argumentos[3] == "--vars"
+    assert argumentos[5] == "--target-path"
 
 
 def test_pipeline_com_dbt_falhando_termina_com_erro(respx_mock, deps, warehouse):
@@ -108,3 +111,98 @@ def test_pipeline_com_falha_de_coleta_e_de_dbt_sai_com_1(respx_mock, deps):
         return ResultadoDbt("falha", 2)
 
     assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
+
+
+def test_pipeline_legado_prepara_bootstrap_privado(deps, tmp_path, monkeypatch):
+    import json
+    from dataclasses import replace
+
+    from coletor import cli
+    from coletor.execucao import ResumoColetas
+
+    deps.config = replace(deps.config, lago=tmp_path / "lago", publico=tmp_path / "publico")
+    monkeypatch.setattr(cli, "rodar", lambda *a: ResumoColetas())
+    chamadas = []
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        chamadas.append(json.loads(argumentos[argumentos.index("--vars") + 1]))
+        return ResultadoDbt("sucesso", 0)
+
+    assert _rodar(["pipeline", "--recursos", "ibge.municipios"], deps, dbt) == 0
+    [variaveis] = chamadas
+    assert set(variaveis["tse_fontes"]) == {
+        "candidaturas",
+        "bens",
+        "receitas",
+        "contratadas",
+        "pagamentos",
+        "doador_originario",
+    }
+    assert variaveis["tse_proveniencia"]
+    assert variaveis["tse_saida"].startswith(
+        (deps.config.lago / "estado/tse/publicacoes/preparadas").as_posix()
+    )
+    assert not (deps.config.lago / "estado/tse/vigente.json").exists()
+
+
+def test_pipeline_marcador_sem_vigente_falha(deps, tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    from coletor import cli
+    from coletor.execucao import ResumoColetas
+
+    deps.config = replace(deps.config, lago=tmp_path / "lago")
+    estado = deps.config.lago / "estado/tse"
+    estado.mkdir(parents=True)
+    (estado / "inicializado.json").write_text("{}")
+    monkeypatch.setattr(cli, "rodar", lambda *a: ResumoColetas())
+
+    def dbt(*a, **kw):
+        raise AssertionError("nao deve executar dbt")
+
+    assert _rodar(["pipeline", "--recursos", "ibge.municipios"], deps, dbt) == 1
+
+
+def test_pipeline_tse_coleta_falha_nao_executa_candidato(deps, tmp_path, monkeypatch):
+    import json
+    from dataclasses import asdict, replace
+
+    from coletor import cli
+    from coletor.execucao import ResumoColetas
+    from tests.test_tse_selecao import montar_vetor
+
+    lago, selecao = montar_vetor(tmp_path)
+    deps.config = replace(deps.config, lago=lago)
+    arquivo = tmp_path / "selecao.json"
+    arquivo.write_text(json.dumps(asdict(selecao)))
+    monkeypatch.setattr(cli, "rodar", lambda *a: ResumoColetas(falhas=1))
+
+    def dbt(*a, **kw):
+        raise AssertionError("coleta falha impede build candidato")
+
+    assert _rodar(["pipeline", "--grupo", "tse", "--selecao-tse", str(arquivo)], deps, dbt) == 1
+    assert not (lago / "estado/tse/vigente.json").exists()
+
+
+def test_pipeline_tse_expoe_execucao_aprovada(deps, tmp_path, monkeypatch, capsys):
+    import json
+    from dataclasses import asdict, replace
+
+    from coletor import cli
+    from coletor.execucao import ResumoColetas
+    from tests.test_tse_pipeline import executor_sintetico
+    from tests.test_tse_selecao import montar_vetor
+
+    lago, selecao = montar_vetor(tmp_path)
+    deps.config = replace(deps.config, lago=lago)
+    arquivo = tmp_path / "selecao.json"
+    arquivo.write_text(json.dumps(asdict(selecao)))
+    monkeypatch.setattr(cli, "rodar", lambda *a: ResumoColetas())
+
+    def dbt(diretorio, **kwargs):
+        return executor_sintetico()(**kwargs)
+
+    assert _rodar(["pipeline", "--grupo", "tse", "--selecao-tse", str(arquivo)], deps, dbt) == 0
+    saida = capsys.readouterr().out
+    assert "execucao_tse=" in saida
+    assert (lago / "estado/tse/vigente.json").exists()

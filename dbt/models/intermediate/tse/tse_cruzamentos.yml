@@ -1,0 +1,358 @@
+version: 2
+models:
+- name: int_tse__cruzamentos
+  description: Contextos privados por fato TSE x origem/fato C1 x relação. Sem alertas
+    nem soma entre fatos.
+  columns:
+  - name: cruzamento_id
+    data_tests:
+    - unique
+    - not_null
+unit_tests:
+- name: data_anterior_nao_cruza
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - &id001
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fato_elegivel: true
+      fornecedor_documento: '11222333000181'
+      valor: 10
+      data: '2024-10-01'
+      item_id: privado
+      ano_arquivo: 2024
+      versao_id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      layout_id: tse:contratadas:2024:v1
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - &id002
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fornecedor_documento: '11222333000181'
+      publicavel: true
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows: []
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows: []
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows: []
+  - input: ref('dim_autor_emenda')
+    rows: []
+  - input: ref('fct_contrato_federal')
+    rows:
+    - contrato_id: antes
+      fornecedor_tipo_documento: CNPJ
+      fornecedor_documento_valido: true
+      fornecedor_cnpj_raiz: '11222333'
+      data_assinatura: '2024-09-30'
+      valor_final: 40
+      valor_suspeito: false
+      _coleta_id: coleta-contrato
+    - contrato_id: igual
+      fornecedor_tipo_documento: CNPJ
+      fornecedor_documento_valido: true
+      fornecedor_cnpj_raiz: '11222333'
+      data_assinatura: '2024-10-01'
+      valor_final: 40
+      valor_suspeito: false
+      _coleta_id: coleta-contrato
+    - &id005
+      contrato_id: c1
+      fornecedor_tipo_documento: CNPJ
+      fornecedor_documento_valido: true
+      fornecedor_cnpj_raiz: '11222333'
+      data_assinatura: '2024-10-02'
+      valor_final: 40
+      valor_suspeito: false
+      _coleta_id: coleta-contrato
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows:
+    - fato_c1_id: c1
+      origem_c1: contrato
+- name: fato_invalido_nao_cruza
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows:
+    - &id003
+      candidatura_id: tse:1:4
+      parlamentar_id: camara:1
+      estado: confirmado
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows:
+    - despesa_id: c1
+      parlamentar_id: camara:1
+      fornecedor_tipo_documento: CNPJ
+      fornecedor_documento_valido: true
+      fornecedor_cnpj_raiz: '11222333'
+      data_emissao: '2024-10-02'
+      data_emissao_valida: false
+      valor_reembolsado: 20
+      _coleta_id: coleta-cota
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows: []
+  - input: ref('dim_autor_emenda')
+    rows: []
+  - input: ref('fct_contrato_federal')
+    rows:
+    - contrato_id: c1
+      fornecedor_tipo_documento: CNPJ
+      fornecedor_documento_valido: true
+      fornecedor_cnpj_raiz: '11222333'
+      data_assinatura: '2024-10-02'
+      valor_final: 40
+      valor_suspeito: true
+      _coleta_id: coleta-contrato
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows: []
+- name: emenda_so_pagamento
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows:
+    - *id003
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows: []
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows:
+    - &id004
+      pagamento_linha_id: c1
+      autor_codigo: autor
+      fase_despesa: Pagamento
+      favorecido_tipo_documento: CNPJ
+      favorecido_documento_valido: true
+      favorecido_cnpj_raiz: '11222333'
+      data_documento: '2024-10-02'
+      valor_pago: 30
+      _coleta_id: coleta-emenda
+    - pagamento_linha_id: empenho
+      autor_codigo: autor
+      fase_despesa: Empenho
+      favorecido_tipo_documento: CNPJ
+      favorecido_documento_valido: true
+      favorecido_cnpj_raiz: '11222333'
+      data_documento: '2024-10-02'
+      valor_pago: 30
+      _coleta_id: coleta-emenda
+    - pagamento_linha_id: liquidacao
+      autor_codigo: autor
+      fase_despesa: Liquidação
+      favorecido_tipo_documento: CNPJ
+      favorecido_documento_valido: true
+      favorecido_cnpj_raiz: '11222333'
+      data_documento: '2024-10-02'
+      valor_pago: 30
+      _coleta_id: coleta-emenda
+  - input: ref('dim_autor_emenda')
+    rows:
+    - autor_codigo: autor
+      parlamentar_id: camara:1
+  - input: ref('fct_contrato_federal')
+    rows: []
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows:
+    - origem_c1: emenda_pagamento
+      fato_c1_id: c1
+      estado_autoria: autoria_contextual_nome
+- name: autoria_contextual
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows:
+    - *id003
+    - *id003
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows: []
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows:
+    - *id004
+  - input: ref('dim_autor_emenda')
+    rows:
+    - autor_codigo: autor
+      parlamentar_id: camara:1
+  - input: ref('fct_contrato_federal')
+    rows: []
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows:
+    - estado_autoria: autoria_contextual_nome
+      parlamentar_id: camara:1
+- name: ponte_distinta_nao_expande_cota
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows:
+    - *id003
+    - *id003
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows:
+    - despesa_id: c1
+      parlamentar_id: camara:1
+      fornecedor_tipo_documento: CNPJ
+      fornecedor_documento_valido: true
+      fornecedor_cnpj_raiz: '11222333'
+      data_emissao: '2024-10-02'
+      data_emissao_valida: true
+      valor_reembolsado: 20
+      _coleta_id: coleta-cota
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows: []
+  - input: ref('dim_autor_emenda')
+    rows: []
+  - input: ref('fct_contrato_federal')
+    rows: []
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows:
+    - origem_c1: cota
+      valor_tse: 10
+      valor_c1: 20
+- name: receita_ausente_cobertura_pendente
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows: []
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows: []
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows: []
+  - input: ref('dim_autor_emenda')
+    rows: []
+  - input: ref('fct_contrato_federal')
+    rows:
+    - *id005
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows:
+    - cobertura_receita: cobertura_pendente
+      competencia_receita: null
+      snapshot_legado_nao_atomico: true
+- name: contrato_sem_ponte_sem_autoria
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows: []
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows: []
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows: []
+  - input: ref('dim_autor_emenda')
+    rows: []
+  - input: ref('fct_contrato_federal')
+    rows:
+    - *id005
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows:
+    - origem_c1: contrato
+      parlamentar_id: null
+      estado_autoria: sem_autoria_demonstrada
+- name: fato_tse_inelegivel_nao_cruza
+  model: int_tse__cruzamentos
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      fato_elegivel: false
+      fornecedor_documento: '11222333000181'
+      valor: 10
+      data: '2024-10-01'
+      item_id: privado
+      ano_arquivo: 2024
+      versao_id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      layout_id: tse:contratadas:2024:v1
+  - input: ref('int_tse__pagamentos')
+    rows: []
+  - input: ref('int_tse__fornecedores_elegiveis')
+    rows:
+    - *id002
+  - input: ref('int_tse__vinculos_parlamentares')
+    rows: []
+  - input: ref('fct_despesa_cota_parlamentar')
+    rows: []
+  - input: ref('int_cgu__emendas_pagamentos')
+    rows: []
+  - input: ref('dim_autor_emenda')
+    rows: []
+  - input: ref('fct_contrato_federal')
+    rows:
+    - *id005
+  - input: ref('int_rfb__empresas')
+    rows: []
+  expect:
+    rows: []

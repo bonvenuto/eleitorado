@@ -10,5 +10,7 @@ select
     iniciada_em,
     finalizada_em,
     linhas,
+    sha256_arquivo,
+    sha256_conteudo,
     esquema_alterado
 from {{ source('meta', 'coletas') }}

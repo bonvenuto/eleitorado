@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from coletor.cli import main
+from coletor.dbt import ResultadoDbt
 from tests.amostras import CEAP_CSV, CNEP_CSV, PAGINA_CGU, RAIZ, zip_com
 
 PAGINA = "https://portaldatransparencia.gov.br/download-de-dados/cnep"
@@ -30,7 +31,7 @@ def test_executar_coleta_o_recurso_pedido_e_registra_tudo(respx_mock, deps, ware
         1,
         "manual",
     )
-    assert len(warehouse.linhas["meta/fontes"]) == 27
+    assert len(warehouse.linhas["meta/fontes"]) == 30
     assert "meta/coletas" in warehouse.tabelas
 
 
@@ -114,3 +115,109 @@ def test_executar_sem_recursos_so_coleta_o_grupo_pedido(deps, warehouse, monkeyp
     assert set(pedidas[0]) == {"diario"}
     assert set(pedidas[1]) == {"receita"}
     assert len(pedidas[1]) == 10
+
+
+def test_bootstrap_tse_tres_chamadas_somente_um_ano(deps, monkeypatch):
+    from coletor import cli
+
+    chamadas = []
+
+    def rodar(tarefas, *a, **kw):
+        chamadas.extend(tarefas)
+        return 0
+
+    monkeypatch.setattr(cli, "_rodar_tarefas", rodar)
+    for recurso in ("candidaturas", "bens", "contas"):
+        assert _rodar(["coletar", f"tse.{recurso}", "--competencia", "2024"], deps) == 0
+    assert len(chamadas) == 3
+    assert {t.competencia.rotulo for t in chamadas} == {"2024"}
+    assert sum(len(t.recurso.recurso.familias) for t in chamadas) == 6
+
+
+def test_publicar_sem_flag_tse_somente_legado(deps, tmp_path, monkeypatch):
+    import json
+    from dataclasses import asdict, replace
+
+    from coletor import cli, publicacao
+    from coletor.tse import publicacao as c2
+    from tests.test_tse_selecao import montar_vetor
+
+    lago, selecao = montar_vetor(tmp_path)
+    (lago / "estado/tse/vigente.json").write_text(json.dumps(asdict(selecao)))
+    deps.config = replace(deps.config, lago=lago, publico=tmp_path / "publico")
+    vistos = []
+
+    def docs(d, t, p, argumentos=()):
+        variaveis = json.loads(argumentos[argumentos.index("--vars") + 1])
+        assert variaveis["tse_saida"].startswith(lago.as_posix())
+        vistos.append("docs")
+        return True
+
+    monkeypatch.setattr(cli, "gerar_linhagem", docs)
+    monkeypatch.setattr(publicacao, "R2Publicador", lambda *a: object())
+    monkeypatch.setattr(publicacao, "publicar", lambda *a: vistos.append("legado"))
+    monkeypatch.setattr(c2, "publicar_tse", lambda *a: pytest.fail("C2 sem flag"))
+    env = {**ENV, **dict.fromkeys(["R2_CONTA", "R2_CHAVE_ID", "R2_SEGREDO", "R2_BUCKET"], "teste")}
+    assert (
+        main(["--fontes", str(RAIZ / "fontes"), "publicar"], fabrica=lambda c: deps, env=env) == 0
+    )
+    assert vistos == ["docs", "legado"]
+
+
+def test_publicar_execucao_explicita_mesmas_vars_e_saida(deps, tmp_path, monkeypatch):
+    import json
+    from dataclasses import replace
+
+    from coletor import cli, publicacao
+    from coletor.tse import publicacao as c2
+    from tests.test_tse_publicacao import candidata
+    from tests.test_tse_selecao import montar_vetor
+
+    lago, selecao = montar_vetor(tmp_path)
+    preparada, selecao, recibo = candidata(lago, selecao, "explicita")
+    deps.config = replace(deps.config, lago=lago, publico=tmp_path / "publico")
+    prep = json.loads((preparada.parent / "preparacao.json").read_bytes())
+    monkeypatch.setattr("coletor.site.gerar_site", lambda *a: 0)
+    assert (
+        main(
+            ["--target", "ci", "site"],
+            env={"ELEITORADO_LAGO": str(lago), "ELEITORADO_PUBLICO": str(deps.config.publico)},
+            dbt=lambda *a: ResultadoDbt("sucesso", 0),
+        )
+        == 0
+    )
+    assert json.loads((preparada.parent / "preparacao.json").read_bytes()) == prep
+    vistos = []
+
+    def docs(d, t, p, argumentos=()):
+        assert t == prep["target"]
+        assert json.loads(argumentos[argumentos.index("--vars") + 1]) == prep["vars"]
+        vistos.append("docs")
+        return True
+
+    def publicar_c2(pub, pasta, sel, agora, versao, rec):
+        assert pasta == preparada and sel == selecao and rec == recibo
+        vistos.append("C2")
+
+    monkeypatch.setattr(cli, "gerar_linhagem", docs)
+    monkeypatch.setattr(publicacao, "R2Publicador", lambda *a: object())
+    monkeypatch.setattr(publicacao, "publicar", lambda *a: vistos.append("legado"))
+    monkeypatch.setattr(c2, "publicar_tse", publicar_c2)
+    env = {**ENV, **dict.fromkeys(["R2_CONTA", "R2_CHAVE_ID", "R2_SEGREDO", "R2_BUCKET"], "teste")}
+    assert (
+        main(
+            [
+                "--fontes",
+                str(RAIZ / "fontes"),
+                "--target",
+                "ci",
+                "publicar",
+                "--execucao-tse",
+                "explicita",
+            ],
+            fabrica=lambda c: deps,
+            env=env,
+        )
+        == 0
+    )
+    assert vistos == ["docs", "legado", "C2"]

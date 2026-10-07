@@ -88,17 +88,20 @@ def test_reconstruir_usa_o_ultimo_original_de_cada_data_e_refaz_os_historicos(
     assert _rodar(["reconstruir"], deps_lago, dbt) == 0
 
     assert dbt.datas_no_replay == ["20261001", "20261002"]  # o original corrompido foi ignorado
-    assert dbt.chamadas == [
-        [
-            "--full-refresh",
-            "--vars",
-            "{fonte_historico: replay}",
-            "--select",
-            "+int_cgu__sancoes_eventos+",
-            "+int_parlamentares__eventos+",
-        ],
-        ["--select", "staging"],
+    import json
+
+    primeira, segunda = dbt.chamadas
+    assert primeira[:2] == ["--full-refresh", "--vars"]
+    variaveis = json.loads(primeira[2])
+    assert variaveis.pop("fonte_historico") == "replay"
+    assert primeira[3:] == [
+        "--select",
+        "+int_cgu__sancoes_eventos+",
+        "+int_parlamentares__eventos+",
     ]
+    assert segunda[:3] == ["--select", "staging", "--vars"]
+    assert json.loads(segunda[3]) == variaveis
+    assert variaveis["tse_fontes"] and variaveis["tse_proveniencia"]
     assert not (deps_lago.config.lago / "replay").exists()
     registros = deps_lago.warehouse.consultar(
         "select status, destino, competencia from coletas order by competencia"
@@ -186,3 +189,38 @@ def test_pipeline_cria_fontes_vazias_antes_do_dbt(deps_lago, respx_mock):
     respx_mock.route().mock(return_value=httpx.Response(503))  # nenhuma fonte responde
     _rodar(["pipeline", "--recursos", "ibge.municipios"], deps_lago, dbt)
     assert vistos == [True]
+
+
+def test_reconstruir_fixa_tse_uma_vez_e_preserva_replay(deps_lago, armazenamento, tmp_path):
+    import json
+
+    _original(
+        armazenamento,
+        tmp_path,
+        "dev/originais/cgu/cnep/competencia=2026-10-01/20261001T100000_a.zip",
+        _cnep("20261001"),
+    )
+    chamadas = []
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        variaveis = json.loads(argumentos[argumentos.index("--vars") + 1])
+        chamadas.append(variaveis)
+        if len(chamadas) == 1:
+            (deps_lago.config.lago / "estado/tse/vigente.json").write_bytes(
+                b"mudou depois do preparo"
+            )
+        return ResultadoDbt("sucesso", 0)
+
+    assert _rodar(["reconstruir"], deps_lago, dbt) == 0
+    assert chamadas[0]["fonte_historico"] == "replay"
+    assert {k: v for k, v in chamadas[0].items() if k != "fonte_historico"} == chamadas[1]
+    assert (
+        len(
+            list(
+                (deps_lago.config.lago / "estado/tse/publicacoes/preparadas").glob(
+                    "*/preparacao.json"
+                )
+            )
+        )
+        == 1
+    )

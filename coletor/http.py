@@ -23,7 +23,7 @@ USER_AGENT = "eleitorado-coletor/0.1"
 # Fontes oficiais: toda requisição (inclusive o destino de um redirecionamento ou o link "next"
 # de uma API) precisa ir para um destes domínios, o que impede a coleta de ser desviada para
 # outro host.
-SUFIXOS_OFICIAIS = (".gov.br", ".leg.br")
+SUFIXOS_OFICIAIS = (".gov.br", ".leg.br", ".tse.jus.br")
 
 
 def host_permitido(host: str, sufixos: tuple[str, ...]) -> bool:

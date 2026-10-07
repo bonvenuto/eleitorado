@@ -35,6 +35,9 @@ def test_manifesto_do_repositorio_tem_os_sete_recursos_da_onda_a():
         "rfb.socios",
         "senado.ceaps",
         "senado.senadores",
+        "tse.bens",
+        "tse.candidaturas",
+        "tse.contas",
     ]
 
 

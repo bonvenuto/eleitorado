@@ -117,6 +117,10 @@ def coletar(
     execucao_id: str,
     forcar: bool = False,
 ) -> RegistroColeta:
+    if recurso.recurso.adaptador == "tse_zip":
+        from coletor.tse.coleta import coletar_tse
+
+        return coletar_tse(recurso, competencia, historico, deps, execucao_id, forcar)
     inicio = deps.agora()
     hoje = data_brasilia(inicio)
     registro = RegistroColeta.novo(

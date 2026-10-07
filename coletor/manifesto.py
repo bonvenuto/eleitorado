@@ -20,11 +20,17 @@ class _Modelo(BaseModel):
 class RegraCompetencia(_Modelo):
     tipo: Literal["ano", "mes", "dia", "data_arquivo", "data_coleta"]
     inicio: int | None = None
+    anos: list[int] | None = None
     fim: str | None = None  # AAAA-MM, só para tipo "mes": última competência de série encerrada
     pagina: str | None = None
 
     @model_validator(mode="after")
     def _fim(self) -> RegraCompetencia:
+        if self.anos is not None:
+            if self.tipo != "ano":
+                raise ValueError("competencia.anos só vale para tipo 'ano'")
+            if not self.anos or len(self.anos) != len(set(self.anos)):
+                raise ValueError("competencia.anos exige valores únicos e não vazios")
         if self.fim is not None:
             if self.tipo != "mes":
                 raise ValueError("competencia.fim só vale para tipo 'mes'")
@@ -66,7 +72,7 @@ class Recurso(_Modelo):
     descricao: str
     fonte_oficial: str
     condicoes_uso: str
-    adaptador: Literal["arquivo", "api_json", "webdav_zip", "api_detalhe"]
+    adaptador: Literal["arquivo", "api_json", "webdav_zip", "api_detalhe", "tse_zip"]
     url: str
     url_detalhe: str | None = None  # api_detalhe: URL de cada registro, com `{id}`
     parametros: dict[str, str | int] = {}
@@ -84,16 +90,20 @@ class Recurso(_Modelo):
     limite_por_execucao: int | None = None  # competências por execução (carga histórica parcelada)
     acesso: Literal["publico"] = "publico"
     # "receita": coletado pelo workflow mensal da Receita, fora do pipeline diário
-    grupo: Literal["diario", "receita"] = "diario"
+    grupo: Literal["diario", "receita", "tse"] = "diario"
     recorte: Recorte | None = None
+    familias: dict[str, str] | None = None
 
     @model_validator(mode="after")
     def _coerente(self) -> Recurso:
         regra = self.competencia
         if self.publicacao == "por_competencia":
-            if regra.tipo not in ("ano", "mes", "dia") or regra.inicio is None:
+            if regra.tipo not in ("ano", "mes", "dia") or (
+                regra.inicio is None and regra.anos is None
+            ):
                 raise ValueError(
-                    "por_competencia exige competencia.tipo 'ano', 'mes' ou 'dia' com 'inicio'"
+                    "por_competencia exige competencia.tipo 'ano', 'mes' ou 'dia' "
+                    "com 'inicio' ou 'anos'"
                 )
             if self.cadencia.anteriores is None:
                 raise ValueError("por_competencia exige cadencia.anteriores")
@@ -117,6 +127,13 @@ class Recurso(_Modelo):
                 raise ValueError("adaptador 'webdav_zip' exige competencia.tipo 'data_arquivo'")
         elif self.recorte is not None:
             raise ValueError("recorte só vale para o adaptador 'webdav_zip'")
+        if self.adaptador == "tse_zip":
+            if not self.familias:
+                raise ValueError("adaptador 'tse_zip' exige familias não vazio")
+            if self.formato.tipo != "csv" or self.formato.compressao != "zip":
+                raise ValueError("adaptador 'tse_zip' exige formato csv com compressao zip")
+        elif self.familias is not None:
+            raise ValueError("familias só vale para o adaptador 'tse_zip'")
         return self
 
 

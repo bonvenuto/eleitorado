@@ -25,7 +25,9 @@ def gerar_vazio(destino: Path, colunas: dict[str, str]) -> None:
     conexao = duckdb.connect()
     try:
         conexao.execute(f"create table vazia ({definicao})")
-        conexao.execute(f"copy vazia to '{destino.as_posix()}' (format parquet)")
+        conexao.execute(
+            f"copy vazia to '{destino.as_posix().replace(chr(39), chr(39) * 2)}' (format parquet)"
+        )
     finally:
         conexao.close()
 
@@ -36,6 +38,8 @@ def garantir_fontes(lago: Path, esquemas: dict[str, dict[str, str]]) -> list[str
     """
     criadas = []
     for tabela, colunas in esquemas.items():
+        if tabela.startswith("raw/tse/"):
+            continue  # TSE exige arquivos enumerados pelo preparo; nunca placeholder raw.
         pasta = lago / tabela
         if any(pasta.glob("*/*.parquet")):
             continue

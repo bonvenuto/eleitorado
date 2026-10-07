@@ -1,15 +1,19 @@
 """PREPARAR: cópia local do lago de produção, dbt no target `agente` e o contexto do agente.
 
 Repete a sequência do pipeline sem a coleta: `coletor estado restaurar` (baixa o que mudou no
-bucket e importa os históricos para o banco) e `dbt build`. O dbt só roda quando o lago mudou.
+bucket e importa os históricos para o banco) e `dbt build`. O cache C2 valida dados, regras,
+saída íntegra e ausência de tentativa pendente antes de reutilizar o banco.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import tempfile
 import threading
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,10 +22,17 @@ from pathlib import Path
 import duckdb
 
 from agente.caderno import Caderno, Caso, ConsultaChave, mudou
-from agente.config import ConfigAgente
+from agente.config import ConfigAgente, preparo_c2_pendente, saida_tse_permitida
 from agente.consulta import ErroConsulta, abrir, executar
 from agente.diario import Diario
 from coletor.esquemas import ARQUIVO_ESQUEMAS, carregar_esquemas, garantir_fontes
+from coletor.hashes import json_canonico, sha256_arquivo
+from coletor.tse.durabilidade import sincronizar_pasta
+from coletor.tse.estado import validar_estado_tse
+from coletor.tse.evidencias import inventario_saida
+from coletor.tse.execucao import preparar_execucao_tse
+from coletor.tse.modelos import SelecaoTse
+from coletor.tse.selecao import digest_entradas, digest_selecao
 
 Rodar = Callable[[list[str], Mapping[str, str], Path], int]
 SCHEMAS = ("marts", "intermediate", "staging")
@@ -70,16 +81,26 @@ def ambiente(config: ConfigAgente, base: Mapping[str, str]) -> dict[str, str]:
 
 
 def impressao_lago(lago: Path) -> str:
-    """Impressão digital do lago (caminho e tamanho de cada arquivo): muda quando algo baixa."""
+    """Legado por caminho/tamanho, C2 por conteúdo selecionado, sem artefatos derivados."""
     resumo = hashlib.sha256()
     for pasta in PASTAS_LAGO:
         raiz = lago / pasta
         if not raiz.exists():
             continue
         for arquivo in sorted(p for p in raiz.rglob("*") if p.is_file()):
+            relativo = arquivo.relative_to(lago).as_posix()
+            if relativo.startswith(("raw/tse/", "meta/tse/", "estado/tse/")):
+                continue
             resumo.update(
                 f"{arquivo.relative_to(lago).as_posix()}|{arquivo.stat().st_size}\n".encode()
             )
+    vigente = lago / "estado/tse/vigente.json"
+    if vigente.exists():
+        selecao = SelecaoTse(**json.loads(vigente.read_bytes()))
+        resumo.update(digest_selecao(selecao).encode())
+        resumo.update(digest_entradas(lago, selecao).encode())
+    else:
+        resumo.update(b"tse:bootstrap")
     return resumo.hexdigest()[:16]
 
 
@@ -119,9 +140,13 @@ def _contar(conexao: duckdb.DuckDBPyConnection, tabela: str, segundos: float) ->
         temporizador.cancel()
 
 
-def gerar_contexto(config: ConfigAgente, segundos_contagem: float = 10) -> str:
+def gerar_contexto(
+    config: ConfigAgente, segundos_contagem: float = 10, *, diretorios: list[Path] | None = None
+) -> str:
     """contexto.md: tabelas de marts, intermediate e staging com colunas, tipos e linhas."""
-    conexao = abrir(config.banco, config.diretorios_permitidos())
+    conexao = abrir(
+        config.banco, diretorios if diretorios is not None else config.diretorios_permitidos()
+    )
     try:
         colunas: dict[tuple[str, str], list[str]] = {}
         for schema, tabela, coluna, tipo in conexao.sql(
@@ -185,7 +210,9 @@ def medir(conexao: duckdb.DuckDBPyConnection, sql: str, diario: Diario) -> Consu
     return ConsultaChave(sql=sql, linhas=tabela.num_rows, soma=_somar(tabela))
 
 
-def revisar_caderno(config: ConfigAgente, caderno: Caderno) -> list[Caso]:
+def revisar_caderno(
+    config: ConfigAgente, caderno: Caderno, *, diretorios: list[Path] | None = None
+) -> list[Caso]:
     """Casos confirmados ou descartados cujas consultas-chave mudaram desde o registro."""
     candidatos = [
         caso
@@ -195,7 +222,9 @@ def revisar_caderno(config: ConfigAgente, caderno: Caderno) -> list[Caso]:
     if not candidatos:
         return []
     diario = Diario(config.lago / "revisao")
-    conexao = abrir(config.banco, config.diretorios_permitidos())
+    conexao = abrir(
+        config.banco, diretorios if diretorios is not None else config.diretorios_permitidos()
+    )
     revisar = []
     try:
         for caso in candidatos:
@@ -213,6 +242,79 @@ def revisar_caderno(config: ConfigAgente, caderno: Caderno) -> list[Caso]:
     return revisar
 
 
+# Escopo explícito C2: SQL/YAML TSE e macros próprias/compartilhadas usadas.
+# Não promete detectar alterações de todo código/modelo legado.
+REGRAS_C2 = (
+    "dbt/macros/tse.sql",
+    "dbt/macros/documentos.sql",
+    "dbt/macros/conversoes.sql",
+    "dbt/macros/generate_schema_name.sql",
+    "dbt/tests/generic/sem_cpf_completo.sql",
+    "dbt/tests/generic/sem_dados_pessoais.sql",
+    # O monitor T16 depende dos hashes oficiais projetados neste staging compartilhado.
+    "dbt/models/staging/stg_meta__coletas.sql",
+    "dbt/models/staging/tse",
+    "dbt/models/intermediate/tse",
+    "dbt/models/marts/tse",
+)
+
+
+def _regras_c2(raiz: Path) -> str:
+    resumo = hashlib.sha256()
+    for relativo in REGRAS_C2:
+        caminho = raiz / relativo
+        arquivos = (
+            sorted(p for p in caminho.rglob("*") if p.suffix in (".sql", ".yml", ".yaml"))
+            if caminho.is_dir()
+            else [caminho]
+        )
+        for arquivo in arquivos:
+            resumo.update(arquivo.relative_to(raiz).as_posix().encode())
+            resumo.update(arquivo.read_bytes() if arquivo.is_file() else b"ausente")
+    return resumo.hexdigest()
+
+
+def _cache_tse(config: ConfigAgente, anterior: dict, impressao: str, regras: str) -> bool:
+    if (
+        preparo_c2_pendente(config.lago)
+        or anterior.get("impressao") != impressao
+        or anterior.get("regras_c2") != regras
+        or anterior.get("dbt") != "sucesso"
+        or not config.banco.exists()
+    ):
+        return False
+    try:
+        tse = anterior["tse"]
+        saida = saida_tse_permitida(config.lago, tse["execucao_id"], tse["saida"])
+        preparacao = saida.parent / "preparacao.json"
+        if preparacao.is_symlink() or preparacao.is_junction():
+            return False
+        dados = json.loads(preparacao.read_bytes())
+        return (
+            sha256_arquivo(preparacao) == tse["preparacao_sha256"]
+            and dados["vars"] == tse["vars"]
+            and dados["target"] == "agente"
+            and inventario_saida(saida) == tse["inventario"]
+        )
+    except (KeyError, ValueError, OSError, TypeError):
+        return False
+
+
+def _gravar_marca(marca: Path, dados: dict) -> None:
+    temporario = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=marca.parent, delete=False) as arquivo:
+            temporario = Path(arquivo.name)
+            arquivo.write(json_canonico(dados).encode("utf8"))
+            arquivo.flush()
+            os.fsync(arquivo.fileno())
+        os.replace(temporario, marca)
+        sincronizar_pasta(marca.parent)
+    finally:
+        if temporario is not None:
+            temporario.unlink(missing_ok=True)
+
+
 def preparar(
     config: ConfigAgente,
     base: Mapping[str, str],
@@ -224,35 +326,97 @@ def preparar(
     # da raiz do repositório: o coletor e o dbt usam caminhos relativos (fontes/, dbt/)
     if rodar(restaurar, env, config.raiz) != 0:
         raise ErroPreparo("coletor estado restaurar falhou (credenciais do GCS no .env?)")
-    # fonte nova ainda sem coleta (a Receita, antes do primeiro workflow mensal): Parquet vazio
-    # com o esquema, como no pipeline, para o dbt não falhar
-    esquemas = config.raiz / "dbt" / ARQUIVO_ESQUEMAS
-    if esquemas.exists():
-        garantir_fontes(config.lago, carregar_esquemas(config.raiz / "dbt"))
-    impressao = impressao_lago(config.lago)
-    marca = config.lago / "preparo.json"
-    anterior = json.loads(marca.read_text(encoding="utf-8")) if marca.exists() else {}
-    dbt_rodou = False
-    if anterior.get("impressao") != impressao or not config.banco.exists():
-        (config.publico / "marts").mkdir(parents=True, exist_ok=True)
-        dbt = [
-            "uv", "run", "dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt",
-            "--target", "agente", "--exclude-resource-type", "unit_test",
-        ]  # fmt: skip
-        codigo = rodar(dbt, env, config.raiz)
-        if not config.banco.exists():
-            raise ErroPreparo("dbt build não gerou o banco do agente")
-        corrigir_particoes(config.banco)
-        dbt_rodou = True
-        anterior = {
-            "impressao": impressao,
-            "dbt": "sucesso" if codigo == 0 else "com falhas",
-            "preparado_em": agora().isoformat(timespec="seconds"),
-        }
-        marca.write_text(json.dumps(anterior), encoding="utf-8")
-    config.investigacoes.mkdir(parents=True, exist_ok=True)
-    (config.investigacoes / "contexto.md").write_text(gerar_contexto(config), encoding="utf-8")
-    revisar = revisar_caderno(config, Caderno(config.caderno))
+    try:
+        # A causalidade restaurada é obrigatória ANTES de qualquer cache/preparação.
+        validar_estado_tse(config.lago)
+        vigente = config.lago / "estado/tse/vigente.json"
+        selecao = SelecaoTse(**json.loads(vigente.read_bytes())) if vigente.exists() else None
+        esquemas = config.raiz / "dbt" / ARQUIVO_ESQUEMAS
+        if esquemas.exists():
+            garantir_fontes(config.lago, carregar_esquemas(config.raiz / "dbt"))
+        impressao = impressao_lago(config.lago)
+        regras = _regras_c2(config.raiz)
+        marca = config.lago / "preparo.json"
+        anterior = json.loads(marca.read_bytes()) if marca.exists() else {}
+        dbt_rodou = False
+        if not _cache_tse(config, anterior, impressao, regras):
+            execucao_id = "agente-" + uuid.uuid4().hex
+            # Persiste antes de alterar banco; não é estado sincronizado nem entrada do cache.
+            _gravar_marca(
+                config.lago / "preparo-c2-pendente.json",
+                {
+                    "execucao_id": execucao_id,
+                    "impressao": impressao,
+                    "regras_c2": regras,
+                },
+            )
+            saida_tse_permitida(config.lago, execucao_id)
+            execucao = preparar_execucao_tse(config.lago, execucao_id, "agente", selecao)
+            (config.publico / "marts").mkdir(parents=True, exist_ok=True)
+            dbt = [
+                "uv",
+                "run",
+                "dbt",
+                "build",
+                "--project-dir",
+                "dbt",
+                "--profiles-dir",
+                "dbt",
+                "--target",
+                "agente",
+                "--exclude-resource-type",
+                "unit_test",
+                "--vars",
+                json_canonico(execucao.vars_dbt),
+                "--target-path",
+                str(execucao.saida.parent / "dbt-target"),
+            ]
+            if rodar(dbt, env, config.raiz) != 0:
+                raise ErroPreparo("dbt build falhou; investigação C2 bloqueada")
+            if not config.banco.exists():
+                raise ErroPreparo("dbt build não gerou o banco do agente")
+            inventario = inventario_saida(execucao.saida)
+            validar_estado_tse(config.lago)
+            if impressao_lago(config.lago) != impressao or _regras_c2(config.raiz) != regras:
+                raise ErroPreparo("entradas ou regras C2 mudaram durante dbt build")
+            corrigir_particoes(config.banco)
+            anterior = {
+                "impressao": impressao,
+                "regras_c2": regras,
+                "dbt": "sucesso",
+                "preparado_em": agora().isoformat(timespec="seconds"),
+                "tse": {
+                    "execucao_id": execucao_id,
+                    "saida": str(execucao.saida),
+                    "vars": execucao.vars_dbt,
+                    "inventario": inventario,
+                    "preparacao_sha256": sha256_arquivo(execucao.saida.parent / "preparacao.json"),
+                },
+            }
+            dbt_rodou = True
+        if dbt_rodou:
+            diretorios = config.diretorios_dados() + [
+                saida_tse_permitida(
+                    config.lago, anterior["tse"]["execucao_id"], anterior["tse"]["saida"]
+                )
+            ]
+        else:
+            diretorios = config.diretorios_permitidos()
+        config.investigacoes.mkdir(parents=True, exist_ok=True)
+        (config.investigacoes / "contexto.md").write_text(
+            gerar_contexto(config, diretorios=diretorios), encoding="utf-8"
+        )
+        revisar = revisar_caderno(config, Caderno(config.caderno), diretorios=diretorios)
+        if dbt_rodou:
+            _gravar_marca(marca, anterior)
+            if json.loads(marca.read_bytes()) != anterior:
+                raise ErroPreparo("marca C2 gravada com conteúdo divergente")
+            # Falha de limpeza póscommit mantém bloqueio e erro; sem rollback fictício.
+            (config.lago / "preparo-c2-pendente.json").unlink()
+    except ErroPreparo:
+        raise
+    except Exception as erro:
+        raise ErroPreparo(f"preparo C2 inválido: {erro}") from erro
     versao = {
         "lago": impressao,
         "dbt": anterior.get("dbt", "—"),

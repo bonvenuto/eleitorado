@@ -24,11 +24,11 @@ import pyarrow.parquet as pq
 from agente import estado as persistencia
 from agente import prompts
 from agente.caderno import Caderno, ConsultaChave
-from agente.config import ConfigAgente, Orcamento
+from agente.config import ConfigAgente, Orcamento, preparo_c2_pendente
 from agente.diario import Diario
 from agente.executor import Executor, Limites, PedidoSessao, ResultadoSessao
 from agente.modelos import Estado, Hipotese, Resumo, Transicao
-from agente.preparar import Preparo, _somar
+from agente.preparar import ErroPreparo, Preparo, _somar
 from agente.relatorio import ErroRelatorio, confianca, gerar, gerar_indice
 
 CICLOS_POR_SESSAO = 25
@@ -184,6 +184,8 @@ class Controlador:
     ) -> ResultadoSessao:
         """Uma sessão com o que resta do orçamento, entre `minimo` e `maximo` ciclos (o mínimo
         pode passar do orçamento: a validação de um achado registrado não fica sem ciclos)."""
+        if preparo_c2_pendente(self.config.lago):
+            raise ErroPreparo("preparo C2 pendente; sessão bloqueada até reconstrução")
         estado = persistencia.carregar(pasta)
         orcamento = self._orcamento(estado)
         limites = Limites(
