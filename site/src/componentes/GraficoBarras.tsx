@@ -1,5 +1,5 @@
 import * as Plot from '@observablehq/plot'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type RefObject } from 'react'
 import { formatarReais, formatarReaisCurto } from '../formato'
 
 export interface Barra {
@@ -24,8 +24,24 @@ const CINZA = '#b2b2b2'
 const BRANCO = '#ffffff'
 const EIXO = '#c2c2c2'
 
-function encurtar(texto: string): string {
-  return texto.length > 28 ? `${texto.slice(0, 27)}…` : texto
+function encurtar(texto: string, limite: number): string {
+  return texto.length > limite ? `${texto.slice(0, limite - 1)}…` : texto
+}
+
+/** largura do contêiner, acompanhando mudanças (o jsdom não mede: fica no padrão do Plot) */
+function useLargura(alvo: RefObject<HTMLDivElement | null>): number {
+  const [largura, setLargura] = useState(640)
+  useEffect(() => {
+    const elemento = alvo.current
+    if (!elemento || typeof ResizeObserver === 'undefined') return
+    const observador = new ResizeObserver(([entrada]) => {
+      const medida = Math.floor(entrada?.contentRect.width ?? 0)
+      if (medida > 0) setLargura(medida)
+    })
+    observador.observe(elemento)
+    return () => observador.disconnect()
+  }, [alvo])
+  return largura
 }
 
 export function GraficoBarras({
@@ -40,6 +56,7 @@ export function GraficoBarras({
   const idTabela = useId()
   const [verTabela, setVerTabela] = useState(false)
   const alvo = useRef<HTMLDivElement>(null)
+  const largura = useLargura(alvo)
 
   useEffect(() => {
     const elemento = alvo.current
@@ -47,13 +64,17 @@ export function GraficoBarras({
     const cor = (b: Barra) => (b.rotulo === destaque ? BRANCO : CINZA)
     const estilo = { background: 'transparent', color: EIXO, fontFamily: 'inherit', fontSize: '13px' }
     const rotulos = barras.map((b) => b.rotulo)
+    // no celular, a margem dos rótulos encolhe e eles são cortados mais cedo
+    const margem = Math.min(200, Math.round(largura * 0.4))
+    const limite = Math.max(10, Math.floor(margem / 7))
     const grafico = horizontal
       ? Plot.plot({
           style: estilo,
-          marginLeft: 200,
+          width: largura,
+          marginLeft: margem,
           height: 32 * barras.length + 40,
           x: { label: null, grid: true, tickFormat: (v: number) => formatarEixo(v) },
-          y: { label: null, domain: rotulos, tickFormat: (t: string) => encurtar(t) },
+          y: { label: null, domain: rotulos, tickFormat: (t: string) => encurtar(t, limite) },
           marks: [
             Plot.barX(barras, { x: 'valor', y: 'rotulo', fill: cor }),
             Plot.ruleX([0], { stroke: EIXO }),
@@ -61,6 +82,7 @@ export function GraficoBarras({
         })
       : Plot.plot({
           style: estilo,
+          width: largura,
           marginLeft: 72,
           height: 240,
           x: { label: null, domain: rotulos },
@@ -73,7 +95,7 @@ export function GraficoBarras({
     grafico.setAttribute('aria-hidden', 'true')
     elemento.replaceChildren(grafico)
     return () => grafico.remove()
-  }, [barras, horizontal, destaque, formatarEixo])
+  }, [barras, horizontal, destaque, formatarEixo, largura])
 
   if (barras.length === 0) return <p className="text-ash">Sem dados.</p>
 
@@ -84,7 +106,7 @@ export function GraficoBarras({
         ref={alvo}
         role="img"
         aria-label={`${titulo}: gráfico de barras. Os mesmos números estão na tabela.`}
-        className="overflow-x-auto"
+        className="w-full overflow-x-auto"
       />
       <div>
         <button

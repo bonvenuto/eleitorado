@@ -46,7 +46,7 @@ export function Tabela({ titulo, colunas, direita = [], linhas }: PropsTabela) {
           {linhas.map((linha) => (
             <tr key={linha.chave} className="border-b border-hairline/10">
               {linha.celulas.map((celula, i) => (
-                <td key={i} className={`py-2 pr-4 align-top ${alinhar(i)}`}>
+                <td key={i} className={`py-2 pr-4 align-top ${alinhar(i)} ${i > 0 ? 'whitespace-nowrap' : ''}`}>
                   {celula}
                 </td>
               ))}
