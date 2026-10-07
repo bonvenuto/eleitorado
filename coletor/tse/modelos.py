@@ -12,3 +12,17 @@ class FamiliaTse:
     membro: str
     csv: Path
     layout_id: str
+
+
+@dataclass(frozen=True)
+class VersaoTse:
+    """Uma versão física privada, sem estado de seleção ou publicação."""
+
+    recurso_id: str
+    ano: int
+    versao_id: str
+    sha256_zip: str
+    familias: dict[str, str]
+    hashes: dict[str, str]
+    layouts: dict[str, str]
+    sha256_semantico: str
