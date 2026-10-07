@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import random
 import time
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, TypeVar
+from urllib.parse import unquote
 
 import httpx
 
@@ -52,6 +54,13 @@ class Download:
     etag: str | None
     bytes: int
     sha256: str
+
+
+@dataclass(frozen=True)
+class ItemWebdav:
+    nome: str  # último segmento do caminho, sem a barra final
+    pasta: bool
+    tamanho: int | None
 
 
 @dataclass(frozen=True)
@@ -107,6 +116,67 @@ class ClienteHttp:
                     bytes=total,
                     sha256=resumo.hexdigest(),
                 )
+
+        return self._com_retentativas(url, tentativa)
+
+    def baixar_retomando(
+        self, url: str, destino: Path, usuario: str | None = None, tentativas: int = 20
+    ) -> Download:
+        """Download de arquivo grande que retoma de onde parou (`Range`) quando a conexão cai.
+
+        O servidor precisa informar o tamanho (`Content-Length`) e responder 206 à retomada; um
+        200 numa retomada recomeçaria o arquivo do zero no meio dele, então vira erro.
+        """
+        auth = (usuario, "") if usuario is not None else None
+        resumo = hashlib.sha256()
+        recebido, total, falhas = 0, None, 0
+        primeira: httpx.Response | None = None
+        with destino.open("wb") as arquivo:
+            while total is None or recebido < total:
+                cabecalhos = {"Range": f"bytes={recebido}-"} if recebido else {}
+                try:
+                    with self._cliente.stream("GET", url, headers=cabecalhos, auth=auth) as r:
+                        if r.status_code >= 400:
+                            if r.status_code not in STATUS_RETENTAVEIS:
+                                raise ErroHttp(str(r.url), r.status_code, "resposta HTTP de erro")
+                            raise httpx.TransportError(f"status {r.status_code}")
+                        if recebido and r.status_code != 206:
+                            raise ErroHttp(str(r.url), r.status_code, "servidor ignorou o Range")
+                        if total is None:
+                            if "content-length" not in r.headers:
+                                raise ErroHttp(str(r.url), r.status_code, "sem Content-Length")
+                            total = int(r.headers["content-length"])
+                            primeira = r
+                        for bloco in r.iter_bytes(1 << 20):
+                            arquivo.write(bloco)
+                            resumo.update(bloco)
+                            recebido += len(bloco)
+                    if recebido < total:
+                        raise httpx.TransportError(f"conexão encerrada em {recebido} de {total}")
+                except httpx.TransportError as erro:
+                    falhas += 1
+                    if falhas >= tentativas:
+                        raise ErroHttp(url, None, f"falha de transporte: {erro!r}") from None
+                    self._dormir(self._espera(falhas, None))
+        assert primeira is not None
+        return Download(
+            url_final=str(primeira.url),
+            status=primeira.status_code,
+            last_modified=primeira.headers.get("last-modified"),
+            etag=primeira.headers.get("etag"),
+            bytes=recebido,
+            sha256=resumo.hexdigest(),
+        )
+
+    def listar_webdav(self, url: str, usuario: str) -> list[ItemWebdav]:
+        """Conteúdo de uma pasta WebDAV (PROPFIND com profundidade 1), sem a própria pasta."""
+
+        def tentativa() -> list[ItemWebdav]:
+            resposta = self._cliente.request(
+                "PROPFIND", url, headers={"Depth": "1"}, auth=(usuario, "")
+            )
+            self._verificar(resposta)
+            return _itens_webdav(resposta.content, httpx.URL(url).path)
 
         return self._com_retentativas(url, tentativa)
 
@@ -176,3 +246,17 @@ class ClienteHttp:
                     pass
         base = min(self._espera_base * 2 ** (numero - 1), self._espera_maxima)
         return base * random.uniform(0.5, 1.0)
+
+
+def _itens_webdav(corpo: bytes, caminho_pasta: str) -> list[ItemWebdav]:
+    dav = "{DAV:}"
+    itens = []
+    for resposta in ET.fromstring(corpo).iter(f"{dav}response"):
+        href = unquote(resposta.findtext(f"{dav}href") or "")
+        if href.rstrip("/") == caminho_pasta.rstrip("/"):
+            continue
+        pasta = resposta.find(f".//{dav}resourcetype/{dav}collection") is not None
+        tamanho = resposta.findtext(f".//{dav}getcontentlength")
+        nome = href.rstrip("/").rsplit("/", 1)[-1]
+        itens.append(ItemWebdav(nome, pasta, int(tamanho) if tamanho else None))
+    return itens
