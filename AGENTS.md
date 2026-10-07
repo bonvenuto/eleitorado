@@ -17,9 +17,10 @@ governo e achar inconsistências. O repositório é **público**.
   (`dados/raw/<órgão>/<recurso>/<partição>/`) e registra em `dados/meta/`.
 - `dbt/`: staging (views), intermediate (tabelas, privadas) e marts (Parquet externo, públicos).
   Targets: `prod`, `dev`, `ci` (lago vazio de `dbt/tests/lago_vazio`) e `agente`.
-- `site/`: contrato dos dados do site público (`site/esquemas/`, JSON Schemas; `site/exemplos/`)
-  e, depois do plano 11, o frontend. Os modelos `dbt/models/site/` montam os arquivos e o
-  `coletor site` os grava em `publico/site/`, que o `coletor publicar` envia ao R2.
+- `site/`: o site público (Vite + React + TypeScript, `site/README.md`), publicado pelo
+  Cloudflare Pages, e o contrato dos seus dados (`site/esquemas/`, JSON Schemas;
+  `site/exemplos/`). Os modelos `dbt/models/site/` montam os arquivos e o `coletor site` os
+  grava em `publico/site/`, que o `coletor publicar` envia ao R2.
 - `agente/`: agente investigador L1 (controlador Python + sessões `claude -p` com servidor MCP
   próprio). Recomenda; não decide nem age. Relatórios só para uso interno.
 - `.github/workflows/`: `pipeline.yml` (diário: coleta do grupo `diario`, dbt build, publica) e
@@ -105,6 +106,9 @@ New-Item -ItemType Directory -Force "$env:ELEITORADO_PUBLICO\marts" | Out-Null
 uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
 ```
 
+Se o PR mexe em `site/`, também (em `site/`): `npm ci`, `npm run lint`, `npm run typecheck`,
+`npm test` e `npm run build`. O CI roda isso no job `site`.
+
 ## Convenções
 
 - Código, comentários, docs, commits e PRs em **português**. Linhas de até 100 colunas (`ruff`).
@@ -122,7 +126,7 @@ uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
 - Testes do coletor sem rede: `respx` para HTTP, dublês em `tests/fakes.py`, amostras em
   `tests/amostras.py`. Testes que acessam GCP e fontes reais levam `@pytest.mark.integracao`.
 - Mudança no formato de um arquivo do site: altere no mesmo PR o modelo `site_*`, o esquema em
-  `site/esquemas/` e os exemplos em `site/exemplos/` (e o frontend, se ele usa o campo).
+  `site/esquemas/` e os exemplos em `site/exemplos/` (e `site/src/tipos.ts` e as telas que usam o campo).
 
 ## Operação: o que já se sabe
 
