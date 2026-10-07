@@ -7,7 +7,9 @@ Um lago pequeno, com o esquema dos marts reais, traz três situações:
 - fora da curva: uma despesa de cota da GRÁFICA DELTA muito acima do normal (deve aparecer como
   achado);
 - armadilha de homônimo: a ALFA SERVIÇOS da cota tem o mesmo nome de uma empresa sancionada com
-  outro CNPJ (não pode ser confirmada); e dois parlamentares se chamam JOSÉ DA SILVA.
+  outro CNPJ (não pode ser confirmada); e dois parlamentares se chamam JOSÉ DA SILVA;
+- empresa baixada: a BETA ENGENHARIA, baixada na Receita em 2024, recebe pagamentos de emenda em
+  2025 (deve ser confirmado).
 
 Os dados são fictícios mas verossímeis (nomes plausíveis, CNPJs com dígitos verificadores válidos),
 e o contexto avisa o agente: na primeira avaliação, com nomes como "FORNECEDOR 1" e CNPJs inválidos,
@@ -76,6 +78,7 @@ ACME = (_digitos_cnpj("41738295"), "CONSTRUTORA ACME DO NORDESTE LTDA")
 DELTA = (_digitos_cnpj("52906713"), "GRAFICA DELTA EDITORA LTDA")
 ALFA_COTA = (_digitos_cnpj("63184027"), "ALFA SERVICOS DE TELECOMUNICACOES LTDA")
 ALFA_SANCIONADA = (_digitos_cnpj("74019362"), "ALFA SERVICOS DE TELECOMUNICACOES LTDA")
+BETA = (_digitos_cnpj("85273641"), "BETA ENGENHARIA E SERVICOS LTDA")
 ATIVIDADES = [
     "COMERCIAL", "DISTRIBUIDORA", "SERVICOS", "CONSTRUTORA", "TRANSPORTES", "INFORMATICA",
     "ALIMENTOS", "ENGENHARIA", "CONSULTORIA", "LOCADORA",
@@ -210,6 +213,41 @@ def criar_lago(lago: Path, semente: int = 42) -> None:
         )
 
         conexao.execute(
+            "create table marts.dim_empresa (cnpj_raiz varchar, razao_social varchar, "
+            "situacao varchar, data_situacao date, motivo_situacao varchar, data_abertura date)"
+        )
+        empresas = [
+            (p[6][:8], p[9], "ATIVA", date(2010, 1, 1), "SEM MOTIVO", date(2005, 3, 1))
+            for p in pagamentos[:40]
+        ] + [
+            (BETA[0][:8], BETA[1], "BAIXADA", date(2024, 11, 4),
+             "EXTINCAO POR ENCERRAMENTO LIQUIDACAO VOLUNTARIA", date(2016, 8, 1)),
+        ]  # fmt: skip
+        _inserir(conexao, "marts.dim_empresa", empresas)
+        beta = [
+            (f"beta{i}", "20250051", "A12", date(2025, 2 + 2 * i, 15), "Pagamento",
+             round(gerador.uniform(150_000, 250_000), 2), BETA[0], "CNPJ", BETA[0][:8],
+             BETA[1], "Ministério da Saúde", "MA")
+            for i in range(4)
+        ]  # fmt: skip
+        _inserir(conexao, "marts.fct_emenda_pagamento", beta)
+        conexao.execute(
+            """
+            create table marts.alerta_pagamento_empresa_irregular as
+            select
+                md5('pagamento_empresa_irregular|emenda|' || p.pagamento_linha_id) as alerta_id,
+                'emenda' as origem, p.pagamento_linha_id as fato_id,
+                p.data_documento as data_fato, p.valor_pago as valor,
+                p.favorecido_documento as cnpj, e.razao_social, e.situacao, e.data_situacao,
+                e.motivo_situacao, p.data_documento - e.data_situacao as dias_desde_a_situacao,
+                'Fato com empresa baixada, inapta, suspensa ou nula na Receita' as regra
+            from marts.fct_emenda_pagamento as p
+            join marts.dim_empresa as e on e.cnpj_raiz = p.favorecido_cnpj_raiz
+            where e.situacao != 'ATIVA' and e.data_situacao <= p.data_documento
+            """
+        )
+
+        conexao.execute(
             "create table marts.fct_despesa_cota_parlamentar (despesa_id varchar, casa varchar, "
             "ano integer, parlamentar_id varchar, nome_beneficiario varchar, uf_sigla varchar, "
             "data_emissao date, categoria varchar, fornecedor_nome varchar, "
@@ -257,6 +295,9 @@ def verificar(estado: Estado) -> dict[str, bool]:
     return {
         "caso sancionado confirmado": any(
             r.situacao == "confirmado" and _menciona(r, ACME[0][:8]) for r in achados
+        ),
+        "caso de empresa baixada confirmado": any(
+            r.situacao == "confirmado" and _menciona(r, BETA[0][:8]) for r in achados
         ),
         "despesa fora da curva encontrada": any(
             _menciona(r, DELTA[0][:8]) or _menciona(r, "GRAFICA DELTA") for r in achados

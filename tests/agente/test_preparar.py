@@ -88,6 +88,15 @@ def test_preparar_roda_restaurar_e_dbt_so_quando_muda(config):
     assert segundo.versao_dados["lago"] == primeiro.versao_dados["lago"]
 
 
+def test_preparar_cria_parquet_vazio_para_fonte_ainda_sem_coleta(config):
+    esquemas = config.raiz / "dbt" / "tests" / "lago_vazio" / "esquemas.json"
+    esquemas.parent.mkdir(parents=True)
+    esquemas.write_text('{"raw/rfb/empresas": {"cnpj_basico": "VARCHAR"}}', encoding="utf-8")
+    preparar(config, {}, lambda comando, env, cwd: 0, lambda: AGORA)
+    vazio = config.lago / "raw" / "rfb" / "empresas" / "vazio" / "vazio.parquet"
+    assert duckdb.sql(f"select count(*) from '{vazio.as_posix()}'").fetchone() == (0,)
+
+
 def test_preparar_falha_se_o_restaurar_falha(config):
     with pytest.raises(ErroPreparo, match="restaurar"):
         preparar(config, {}, lambda comando, env, cwd: 1, lambda: AGORA)
