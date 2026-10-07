@@ -172,3 +172,88 @@ def test_listar_webdav_devolve_pastas_e_arquivos_sem_a_propria_pasta(respx_mock,
         ("Sócios.zip", False, 42),
     ]
     assert rota.calls[0].request.headers["Depth"] == "1"
+
+
+@pytest.mark.parametrize(
+    ("host", "permitido"),
+    [
+        ("tse.jus.br", True),
+        ("cdn.tse.jus.br", True),
+        ("outro.jus.br", False),
+        ("evil-tse.jus.br", False),
+        ("tse.jus.br.evil.gov", False),
+    ],
+)
+def test_tse_e_subdominio_permitidos(host, permitido):
+    assert host_permitido(host, SUFIXOS_OFICIAIS) is permitido
+
+
+def test_tse_segue_redirecionamento_para_subdominio(respx_mock):
+    cliente = ClienteHttp(dormir=lambda s: None, sufixos_permitidos=SUFIXOS_OFICIAIS)
+    respx_mock.get("https://tse.jus.br/a").mock(
+        return_value=httpx.Response(302, headers={"Location": "https://cdn.tse.jus.br/a"})
+    )
+    respx_mock.get("https://cdn.tse.jus.br/a").mock(
+        return_value=httpx.Response(200, json={"ok": True})
+    )
+    try:
+        resposta = cliente.obter_json("https://tse.jus.br/a")
+        assert resposta.dados == {"ok": True}
+        assert resposta.url_final == "https://cdn.tse.jus.br/a"
+    finally:
+        cliente.fechar()
+
+
+@pytest.mark.parametrize("metodo", ["obter_json", "baixar"])
+def test_tse_bloqueia_host_intermediario_antes_de_voltar_a_host_permitido(
+    respx_mock, tmp_path, metodo
+):
+    cliente = ClienteHttp(dormir=lambda s: None, sufixos_permitidos=SUFIXOS_OFICIAIS)
+    origem = respx_mock.get("https://tse.jus.br/a").mock(
+        return_value=httpx.Response(302, headers={"Location": "https://outro.jus.br/a"})
+    )
+    proibido = respx_mock.get("https://outro.jus.br/a").mock(
+        return_value=httpx.Response(302, headers={"Location": "https://cdn.tse.jus.br/a"})
+    )
+    final = respx_mock.get("https://cdn.tse.jus.br/a").mock(
+        return_value=httpx.Response(200, json={"ok": True})
+    )
+    try:
+        with pytest.raises(ErroHttp, match="host não permitido: outro.jus.br") as erro:
+            if metodo == "obter_json":
+                cliente.obter_json("https://tse.jus.br/a")
+            else:
+                cliente.baixar("https://tse.jus.br/a", tmp_path / "x")
+        assert erro.value.url == "https://outro.jus.br/a"
+        assert origem.call_count == 1
+        assert proibido.call_count == 0
+        assert final.call_count == 0
+    finally:
+        cliente.fechar()
+
+
+def test_tse_bloqueia_host_intermediario_na_retomada(respx_mock, tmp_path):
+    cliente = ClienteHttp(dormir=lambda s: None, sufixos_permitidos=SUFIXOS_OFICIAIS)
+    origem = respx_mock.get("https://tse.jus.br/a").mock(
+        side_effect=[
+            _parcial(b"abcd", 10),
+            httpx.Response(302, headers={"Location": "https://outro.jus.br/a"}),
+        ]
+    )
+    proibido = respx_mock.get("https://outro.jus.br/a").mock(
+        return_value=httpx.Response(302, headers={"Location": "https://cdn.tse.jus.br/a"})
+    )
+    final = respx_mock.get("https://cdn.tse.jus.br/a").mock(
+        return_value=_parcial(b"efghij", 6, status=206)
+    )
+    try:
+        with pytest.raises(ErroHttp, match="host não permitido: outro.jus.br") as erro:
+            cliente.baixar_retomando("https://tse.jus.br/a", tmp_path / "x")
+        assert erro.value.url == "https://outro.jus.br/a"
+        assert (tmp_path / "x").read_bytes() == b"abcd"
+        assert origem.call_count == 2
+        assert origem.calls[1].request.headers["Range"] == "bytes=4-"
+        assert proibido.call_count == 0
+        assert final.call_count == 0
+    finally:
+        cliente.fechar()
