@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from coletor.cli import main
+from coletor.dbt import ResultadoDbt
 from tests.amostras import CEAP_CSV, CNEP_CSV, PAGINA_CGU, RAIZ, zip_com
 
 PAGINA = "https://portaldatransparencia.gov.br/download-de-dados/cnep"
@@ -176,6 +177,16 @@ def test_publicar_execucao_explicita_mesmas_vars_e_saida(deps, tmp_path, monkeyp
     preparada, selecao, recibo = candidata(lago, selecao, "explicita")
     deps.config = replace(deps.config, lago=lago, publico=tmp_path / "publico")
     prep = json.loads((preparada.parent / "preparacao.json").read_bytes())
+    monkeypatch.setattr("coletor.site.gerar_site", lambda *a: 0)
+    assert (
+        main(
+            ["--target", "ci", "site"],
+            env={"ELEITORADO_LAGO": str(lago), "ELEITORADO_PUBLICO": str(deps.config.publico)},
+            dbt=lambda *a: ResultadoDbt("sucesso", 0),
+        )
+        == 0
+    )
+    assert json.loads((preparada.parent / "preparacao.json").read_bytes()) == prep
     vistos = []
 
     def docs(d, t, p, argumentos=()):

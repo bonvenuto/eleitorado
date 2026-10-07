@@ -87,6 +87,8 @@ def executor_sintetico(status="pass", *, defeito=None, chamadas=None):
             "nodes": {
                 "model.eleitorado.a": {"resource_type": "model"},
                 "test.eleitorado.a": {"resource_type": "test"},
+                "model.eleitorado.site_arquivos": {"resource_type": "model"},
+                "seed.eleitorado.site_alerta_tipos": {"resource_type": "seed"},
             },
             "unit_tests": {},
         }
@@ -104,10 +106,19 @@ def executor_sintetico(status="pass", *, defeito=None, chamadas=None):
             "results": [
                 {"unique_id": "model.eleitorado.a", "status": "success"},
                 {"unique_id": "test.eleitorado.a", "status": status},
+                {"unique_id": "model.eleitorado.site_arquivos", "status": "success"},
+                {"unique_id": "seed.eleitorado.site_alerta_tipos", "status": "success"},
             ],
         }
         if defeito == "cobertura":
             resultados["results"].pop(0)
+        if defeito in {"sem_site", "sem_seed"}:
+            indice = 2 if defeito == "sem_site" else 3
+            resultados["results"].pop(indice)
+        if defeito == "site_falha":
+            resultados["results"][2]["status"] = "error"
+        if defeito == "exclude_site":
+            comando.extend(["--exclude", "path:models/site", "site_alerta_tipos"])
         if defeito == "invocacao":
             resultados["metadata"]["invocation_id"] = str(uuid.uuid4())
         if defeito == "args":
@@ -144,6 +155,10 @@ def test_pipeline_tse_falha_preserva_edicao(candidato):
     "defeito,status",
     [
         ("cobertura", "fail"),
+        ("sem_site", "pass"),
+        ("sem_seed", "pass"),
+        ("site_falha", "pass"),
+        ("exclude_site", "pass"),
         ("invocacao", "fail"),
         ("args", "fail"),
         ("target_path", "fail"),

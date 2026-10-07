@@ -88,7 +88,7 @@ class PublicadorMemoria:
         self.corromper = False
 
     def listar(self):
-        return set(self.objetos)
+        return {chave: hashlib.md5(dados).hexdigest() for chave, dados in self.objetos.items()}
 
     def enviar(self, origem, chave, tipo):
         self.eventos.append(("enviar", chave))
@@ -420,11 +420,13 @@ def test_r2_cache_c2_preserva_metadados_legados(tmp_path):
     envios = []
 
     class S3:
-        def upload_file(self, origem, bucket, chave, ExtraArgs):
+        def upload_file(self, origem, bucket, chave, ExtraArgs, Config):
+            assert Config is remoto._transferencia
             envios.append((chave, ExtraArgs))
 
     remoto = object.__new__(R2Publicador)
     remoto._bucket, remoto._s3 = "teste", S3()
+    remoto._transferencia = object()
     remoto.enviar(arquivo, MANIFESTO, "application/json")
     remoto.enviar(arquivo, "marts/c2/edicoes/id/a.parquet", "application/vnd.apache.parquet")
     remoto.enviar(arquivo, "manifesto.json", "application/json")

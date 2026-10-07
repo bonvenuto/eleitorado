@@ -53,7 +53,10 @@ def test_pipeline_deixa_os_modelos_do_site_para_o_coletor_site(respx_mock, deps)
         return ResultadoDbt("sucesso", 0)
 
     _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt)
-    assert argumentos_vistos == [["--exclude", "path:models/site", "site_alerta_tipos"]]
+    [argumentos] = argumentos_vistos
+    assert argumentos[:3] == ["--exclude", "path:models/site", "site_alerta_tipos"]
+    assert argumentos[3] == "--vars"
+    assert argumentos[5] == "--target-path"
 
 
 def test_pipeline_com_dbt_falhando_termina_com_erro(respx_mock, deps, warehouse):

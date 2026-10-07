@@ -223,7 +223,8 @@ def _pipeline(
                 args.target,
                 deps.config.publico,
                 [
-                    "--exclude", *SELECAO_SITE,
+                    "--exclude",
+                    *SELECAO_SITE,
                     "--vars",
                     json.dumps(preparada.vars_dbt),
                     "--target-path",
@@ -342,7 +343,19 @@ def _site(args: argparse.Namespace, env: Mapping[str, str], rodar_dbt_: RodarDbt
 
     lago = Path(env.get("ELEITORADO_LAGO", "dados"))
     publico = Path(env.get("ELEITORADO_PUBLICO", "dados/publico"))
-    resultado = rodar_dbt_(args.dbt_dir, args.target, publico, ["--select", *SELECAO_SITE])
+    from coletor.tse.execucao import preparar_execucao_tse
+
+    preparada = preparar_execucao_tse(lago, str(uuid.uuid4()), args.target)
+    argumentos = [
+        "--select",
+        *SELECAO_SITE,
+        "--vars",
+        json.dumps(preparada.vars_dbt, sort_keys=True),
+        "--target-path",
+        (preparada.saida.parent / "dbt-target").as_posix(),
+    ]
+    with ambiente_dbt(lago, publico):
+        resultado = rodar_dbt_(args.dbt_dir, args.target, publico, argumentos)
     if resultado.status != "sucesso":
         log.error("dbt dos modelos do site falhou: %s", resultado)
         return 1

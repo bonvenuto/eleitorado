@@ -211,7 +211,9 @@ def test_legado_nao_envia_nem_apaga_c2(publico):
             pq.write_table(pa.table({"a": [1]}), arquivo)
         else:
             arquivo.write_bytes(b"c2 preservada")
-    remoto = FakePublicador(protegidos | {"marts/obsoleto.parquet"})
+    remoto = FakePublicador(
+        {chave: b"preservar" for chave in protegidos | {"marts/obsoleto.parquet"}}
+    )
     publicar(remoto, publico, AGORA, "v")
     enviados_c2 = [
         chave for acao, chave in remoto.ordem if acao == "enviar" and chave.startswith("marts/c2/")
@@ -225,9 +227,14 @@ def test_legado_nao_envia_nem_apaga_c2(publico):
     assert not any(a["caminho"].startswith("marts/c2/") for a in remoto.manifesto["arquivos"])
 
 
-def test_legado_preserva_c2_que_nao_existe_localmente(publico):
+@pytest.mark.parametrize("com_site", [False, True])
+def test_legado_preserva_c2_que_nao_existe_localmente(publico, com_site):
+    if com_site:
+        _site(publico, {"resumo.json": b"gzip"})
     protegidos = {"marts/c2/manifesto.json", "marts/c2/edicoes/antiga/a.parquet"}
-    remoto = FakePublicador(protegidos | {"marts/obsoleto.parquet"})
+    remoto = FakePublicador(
+        {chave: b"preservar" for chave in protegidos | {"marts/obsoleto.parquet"}}
+    )
     publicar(remoto, publico, AGORA, "v")
     removidos_c2 = [
         chave for acao, chave in remoto.ordem if acao == "apagar" and chave.startswith("marts/c2/")
