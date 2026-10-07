@@ -1,0 +1,13 @@
+{
+  "esquema": 1,
+  "prefixo": "exe",
+  "subdividido": false,
+  "empresas": [
+    {
+      "raiz": "11222333",
+      "nome": "EMPRESA EXEMPLO LTDA",
+      "uf": "DF",
+      "situacao": "ATIVA"
+    }
+  ]
+}

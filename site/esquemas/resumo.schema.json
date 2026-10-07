@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/resumo.schema.json",
+  "title": "resumo.json: números da capa, tipos de alerta e situação das fontes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "esquema", "gerado_em", "dados_ate", "totais", "alerta_tipos", "alertas_recentes", "fontes",
+    "fontes_reduzidas"
+  ],
+  "properties": {
+    "esquema": { "$ref": "comum.schema.json#/$defs/esquema" },
+    "gerado_em": { "$ref": "comum.schema.json#/$defs/instante" },
+    "dados_ate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cota", "emendas", "contratos", "receita"],
+      "properties": {
+        "cota": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+        "emendas": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+        "contratos": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+        "receita": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}$" }
+      }
+    },
+    "totais": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cota", "emendas_pago", "contratos", "parlamentares", "empresas"],
+      "properties": {
+        "cota": { "$ref": "comum.schema.json#/$defs/valor" },
+        "emendas_pago": { "$ref": "comum.schema.json#/$defs/valor" },
+        "contratos": { "$ref": "comum.schema.json#/$defs/valor" },
+        "parlamentares": { "$ref": "comum.schema.json#/$defs/inteiro" },
+        "empresas": { "$ref": "comum.schema.json#/$defs/inteiro" }
+      }
+    },
+    "alerta_tipos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tipo", "titulo", "explicacao", "cautela", "ordem", "quantidade"],
+        "properties": {
+          "tipo": { "type": "string", "pattern": "^[a-z_]+$" },
+          "titulo": { "$ref": "comum.schema.json#/$defs/texto" },
+          "explicacao": { "$ref": "comum.schema.json#/$defs/texto" },
+          "cautela": { "$ref": "comum.schema.json#/$defs/texto" },
+          "ordem": { "type": "integer" },
+          "quantidade": { "$ref": "comum.schema.json#/$defs/inteiro" }
+        }
+      }
+    },
+    "alertas_recentes": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "comum.schema.json#/$defs/alerta" }
+    },
+    "fontes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recurso_id", "cadencia", "ultimo_sucesso", "status", "atraso_horas", "situacao"
+        ],
+        "properties": {
+          "recurso_id": { "$ref": "comum.schema.json#/$defs/texto" },
+          "cadencia": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+          "ultimo_sucesso": { "$ref": "comum.schema.json#/$defs/instante_ou_nulo" },
+          "status": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+          "atraso_horas": { "$ref": "comum.schema.json#/$defs/inteiro_ou_nulo" },
+          "situacao": { "enum": ["ok", "aviso", "erro"] }
+        }
+      }
+    },
+    "fontes_reduzidas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recurso_id", "competencia", "coletada_em", "linhas_antes", "linhas_depois",
+          "variacao_pct"
+        ],
+        "properties": {
+          "recurso_id": { "$ref": "comum.schema.json#/$defs/texto" },
+          "competencia": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+          "coletada_em": { "$ref": "comum.schema.json#/$defs/instante_ou_nulo" },
+          "linhas_antes": { "$ref": "comum.schema.json#/$defs/inteiro_ou_nulo" },
+          "linhas_depois": { "$ref": "comum.schema.json#/$defs/inteiro_ou_nulo" },
+          "variacao_pct": { "$ref": "comum.schema.json#/$defs/valor_ou_nulo" }
+        }
+      }
+    }
+  }
+}

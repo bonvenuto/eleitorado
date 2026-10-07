@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/busca-parlamentares.schema.json",
+  "title": "busca/parlamentares.json: todos os parlamentares, para a busca",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["esquema", "parlamentares"],
+  "properties": {
+    "esquema": { "$ref": "comum.schema.json#/$defs/esquema" },
+    "parlamentares": {
+      "type": "array",
+      "items": { "$ref": "comum.schema.json#/$defs/parlamentar_resumo" }
+    }
+  }
+}

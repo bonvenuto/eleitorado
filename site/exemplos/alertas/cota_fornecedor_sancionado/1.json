@@ -1,0 +1,24 @@
+{
+  "esquema": 1,
+  "tipo": "cota_fornecedor_sancionado",
+  "pagina": 1,
+  "paginas": 1,
+  "total": 1,
+  "alertas": [
+    {
+      "alerta_id": "7c1e0d2a9f4b4e6a8d3c2b1a0f9e8d7c",
+      "tipo": "cota_fornecedor_sancionado",
+      "data": "2026-08-14",
+      "valor": 1200.0,
+      "parlamentar_id": "camara:900001",
+      "parlamentar_nome": "ANA EXEMPLO",
+      "cnpj_raiz": "11222333",
+      "empresa_nome": "EMPRESA EXEMPLO LTDA",
+      "cnpj_raiz_2": null,
+      "empresa_nome_2": null,
+      "descricao": "Despesa de cota com fornecedor sancionado no CEIS por MINISTERIO EXEMPLO desde 01/03/2025",
+      "correspondencia": "forte",
+      "regra": "Despesa de cota com fornecedor que tinha sanção vigente (CEIS ou CNEP) na data de emissão do documento"
+    }
+  ]
+}

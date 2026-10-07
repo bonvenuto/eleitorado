@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/busca-empresas.schema.json",
+  "title": "busca/empresas/<prefixo>.json: empresas com uma palavra da razão social começando pelo prefixo",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["esquema", "prefixo", "subdividido", "empresas"],
+  "properties": {
+    "esquema": { "$ref": "comum.schema.json#/$defs/esquema" },
+    "prefixo": { "type": "string", "pattern": "^[a-z0-9]{3,4}$" },
+    "subdividido": { "type": "boolean" },
+    "empresas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["raiz", "nome", "uf", "situacao"],
+        "properties": {
+          "raiz": { "$ref": "comum.schema.json#/$defs/raiz" },
+          "nome": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+          "uf": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+          "situacao": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" }
+        }
+      }
+    }
+  }
+}

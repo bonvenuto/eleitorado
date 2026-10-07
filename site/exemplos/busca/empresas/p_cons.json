@@ -1,0 +1,13 @@
+{
+  "esquema": 1,
+  "prefixo": "cons",
+  "subdividido": false,
+  "empresas": [
+    {
+      "raiz": "55666777",
+      "nome": "CONSTRUTORA EXEMPLO LTDA",
+      "uf": "MG",
+      "situacao": "INAPTA"
+    }
+  ]
+}

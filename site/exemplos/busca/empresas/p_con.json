@@ -1,0 +1,13 @@
+{
+  "esquema": 1,
+  "prefixo": "con",
+  "subdividido": true,
+  "empresas": [
+    {
+      "raiz": "77888999",
+      "nome": "CON ENGENHARIA SA",
+      "uf": "RJ",
+      "situacao": "BAIXADA"
+    }
+  ]
+}
