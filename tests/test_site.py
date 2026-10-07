@@ -165,27 +165,49 @@ def test_bloco_de_cnpj_alfanumerico(tmp_path):
 # ---- comando `coletor site`
 
 
-def test_comando_site_nao_precisa_de_credenciais(tmp_path):
+class DbtFalso:
+    def __init__(self, status: str = "sucesso") -> None:
+        self.status = status
+        self.chamadas: list[tuple[str, list[str]]] = []
+
+    def __call__(self, diretorio, target, publico, argumentos=()):
+        from coletor.dbt import ResultadoDbt
+
+        self.chamadas.append((target, list(argumentos)))
+        return ResultadoDbt(self.status, 0)
+
+
+def _comando_site(tmp_path: Path, dbt: DbtFalso, com_banco: bool = True) -> tuple[int, Path]:
     from coletor.cli import main
 
     lago = tmp_path / "lago"
     lago.mkdir()
-    banco = _banco(tmp_path, _exemplos())
-    banco.rename(lago / "ci.duckdb")
+    if com_banco:
+        _banco(tmp_path, _exemplos()).rename(lago / "ci.duckdb")
     publico = tmp_path / "publico"
     codigo = main(
         ["--target", "ci", "site", "--esquemas", str(ESQUEMAS)],
         env={"ELEITORADO_LAGO": str(lago), "ELEITORADO_PUBLICO": str(publico)},
+        dbt=dbt,
     )
+    return codigo, publico
+
+
+def test_comando_site_roda_o_dbt_do_site_e_grava_sem_credenciais(tmp_path):
+    dbt = DbtFalso()
+    codigo, publico = _comando_site(tmp_path, dbt)
     assert codigo == 0
+    # os modelos do site rodam aqui, não no dbt build do pipeline (não bloqueiam os marts)
+    assert dbt.chamadas == [("ci", ["--select", "path:models/site", "site_alerta_tipos"])]
     assert _ler(publico, "resumo.json")["esquema"] == 1
 
 
-def test_comando_site_com_erro_sai_com_1(tmp_path):
-    from coletor.cli import main
+def test_comando_site_com_dbt_falhando_sai_com_1_sem_gravar(tmp_path):
+    codigo, publico = _comando_site(tmp_path, DbtFalso("falha"))
+    assert codigo == 1
+    assert not (publico / "site").exists()
 
-    codigo = main(
-        ["site", "--esquemas", str(ESQUEMAS)],
-        env={"ELEITORADO_LAGO": str(tmp_path), "ELEITORADO_PUBLICO": str(tmp_path / "p")},
-    )
+
+def test_comando_site_com_erro_sai_com_1(tmp_path):
+    codigo, _ = _comando_site(tmp_path, DbtFalso(), com_banco=False)
     assert codigo == 1

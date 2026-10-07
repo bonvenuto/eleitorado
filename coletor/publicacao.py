@@ -7,6 +7,7 @@ import json
 import logging
 import tempfile
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,8 @@ TIPOS = {
 }
 # os JSON do site já estão em gzip (coletor site): o navegador descomprime pelo Content-Encoding
 CACHE_SITE = "public, max-age=600"
+# envios simultâneos: o site tem milhares de arquivos pequenos (o cliente do boto3 é thread-safe)
+TRABALHADORES = 16
 
 
 class ErroPublicacao(Exception):
@@ -122,16 +125,23 @@ def publicar(
     """
     arquivos = arquivos_publicos(publico)
     anteriores = publicador.listar()
-    enviados = 0
-    for chave, caminho in sorted(arquivos.items()):
-        if anteriores.get(chave) == _md5(caminho):
-            continue
+    pendentes = [
+        (chave, caminho)
+        for chave, caminho in sorted(arquivos.items())
+        if anteriores.get(chave) != _md5(caminho)
+    ]
+
+    def enviar(item: tuple[str, Path]) -> None:
+        chave, caminho = item
         tipo = TIPOS.get(caminho.suffix, "application/octet-stream")
         if chave.startswith(SITE):
             publicador.enviar(caminho, chave, tipo, codificacao="gzip", cache=CACHE_SITE)
         else:
             publicador.enviar(caminho, chave, tipo)
-        enviados += 1
+
+    with ThreadPoolExecutor(max_workers=TRABALHADORES) as executor:
+        list(executor.map(enviar, pendentes))  # propaga a primeira falha: o manifesto não sai
+    enviados = len(pendentes)
     manifesto = montar_manifesto(arquivos, gerado_em, versao)
     with tempfile.TemporaryDirectory() as pasta:
         destino = Path(pasta) / MANIFESTO
@@ -159,6 +169,7 @@ class R2Publicador:
     def __init__(self, conta: str, chave_id: str, segredo: str, bucket: str) -> None:
         import boto3
         from boto3.s3.transfer import TransferConfig
+        from botocore.config import Config
 
         self._bucket = bucket
         self._s3 = boto3.client(
@@ -167,6 +178,12 @@ class R2Publicador:
             aws_access_key_id=chave_id,
             aws_secret_access_key=segredo,
             region_name="auto",
+            # sem checksum em trailer: com ele o botocore manda
+            # "Content-Encoding: gzip,aws-chunked", e o site precisa de exatamente "gzip"
+            config=Config(
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
         )
         # upload sem multipart (até 4 GB): o ETag fica sendo o MD5, que o envio incremental compara
         self._transferencia = TransferConfig(multipart_threshold=4 * 1024**3)

@@ -144,8 +144,9 @@ uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
   #35), por isso a coleta é local, num lago próprio (`dados-receita/`), e sobe ao bucket com
   `coletor estado salvar --aditivo` (só arquivos novos de `raw/` e `meta/`; nunca apaga nem
   sobrescreve), sempre com o pipeline parado: ele espelha o lago e apagaria o que não conhece.
-- **Site:** o `coletor site` roda no passo de publicação do pipeline. Se ele falhar, os marts
-  são publicados mesmo assim e o `site/` do R2 fica com os dados da véspera. O `publicar` só
+- **Site:** o `coletor site` roda no passo de publicação do pipeline e ele mesmo roda os modelos
+  `site_*` no dbt (fora do `dbt build` do pipeline). Se ele falhar, os marts são publicados mesmo
+  assim e o `site/` do R2 fica com os dados da véspera. O `publicar` só
   envia o que mudou (MD5 × ETag), então o site não reenvia milhares de arquivos por dia.
 - **Windows:** o desenvolvimento local é em Windows (PowerShell e Git Bash). Use caminhos com `/`
   ou caminhos Windows; caminhos `/c/...` quebram em subprocessos Python. `con`, `prn`, `aux`,

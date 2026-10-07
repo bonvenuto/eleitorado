@@ -164,14 +164,19 @@ Cada item de `alertas` (em qualquer arquivo):
   - grava numa pasta temporária e só troca `site/` no fim: em caso de falha, nada muda;
   - antes, apaga `site/` inteira, para que um arquivo que deixou de existir não fique para trás;
   - recusa caminhos com `..` ou absolutos.
-- **`pipeline.yml`:** os modelos `site_*` rodam no mesmo `dbt build`. O `coletor site` roda no
-  passo de publicação, antes do `coletor publicar`. Se ele falhar, os marts são publicados mesmo
+- **`pipeline.yml`:** o `coletor site` roda no passo de publicação, antes do `coletor publicar`.
+  Ele mesmo roda os modelos `site_*` e o seed (`dbt build --select path:models/site
+  site_alerta_tipos`), que ficam fora do `dbt build` do pipeline (revisão final do plano 10: uma
+  falha neles não pode impedir a publicação dos marts). Se ele falhar, os marts são publicados mesmo
   assim e o job fica vermelho; sem `site/` local, o `publicar` não apaga o `site/` do R2, que
   continua com os dados da véspera.
 - **`publicacao.py`:**
   - `PERMITIDOS` ganha `site/`;
   - o `manifesto.json` continua listando só `marts/` e `linhagem/`;
   - o envio passa a ser **incremental**: compara o MD5 local com o ETag do objeto no R2 (uploads simples, sem multipart, têm ETag = MD5) e só envia o que mudou. Isso vale para todos os arquivos e evita reenviar milhares de JSON por dia.
+  - os envios são simultâneos (16 de cada vez), porque o site tem milhares de arquivos;
+  - o cliente do R2 não usa checksum em trailer: com ele, o botocore manda
+    `Content-Encoding: gzip,aws-chunked`;
   - arquivos de `site/` saem com `Cache-Control: public, max-age=600`;
   - os JSON de `site/` são gravados já em gzip, de forma determinística (`mtime=0`), e enviados com `Content-Encoding: gzip`. O `r2.dev` não comprime sozinho (verificado), e o navegador descomprime de forma transparente. O ETag é então o MD5 dos bytes comprimidos, que é o que o envio incremental compara.
 - **CORS no bucket R2** (configuração única do usuário, no painel da Cloudflare): `GET` e `HEAD` para `https://eleitorado.pages.dev`, `https://*.eleitorado.pages.dev` (prévias) e `http://localhost:5173`.

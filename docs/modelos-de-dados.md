@@ -1120,7 +1120,8 @@ flowchart LR
 ## Arquivos do site (`site/`)
 
 O site público lê arquivos JSON pequenos, gerados todo dia a partir dos marts pelos modelos
-`site_*` (pasta `dbt/models/site/`, que só lê marts e seeds) e gravados pelo `coletor site`.
+`site_*` (pasta `dbt/models/site/`, que só lê marts e seeds; o `coletor site` os roda depois do
+`dbt build` do pipeline) e gravados pelo `coletor site`.
 Ficam no R2 em `site/`, em gzip (`Content-Encoding: gzip`), fora do `manifesto.json`.
 
 | Caminho | Conteúdo |

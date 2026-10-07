@@ -153,3 +153,45 @@ def test_etag_que_nao_e_md5_faz_reenviar(publico):
     publicador.ordem.clear()
     publicar(publicador, publico, AGORA, "v")
     assert ("enviar", "marts/dim_uf.parquet") in publicador.ordem
+
+
+def test_envia_em_paralelo(publico):
+    import threading
+    import time
+
+    _site(publico, {f"parlamentar/camara-{i}.json": bytes([i]) for i in range(8)})
+
+    class Lento(FakePublicador):
+        def __init__(self) -> None:
+            super().__init__()
+            self.trava = threading.Lock()
+            self.agora = 0
+            self.maximo = 0
+
+        def enviar(self, origem, chave, tipo, codificacao=None, cache=None) -> None:
+            with self.trava:
+                self.agora += 1
+                self.maximo = max(self.maximo, self.agora)
+            time.sleep(0.05)
+            super().enviar(origem, chave, tipo, codificacao, cache)
+            with self.trava:
+                self.agora -= 1
+
+    publicador = Lento()
+    publicar(publicador, publico, AGORA, "v")
+    assert publicador.maximo > 1
+    assert publicador.ordem[-1] == ("enviar", "manifesto.json")
+    assert len(publicador.chaves) == 12  # 3 de marts/linhagem, 8 do site e o manifesto
+
+
+def test_r2_sem_checksum_no_trailer(monkeypatch):
+    # com o checksum em trailer, o botocore manda "Content-Encoding: gzip,aws-chunked"
+    import boto3
+
+    from coletor.publicacao import R2Publicador
+
+    vistos = {}
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: vistos.update(k) or object())
+    R2Publicador("conta", "id", "segredo", "bucket")
+    assert vistos["config"].request_checksum_calculation == "when_required"
+    assert vistos["config"].response_checksum_validation == "when_required"
