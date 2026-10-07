@@ -49,8 +49,9 @@ try {
     if ((Rodar @("uv", "run", "coletor", "estado", "restaurar")) -ne 0) {
         throw "coletor estado restaurar falhou"
     }
+    # uma thread: os intermediários grandes em paralelo estouram os 4 GB do DuckDB nesta máquina
     $dbt = @("uv", "run", "dbt", "run", "--project-dir", "dbt", "--profiles-dir", "dbt",
-        "--target", "prod", "--select", "+int_rfb__raizes_interesse")
+        "--target", "prod", "--select", "+int_rfb__raizes_interesse", "--threads", "1")
     if ((Rodar $dbt) -ne 0) { throw "dbt das raízes de interesse falhou" }
     $codigo = Rodar @("uv", "run", "coletor", "executar", "--grupo", "receita")
     # duas passadas: se um pipeline rodou entre a primeira e o fim dela, ele pode ter apagado o
