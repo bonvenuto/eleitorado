@@ -42,3 +42,7 @@ avaliacao/
 
 # coleta local da Receita (scripts/receita_local.ps1)
 dados-receita/
+
+# site (frontend)
+site/node_modules/
+site/dist/
