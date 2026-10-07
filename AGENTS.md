@@ -17,6 +17,9 @@ governo e achar inconsistências. O repositório é **público**.
   (`dados/raw/<órgão>/<recurso>/<partição>/`) e registra em `dados/meta/`.
 - `dbt/`: staging (views), intermediate (tabelas, privadas) e marts (Parquet externo, públicos).
   Targets: `prod`, `dev`, `ci` (lago vazio de `dbt/tests/lago_vazio`) e `agente`.
+- `site/`: contrato dos dados do site público (`site/esquemas/`, JSON Schemas; `site/exemplos/`)
+  e, depois do plano 11, o frontend. Os modelos `dbt/models/site/` montam os arquivos e o
+  `coletor site` os grava em `publico/site/`, que o `coletor publicar` envia ao R2.
 - `agente/`: agente investigador L1 (controlador Python + sessões `claude -p` com servidor MCP
   próprio). Recomenda; não decide nem age. Relatórios só para uso interno.
 - `.github/workflows/`: `pipeline.yml` (diário: coleta do grupo `diario`, dbt build, publica) e
@@ -118,6 +121,8 @@ uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
   desde 07/2026; compare empresas pela raiz de 8 posições).
 - Testes do coletor sem rede: `respx` para HTTP, dublês em `tests/fakes.py`, amostras em
   `tests/amostras.py`. Testes que acessam GCP e fontes reais levam `@pytest.mark.integracao`.
+- Mudança no formato de um arquivo do site: altere no mesmo PR o modelo `site_*`, o esquema em
+  `site/esquemas/` e os exemplos em `site/exemplos/` (e o frontend, se ele usa o campo).
 
 ## Operação: o que já se sabe
 
@@ -139,5 +144,9 @@ uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
   #35), por isso a coleta é local, num lago próprio (`dados-receita/`), e sobe ao bucket com
   `coletor estado salvar --aditivo` (só arquivos novos de `raw/` e `meta/`; nunca apaga nem
   sobrescreve), sempre com o pipeline parado: ele espelha o lago e apagaria o que não conhece.
+- **Site:** o `coletor site` roda no passo de publicação do pipeline. Se ele falhar, os marts
+  são publicados mesmo assim e o `site/` do R2 fica com os dados da véspera. O `publicar` só
+  envia o que mudou (MD5 × ETag), então o site não reenvia milhares de arquivos por dia.
 - **Windows:** o desenvolvimento local é em Windows (PowerShell e Git Bash). Use caminhos com `/`
-  ou caminhos Windows; caminhos `/c/...` quebram em subprocessos Python.
+  ou caminhos Windows; caminhos `/c/...` quebram em subprocessos Python. `con`, `prn`, `aux`,
+  `nul`, `com1`… são nomes de arquivo reservados (por isso os arquivos do site levam `p_`/`b_`).
