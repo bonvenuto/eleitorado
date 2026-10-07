@@ -112,6 +112,8 @@ Colunas em `snake_case` e português. Valores monetários em `DECIMAL(38,2)` (re
 
 ### Documentos (CPF e CNPJ) e LGPD
 
+Os marts da Receita (`dim_empresa`, `dim_estabelecimento` e os alertas da onda C1) também passam por `sem_dados_pessoais`: falha se o mart tiver coluna de endereço, contato ou sócio pessoa física.
+
 - **CPF nunca é publicado completo.** Nos marts ele sai como `***.456.789-**` (só os 6 dígitos do meio). O mesmo vale para CPFs dentro de texto livre (nome de MEI, objeto, detalhamento), que são mascarados por expressão regular.
 - CNPJ é dado de pessoa jurídica e sai completo. Desde 31/07/2026 o CNPJ pode ser **alfanumérico** (12 posições com dígitos ou letras + 2 dígitos verificadores); a validação já cobre os dois formatos.
 - `*_cnpj_raiz`: as 8 primeiras posições do CNPJ, que identificam a empresa (matriz e filiais).
@@ -157,8 +159,11 @@ Os alertas `*_sancionado` cruzam um documento (fornecedor, favorecido, vencedor)
 | `pncp.contratos` | Contratos do PNCP (todas as esferas) | por competência | dia, desde 2021 | semanal / anual |
 | `pncp.contratos_atualizacao` | Contratos do PNCP atualizados nos últimos 7 dias | snapshot | data da coleta | diária |
 | `ibge.municipios` | Municípios e hierarquia territorial | snapshot | data da coleta | mensal |
+| `camara.deputados_detalhe` | Detalhe dos deputados (nome civil e CPF; só no lago privado) | snapshot | data da coleta | mensal |
+| `rfb.empresas`, `rfb.estabelecimentos`, `rfb.socios`, `rfb.simples` | Base do CNPJ da Receita, recortada às raízes que aparecem nos dados | snapshot mensal (histórico mantido) | pasta `AAAA-MM` da Receita | semanal (coleta uma vez por competência) |
+| `rfb.cnaes`, `rfb.municipios`, `rfb.naturezas`, `rfb.qualificacoes`, `rfb.motivos`, `rfb.paises` | Tabelas de apoio da Receita (código e descrição) | snapshot mensal | pasta `AAAA-MM` da Receita | semanal |
 
-Órgãos: Câmara dos Deputados (`dadosabertos.camara.leg.br`, `www.camara.leg.br`), Senado Federal (`legis.senado.leg.br`, `adm.senado.gov.br`), Controladoria-Geral da União — Portal da Transparência (`portaldatransparencia.gov.br`), Portal Nacional de Contratações Públicas (`pncp.gov.br`) e IBGE (`servicodados.ibge.gov.br`). O catálogo completo, com URLs e condições de uso, está em `fontes/*.yaml`.
+Órgãos: Câmara dos Deputados (`dadosabertos.camara.leg.br`, `www.camara.leg.br`), Senado Federal (`legis.senado.leg.br`, `adm.senado.gov.br`), Controladoria-Geral da União — Portal da Transparência (`portaldatransparencia.gov.br`), Portal Nacional de Contratações Públicas (`pncp.gov.br`) IBGE (`servicodados.ibge.gov.br`) e Receita Federal (`arquivos.receitafederal.gov.br`, compartilhamento WebDAV, coletado pelo workflow `receita.yml`, fora do pipeline diário). O catálogo completo, com URLs e condições de uso, está em `fontes/*.yaml`.
 
 - **Snapshot**: a fonte publica o estado atual; cada coleta guarda uma fotografia (o raw mantém 60 dias; os históricos de sanções e parlamentares guardam os eventos para sempre).
 - **Por competência**: a fonte publica um arquivo por ano, mês ou dia; competências recentes são recoletadas com mais frequência porque ainda mudam.
@@ -333,6 +338,57 @@ flowchart LR
 | `tipo_autor` | VARCHAR | `parlamentar`, `bancada`, `comissao`, `relator` ou `outro` (a partir do tipo de emenda). |
 | `parlamentar_id` | VARCHAR | Parlamentar ligado ao autor (só autor individual com nome único entre os parlamentares). |
 | `parlamentares_com_o_nome` | BIGINT | Quantos parlamentares têm o mesmo nome normalizado (a ligação só é feita quando é 1). |
+
+#### dim_empresa
+
+**Empresas (Receita).** Cadastro na Receita das empresas que aparecem nos dados do eleitorado (fornecedores da cota, favorecidos de emendas, contratados, licitantes e sancionadas), na competência mais recente.
+
+- **Grão:** empresa (raiz do CNPJ)
+- **Chave:** `cnpj_raiz`
+- **Fonte:** Receita Federal (base aberta do CNPJ)
+- **Arquivo:** `marts/dim_empresa.parquet`
+- **Modelos de origem:** `int_rfb__empresas`
+- **Testes:** `not_null(cnpj_raiz)`, `sem_cpf_completo`, `sem_dados_pessoais`, `unique(cnpj_raiz)`
+
+> Sem endereço, contato nem sócios (ficam no lago privado). A razão social do MEI traz o nome (e às vezes o CPF) de uma pessoa: o CPF é mascarado.
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `cnpj_raiz` | VARCHAR | Raiz do CNPJ (8 posições). |
+| `razao_social` | VARCHAR | Razão social (CPFs no texto mascarados). |
+| `natureza_juridica_codigo`, `natureza_juridica` | VARCHAR | Natureza jurídica (código e descrição). |
+| `porte` | VARCHAR | `MICRO EMPRESA`, `EMPRESA DE PEQUENO PORTE`, `DEMAIS` ou `NAO INFORMADO`. |
+| `capital_social` | DECIMAL(38,2) | Capital social declarado (R$). |
+| `data_abertura` | DATE | Início de atividade mais antigo entre os estabelecimentos. |
+| `matriz_cnpj` | VARCHAR | CNPJ da matriz. |
+| `situacao`, `data_situacao`, `motivo_situacao` | | Situação cadastral da matriz, desde quando vale e o motivo. |
+| `cnae_principal`, `cnae_principal_descricao` | VARCHAR | Atividade principal da matriz. |
+| `municipio_id`, `uf_sigla` | VARCHAR | Município (código IBGE) e UF da matriz. |
+| `optante_simples`, `data_opcao_simples`, `data_exclusao_simples` | | Simples Nacional. |
+| `optante_mei`, `data_opcao_mei`, `data_exclusao_mei` | | Microempreendedor individual. |
+| `estabelecimentos`, `socios` | BIGINT | Quantidade de estabelecimentos e de sócios. |
+| `competencia_receita` | VARCHAR | Competência da base da Receita (`AAAA-MM`). |
+
+#### dim_estabelecimento
+
+**Estabelecimentos (Receita).** Matriz e filiais das empresas de `dim_empresa`, um por CNPJ completo.
+
+- **Grão:** estabelecimento
+- **Chave:** `cnpj`
+- **Arquivo:** `marts/dim_estabelecimento.parquet`
+- **Modelos de origem:** `int_rfb__estabelecimentos`
+- **Testes:** `not_null(cnpj)`, `sem_cpf_completo`, `sem_dados_pessoais`, `unique(cnpj)`
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `cnpj`, `cnpj_raiz` | VARCHAR | CNPJ completo (14 posições) e raiz. |
+| `matriz` | BOOLEAN | `true` na matriz. |
+| `nome_fantasia` | VARCHAR | Nome fantasia (CPFs no texto mascarados). |
+| `situacao`, `data_situacao`, `motivo_situacao` | | Situação cadastral do estabelecimento. |
+| `data_inicio_atividade` | DATE | Início de atividade do estabelecimento. |
+| `cnae_principal`, `cnae_principal_descricao` | VARCHAR | Atividade principal. |
+| `municipio_id`, `uf_sigla` | VARCHAR | Município (código IBGE; nulo quando o nome da Receita não casa) e UF. |
+| `competencia_receita` | VARCHAR | Competência da base da Receita. |
 
 ### Fatos
 
@@ -897,6 +953,112 @@ flowchart LR
 | `sancao_coleta_id` | VARCHAR | Coleta da versão da sanção usada no cruzamento. |
 | `regra` | VARCHAR | Descrição em texto da regra que gerou o alerta. |
 
+#### alerta_pagamento_empresa_irregular
+
+**Alerta: pagamento a empresa irregular na Receita.** Despesa de cota, pagamento de emenda ou contrato federal com empresa que já estava baixada, inapta, suspensa ou nula na Receita na data do fato.
+
+- **Grão:** fato (despesa, pagamento ou contrato)
+- **Chave:** `alerta_id`
+- **Fonte:** `fct_despesa_cota_parlamentar`, `fct_emenda_pagamento`, `fct_contrato_federal` × cadastro da Receita
+- **Arquivo:** `marts/alerta_pagamento_empresa_irregular.parquet`
+- **Modelos de origem:** `int_rfb__estabelecimentos`, `int_rfb__empresas`, `dim_autor_emenda`
+- **Testes:** `not_null(alerta_id)`, `sem_cpf_completo`, `sem_dados_pessoais`, `unique(alerta_id)`
+
+> Vale a situação do estabelecimento exato (CNPJ de 14 posições); sem ele, a da matriz. Sucessão (incorporação, fusão, cisão total) não dispara: a empresa sucessora existe.
+>
+> A Receita informa desde quando vale a situação atual; reativações anteriores não aparecem. Registros com `valor_suspeito` ou `data_emissao_valida = false` ficam de fora.
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `alerta_id` | VARCHAR | MD5 de `pagamento_empresa_irregular|origem|fato_id`. |
+| `origem` | VARCHAR | `cota`, `emenda` ou `contrato`. |
+| `fato_id` | VARCHAR | `despesa_id`, `pagamento_linha_id` ou `contrato_id`. |
+| `data_fato` | DATE | Data de emissão, do documento de pagamento ou de assinatura. |
+| `valor` | DECIMAL(38,2) | Valor do documento, pago ou do contrato (R$). |
+| `cnpj` | VARCHAR | CNPJ do fornecedor ou favorecido no fato. |
+| `razao_social` | VARCHAR | Razão social na Receita (CPFs no texto mascarados). |
+| `estabelecimento_cnpj` | VARCHAR | Estabelecimento cuja situação foi usada. |
+| `estabelecimento_exato` | BOOLEAN | `true` quando é o CNPJ do fato; `false` quando é a matriz. |
+| `situacao` | VARCHAR | `BAIXADA`, `INAPTA`, `SUSPENSA` ou `NULA`. |
+| `data_situacao` | DATE | Desde quando vale a situação. |
+| `motivo_situacao` | VARCHAR | Motivo da situação (tabela da Receita). |
+| `dias_desde_a_situacao` | BIGINT | Dias entre a situação e o fato. |
+| `parlamentar_id` | VARCHAR | Parlamentar da cota ou autor da emenda (nulo em contratos). |
+| `regra` | VARCHAR | Descrição da regra. |
+
+#### alerta_empresa_recem_aberta
+
+**Alerta: empresa recém-aberta.** Contrato ou pagamento de emenda de pelo menos R$ 50 mil, ou despesa de cota de pelo menos R$ 10 mil, com empresa aberta até 180 dias antes.
+
+- **Grão:** fato
+- **Chave:** `alerta_id`
+- **Arquivo:** `marts/alerta_empresa_recem_aberta.parquet`
+- **Modelos de origem:** `int_rfb__empresas` e os mesmos fatos do alerta anterior
+- **Testes:** `not_null(alerta_id)`, `sem_cpf_completo`, `sem_dados_pessoais`, `unique(alerta_id)`
+
+> A abertura é o início de atividade mais antigo entre os estabelecimentos (a matriz atual pode ser nova). Consórcio de Sociedades (natureza 2151) fica de fora: é criado para o contrato. Fato anterior à abertura sai com `tipo = 'fato_antes_da_abertura'` (em geral, contrato transferido para uma sucessora).
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `alerta_id` | VARCHAR | MD5 de `empresa_recem_aberta|origem|fato_id`. |
+| `origem`, `fato_id`, `data_fato`, `valor`, `cnpj`, `parlamentar_id` | | Como em `alerta_pagamento_empresa_irregular`. |
+| `razao_social` | VARCHAR | Razão social (CPFs no texto mascarados). |
+| `natureza_juridica` | VARCHAR | Natureza jurídica. |
+| `capital_social` | DECIMAL(38,2) | Capital social declarado (R$). |
+| `data_abertura` | DATE | Início de atividade mais antigo da empresa. |
+| `dias_desde_a_abertura` | BIGINT | Dias entre a abertura e o fato (negativo: antes da abertura). |
+| `tipo` | VARCHAR | `recem_aberta` ou `fato_antes_da_abertura`. |
+| `regra` | VARCHAR | Descrição da regra. |
+
+#### alerta_licitacao_socios_em_comum
+
+**Alerta: sócios em comum na licitação.** Dois participantes (raízes diferentes) da mesma licitação do Portal com sócio em comum desde antes da licitação.
+
+- **Grão:** licitação × par de participantes
+- **Chave:** `alerta_id`
+- **Arquivo:** `marts/alerta_licitacao_socios_em_comum.parquet`
+- **Modelos de origem:** `int_cgu__licitacao_participantes`, `int_rfb__socios`
+- **Testes:** `not_null(alerta_id)`, `sem_cpf_completo`, `sem_dados_pessoais`, `unique(alerta_id)`
+
+> Sócio empresa casa pela raiz do CNPJ; sócio pessoa física, pelo nome e pelos 6 dígitos visíveis do CPF. O sócio precisa ter entrado nas duas empresas até a data da licitação. Nome e CPF de sócio pessoa física não são publicados. Os sócios são os da competência mais recente da Receita: quem saiu antes não aparece.
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `alerta_id` | VARCHAR | MD5 de `licitacao_socios_em_comum|licitacao_id|raiz A|raiz B`. |
+| `licitacao_id`, `licitacao_numero`, `orgao_nome`, `data_licitacao` | | A licitação. |
+| `participante_a_cnpj_raiz`, `participante_a_nome`, `participante_a_venceu` | | Primeiro participante (menor raiz). |
+| `participante_b_cnpj_raiz`, `participante_b_nome`, `participante_b_venceu` | | Segundo participante. |
+| `socios_pessoa_fisica` | BIGINT | Sócios pessoa física em comum. |
+| `socios_empresa` | BIGINT | Sócios empresa em comum. |
+| `socios_empresa_cnpj_raiz` | VARCHAR[] | Raízes dos sócios empresa em comum. |
+| `qualificacoes_no_participante_a`, `qualificacoes_no_participante_b` | VARCHAR[] | Qualificações dos sócios em comum em cada participante. |
+| `regra` | VARCHAR | Descrição da regra. |
+
+#### alerta_parlamentar_socio_fornecedor
+
+**Alerta: parlamentar sócio de fornecedor.** Parlamentar que é sócio (pessoa física) de empresa que aparece nos dados do eleitorado.
+
+- **Grão:** parlamentar × empresa
+- **Chave:** `alerta_id`
+- **Arquivo:** `marts/alerta_parlamentar_socio_fornecedor.parquet`
+- **Modelos de origem:** `stg_camara__deputados_detalhe`, `stg_senado__senadores`, `int_rfb__socios`, `int_rfb__empresas`
+- **Testes:** `not_null(alerta_id)`, `sem_cpf_completo`, `sem_dados_pessoais`, `unique(alerta_id)`
+
+> Deputado: mesmo nome civil e mesmos 6 dígitos do meio do CPF (`correspondencia = 'nome e cpf'`). Senador: só pelo nome completo (`'só nome'`), sujeito a homônimo. O CPF não aparece.
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `alerta_id` | VARCHAR | MD5 de `parlamentar_socio_fornecedor|parlamentar_id|cnpj_raiz`. |
+| `parlamentar_id`, `parlamentar_nome` | VARCHAR | O parlamentar. |
+| `correspondencia` | VARCHAR | `nome e cpf` ou `só nome`. |
+| `cnpj_raiz`, `razao_social`, `situacao` | VARCHAR | A empresa. |
+| `qualificacoes` | VARCHAR[] | Qualificações do parlamentar como sócio. |
+| `data_entrada` | DATE | Entrada mais antiga como sócio. |
+| `cota_do_parlamentar` | DECIMAL(38,2) | Total da cota do próprio parlamentar pago à empresa. |
+| `emendas_do_parlamentar` | DECIMAL(38,2) | Total de pagamentos de emendas de autoria dele à empresa. |
+| `contratos_federais` | DECIMAL(38,2) | Total de contratos federais da empresa. |
+| `regra` | VARCHAR | Descrição da regra. |
+
 #### alerta_fonte_reduzida
 
 **Alerta: fonte que encolheu.** Carga com pelo menos 10% menos linhas que a anterior da mesma série (mesma competência, ou o snapshot anterior). Sinaliza dado apagado ou republicado na fonte.
@@ -1313,6 +1475,14 @@ Documentos de despesa de emendas com o documento completo do favorecido e a vali
 | `favorecido_cnpj_raiz` | VARCHAR |
 
 </details>
+
+### Receita Federal (onda C1)
+
+- `int_rfb__raizes_interesse`: raízes de CNPJ que aparecem em cota, contratos, emendas (pagamentos e favorecidos), participantes de licitação e sanções, com as origens. Vai para `<lago>/rfb_raizes_interesse.parquet`, que o coletor usa para recortar a base da Receita.
+- `int_rfb__municipios`: código de município da Receita para o código IBGE, por nome sem acentos e UF (só correspondências únicas; ~99,9% dos estabelecimentos).
+- `int_rfb__estabelecimentos`: estabelecimentos da competência mais recente, com endereço e contato (privado).
+- `int_rfb__socios`: sócios da competência mais recente, como a Receita publica (CPF de pessoa física mascarado, sócio empresa só com a raiz). Privado.
+- `int_rfb__empresas`: uma linha por empresa, com matriz, abertura, Simples/MEI e contagens.
 
 ## Camada staging
 

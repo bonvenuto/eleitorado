@@ -1,0 +1,211 @@
+orgao: rfb
+nome: Receita Federal do Brasil
+portal: https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj
+# Base aberta do CNPJ: uma pasta por competência (AAAA-MM) no compartilhamento WebDAV da Receita.
+# Coletada pelo workflow receita.yml (grupo receita), recortada às raízes de CNPJ que aparecem nos
+# dados do eleitorado (int_rfb__raizes_interesse). O usuário é o token público do
+# compartilhamento.
+recursos:
+  - id: empresas
+    descricao: Empresas (cadastro por CNPJ básico)
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Empresas*.zip"
+      colunas: [cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel,
+        capital_social, porte_empresa, ente_federativo_responsavel]
+      raizes: rfb_raizes_interesse.parquet
+  - id: estabelecimentos
+    descricao: Estabelecimentos (matriz e filiais)
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Estabelecimentos*.zip"
+      colunas: [cnpj_basico, cnpj_ordem, cnpj_dv, identificador_matriz_filial, nome_fantasia,
+        situacao_cadastral, data_situacao_cadastral, motivo_situacao_cadastral,
+        nome_cidade_exterior, pais, data_inicio_atividade, cnae_fiscal_principal,
+        cnae_fiscal_secundaria, tipo_logradouro, logradouro, numero, complemento, bairro, cep,
+        uf, municipio, ddd_1, telefone_1, ddd_2, telefone_2, ddd_fax, fax, correio_eletronico,
+        situacao_especial, data_situacao_especial]
+      raizes: rfb_raizes_interesse.parquet
+  - id: socios
+    descricao: Sócios (quadro societário)
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Socios*.zip"
+      colunas: [cnpj_basico, identificador_socio, nome_socio_razao_social, cnpj_cpf_socio,
+        qualificacao_socio, data_entrada_sociedade, pais, representante_legal,
+        nome_representante, qualificacao_representante_legal, faixa_etaria]
+      raizes: rfb_raizes_interesse.parquet
+  - id: simples
+    descricao: Opção pelo Simples Nacional e pelo MEI
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Simples.zip"
+      colunas: [cnpj_basico, opcao_pelo_simples, data_opcao_simples, data_exclusao_simples,
+        opcao_mei, data_opcao_mei, data_exclusao_mei]
+      raizes: rfb_raizes_interesse.parquet
+  - id: cnaes
+    descricao: Tabela de apoio de CNAEs (atividades econômicas)
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Cnaes.zip"
+      colunas: [codigo, descricao]
+  - id: municipios
+    descricao: Tabela de apoio de municípios (código próprio da Receita)
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Municipios.zip"
+      colunas: [codigo, descricao]
+  - id: naturezas
+    descricao: Tabela de apoio de naturezas jurídicas
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Naturezas.zip"
+      colunas: [codigo, descricao]
+  - id: qualificacoes
+    descricao: Tabela de apoio de qualificações de sócios e responsáveis
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Qualificacoes.zip"
+      colunas: [codigo, descricao]
+  - id: motivos
+    descricao: Tabela de apoio de motivos de situação cadastral
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Motivos.zip"
+      colunas: [codigo, descricao]
+  - id: paises
+    descricao: Tabela de apoio de países
+    fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    condicoes_uso: >-
+      Dados abertos do CNPJ publicados pela Receita Federal no Portal Brasileiro de Dados Abertos
+      (dados.gov.br), de uso livre (Decreto 8.777/2016).
+    adaptador: webdav_zip
+    url: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    parametros: {usuario: YggdBLfdninEJX9}
+    publicacao: snapshot
+    competencia:
+      tipo: data_arquivo
+      pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
+    cadencia: {corrente: semanal}
+    formato: {tipo: csv}
+    grupo: receita
+    recorte:
+      arquivos: "Paises.zip"
+      colunas: [codigo, descricao]

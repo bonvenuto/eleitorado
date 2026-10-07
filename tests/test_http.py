@@ -105,3 +105,70 @@ def test_422_e_repetido_como_transitorio(respx_mock):
     )
     assert cliente.obter_json("https://fonte/a").dados == [1]
     assert rota.call_count == 2
+
+
+def _parcial(conteudo: bytes, total: int, status: int = 200) -> httpx.Response:
+    """Resposta que anuncia `total` bytes e entrega só `conteudo` (conexão derrubada)."""
+    return httpx.Response(
+        status, headers={"Content-Length": str(total)}, stream=httpx.ByteStream(conteudo)
+    )
+
+
+def test_baixar_retomando_continua_de_onde_parou(respx_mock, http, tmp_path):
+    rota = respx_mock.get("https://arquivos.receitafederal.gov.br/x.zip")
+    rota.side_effect = [_parcial(b"abcd", 10), _parcial(b"efghij", 6, status=206)]
+    download = http.baixar_retomando(
+        "https://arquivos.receitafederal.gov.br/x.zip", tmp_path / "x", "token"
+    )
+    assert (tmp_path / "x").read_bytes() == b"abcdefghij"
+    assert download.sha256 == hashlib.sha256(b"abcdefghij").hexdigest()
+    assert download.bytes == 10
+    assert rota.calls[1].request.headers["Range"] == "bytes=4-"
+    assert rota.calls[0].request.headers["Authorization"].startswith("Basic ")
+
+
+def test_baixar_retomando_recusa_servidor_que_ignora_o_range(respx_mock, http, tmp_path):
+    rota = respx_mock.get("https://arquivos.receitafederal.gov.br/x.zip")
+    rota.side_effect = [_parcial(b"abcd", 10), _parcial(b"abcdefghij", 10)]
+    with pytest.raises(ErroHttp, match="ignorou o Range"):
+        http.baixar_retomando("https://arquivos.receitafederal.gov.br/x.zip", tmp_path / "x")
+
+
+def test_baixar_retomando_repete_falha_de_transporte_e_desiste(respx_mock, http, tmp_path):
+    rota = respx_mock.get("https://arquivos.receitafederal.gov.br/x.zip")
+    rota.side_effect = httpx.ReadError("caiu")
+    with pytest.raises(ErroHttp, match="falha de transporte"):
+        http.baixar_retomando(
+            "https://arquivos.receitafederal.gov.br/x.zip", tmp_path / "x", tentativas=3
+        )
+    assert rota.call_count == 3
+
+
+def test_baixar_retomando_nao_repete_404(respx_mock, http, tmp_path):
+    rota = respx_mock.get("https://arquivos.receitafederal.gov.br/x.zip")
+    rota.mock(return_value=httpx.Response(404))
+    with pytest.raises(ErroHttp) as erro:
+        http.baixar_retomando("https://arquivos.receitafederal.gov.br/x.zip", tmp_path / "x")
+    assert erro.value.status == 404
+    assert rota.call_count == 1
+
+
+def test_listar_webdav_devolve_pastas_e_arquivos_sem_a_propria_pasta(respx_mock, http):
+    corpo = (
+        '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">'
+        "<d:response><d:href>/webdav/</d:href><d:propstat><d:prop>"
+        "<d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>"
+        "<d:response><d:href>/webdav/2026-09/</d:href><d:propstat><d:prop>"
+        "<d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>"
+        "<d:response><d:href>/webdav/S%C3%B3cios.zip</d:href><d:propstat><d:prop>"
+        "<d:resourcetype/><d:getcontentlength>42</d:getcontentlength></d:prop></d:propstat>"
+        "</d:response></d:multistatus>"
+    )
+    rota = respx_mock.route(method="PROPFIND", url="https://arquivos.receitafederal.gov.br/webdav/")
+    rota.mock(return_value=httpx.Response(207, text=corpo))
+    itens = http.listar_webdav("https://arquivos.receitafederal.gov.br/webdav/", "token")
+    assert [(i.nome, i.pasta, i.tamanho) for i in itens] == [
+        ("2026-09", True, None),
+        ("Sócios.zip", False, 42),
+    ]
+    assert rota.calls[0].request.headers["Depth"] == "1"

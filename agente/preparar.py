@@ -21,6 +21,7 @@ from agente.caderno import Caderno, Caso, ConsultaChave, mudou
 from agente.config import ConfigAgente
 from agente.consulta import ErroConsulta, abrir, executar
 from agente.diario import Diario
+from coletor.esquemas import ARQUIVO_ESQUEMAS, carregar_esquemas, garantir_fontes
 
 Rodar = Callable[[list[str], Mapping[str, str], Path], int]
 SCHEMAS = ("marts", "intermediate", "staging")
@@ -223,6 +224,11 @@ def preparar(
     # da raiz do repositório: o coletor e o dbt usam caminhos relativos (fontes/, dbt/)
     if rodar(restaurar, env, config.raiz) != 0:
         raise ErroPreparo("coletor estado restaurar falhou (credenciais do GCS no .env?)")
+    # fonte nova ainda sem coleta (a Receita, antes do primeiro workflow mensal): Parquet vazio
+    # com o esquema, como no pipeline, para o dbt não falhar
+    esquemas = config.raiz / "dbt" / ARQUIVO_ESQUEMAS
+    if esquemas.exists():
+        garantir_fontes(config.lago, carregar_esquemas(config.raiz / "dbt"))
     impressao = impressao_lago(config.lago)
     marca = config.lago / "preparo.json"
     anterior = json.loads(marca.read_text(encoding="utf-8")) if marca.exists() else {}

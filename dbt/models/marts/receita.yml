@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: dim_empresa
+    data_tests:
+      - sem_dados_pessoais
+      - sem_cpf_completo
+    columns:
+      - name: cnpj_raiz
+        data_tests: [unique, not_null]
+  - name: dim_estabelecimento
+    data_tests:
+      - sem_dados_pessoais
+      - sem_cpf_completo
+    columns:
+      - name: cnpj
+        data_tests: [unique, not_null]

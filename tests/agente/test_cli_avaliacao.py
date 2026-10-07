@@ -7,6 +7,7 @@ from agente import cli
 from agente.avaliacao import (
     ACME,
     ALFA_COTA,
+    BETA,
     DELTA,
     _digitos_cnpj,
     contexto_de_avaliacao,
@@ -58,6 +59,10 @@ def test_lago_de_avaliacao_tem_os_casos_plantados(tmp_path):
         "select count(*) from marts.dim_parlamentar where nome = 'JOSE DA SILVA'"
     ).fetchone()
     assert homonimos == (2,)
+    baixada = conexao.sql(
+        "select razao_social, count(*) from marts.alerta_pagamento_empresa_irregular group by 1"
+    ).fetchall()
+    assert baixada == [(BETA[1], 4)]
     conexao.close()
 
 
@@ -67,6 +72,7 @@ def test_verificar():
         criada_em=AGORA,
         achados=[
             registro("confirmado", ACME[0][:8]),
+            registro("confirmado", BETA[0][:8], "Pagamentos a empresa baixada"),
             registro("inconclusivo", DELTA[0][:8], "Despesa muito acima do normal"),
         ],
     )

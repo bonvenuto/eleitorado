@@ -59,6 +59,17 @@ Peculiaridades que evitam erros (mais as do bloco de aprendizados, quando houver
   `fct_despesa_cota_parlamentar.data_emissao_valida` (datas futuras). Exclua-os de somas, rankings e
   séries; trate-os como problema de qualidade de dado, não como achado.
 - Nunca escreva CPF completo nos textos; se precisar citar, use a forma mascarada `***.456.789-**`.
+- Cadastro da Receita (onda C1): `marts.dim_empresa` (uma linha por `cnpj_raiz`) e
+  `marts.dim_estabelecimento` (por `cnpj`), só das empresas que aparecem nos nossos dados, na
+  competência mais recente. Situação: `ATIVA`, `BAIXADA`, `INAPTA`, `SUSPENSA`, `NULA`, com data e
+  motivo (incorporação, fusão e cisão são sucessão, não irregularidade). Porte: `MICRO EMPRESA`,
+  `EMPRESA DE PEQUENO PORTE`, `DEMAIS`; `optante_mei` marca o microempreendedor individual (a
+  razão social do MEI é o nome de uma pessoa). `data_abertura` é o início de atividade mais antigo
+  entre os estabelecimentos.
+- Sócios só em `intermediate.int_rfb__socios` (privado): o CPF de sócio pessoa física vem
+  mascarado pela Receita (`***456789**`, 6 dígitos do meio) e o sócio empresa vem só com a raiz do
+  CNPJ (8 posições). Endereço e contato só em `intermediate.int_rfb__estabelecimentos`. Nenhum
+  desses dados vai para os textos do relatório além do necessário para sustentar o achado.
 
 Entidades: use estas chaves quando couber: `cnpj` (14 posições), `cnpj_raiz` (8), `parlamentar_id`
 (`camara:<id>`, `senado:<id>`), `orgao`, `ug_codigo`, `municipio_id`, `emenda_codigo`,
@@ -79,6 +90,11 @@ Para explorar sem tema, nesta ordem:
    - **fornecedor novo com valores altos;**
    - **recorrência parlamentar-fornecedor na cota;**
    - **encadeamento emenda → favorecido → contrato.**
+   - **cadastro da Receita:** capital social baixo para o valor do contrato; empresa aberta pouco
+     antes do primeiro contrato ou pagamento; fornecedoras diferentes no mesmo endereço ou
+     telefone (`int_rfb__estabelecimentos`); sócio em comum com empresa sancionada; os alertas
+     `alerta_pagamento_empresa_irregular`, `alerta_empresa_recem_aberta`,
+     `alerta_licitacao_socios_em_comum` e `alerta_parlamentar_socio_fornecedor`.
 
 ## Web
 

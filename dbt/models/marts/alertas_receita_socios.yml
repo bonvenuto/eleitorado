@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: alerta_licitacao_socios_em_comum
+    data_tests:
+      - sem_dados_pessoais
+      - sem_cpf_completo:
+          arguments: {excluir: [licitacao_numero]}
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+  - name: alerta_parlamentar_socio_fornecedor
+    data_tests:
+      - sem_dados_pessoais
+      - sem_cpf_completo
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: socios_em_comum_antes_da_licitacao
+    description: >
+      Sócio pessoa física em comum (mesmo nome e mesmos 6 dígitos) gera alerta; homônimo com
+      outros dígitos, não. Sócio empresa que entrou depois da licitação não conta; antes, sim.
+    model: alerta_licitacao_socios_em_comum
+    given:
+      - input: ref('int_cgu__licitacao_participantes')
+        rows:
+          - {licitacao_id: L1, participante_cnpj_raiz: AAAAAAAA, licitacao_numero: '1/2024', orgao_nome: ORGAO, data_licitacao: '2024-05-01', participante_nome: EMPRESA A, vencedor: true}
+          - {licitacao_id: L1, participante_cnpj_raiz: BBBBBBBB, licitacao_numero: '1/2024', orgao_nome: ORGAO, data_licitacao: '2024-05-01', participante_nome: EMPRESA B, vencedor: false}
+          - {licitacao_id: L1, participante_cnpj_raiz: CCCCCCCC, licitacao_numero: '1/2024', orgao_nome: ORGAO, data_licitacao: '2024-05-01', participante_nome: EMPRESA C, vencedor: false}
+          - {licitacao_id: L2, participante_cnpj_raiz: DDDDDDDD, licitacao_numero: '2/2024', orgao_nome: ORGAO, data_licitacao: '2024-05-01', participante_nome: EMPRESA D, vencedor: true}
+          - {licitacao_id: L2, participante_cnpj_raiz: EEEEEEEE, licitacao_numero: '2/2024', orgao_nome: ORGAO, data_licitacao: '2024-05-01', participante_nome: EMPRESA E, vencedor: false}
+      - input: ref('int_rfb__socios')
+        rows:
+          - {cnpj_raiz: AAAAAAAA, tipo_socio: pessoa_fisica, nome_socio_normalizado: JOSE DA SILVA, documento_socio: '***111222**', qualificacao: Sócio-Administrador, data_entrada: '2020-01-01'}
+          - {cnpj_raiz: BBBBBBBB, tipo_socio: pessoa_fisica, nome_socio_normalizado: JOSE DA SILVA, documento_socio: '***111222**', qualificacao: Sócio, data_entrada: '2020-01-01'}
+          - {cnpj_raiz: CCCCCCCC, tipo_socio: pessoa_fisica, nome_socio_normalizado: JOSE DA SILVA, documento_socio: '***333444**', qualificacao: Sócio, data_entrada: '2020-01-01'}
+          - {cnpj_raiz: AAAAAAAA, tipo_socio: pessoa_juridica, nome_socio_normalizado: HOLDING X, documento_socio: '99887766', qualificacao: Sócio, data_entrada: '2019-01-01'}
+          - {cnpj_raiz: CCCCCCCC, tipo_socio: pessoa_juridica, nome_socio_normalizado: HOLDING X, documento_socio: '99887766', qualificacao: Sócio, data_entrada: '2024-06-01'}
+          - {cnpj_raiz: DDDDDDDD, tipo_socio: pessoa_juridica, nome_socio_normalizado: HOLDING X, documento_socio: '99887766', qualificacao: Sócio, data_entrada: '2019-01-01'}
+          - {cnpj_raiz: EEEEEEEE, tipo_socio: pessoa_juridica, nome_socio_normalizado: HOLDING X, documento_socio: '99887766', qualificacao: Sócio, data_entrada: '2024-05-01'}
+    expect:
+      rows:
+        - {licitacao_id: L1, participante_a_cnpj_raiz: AAAAAAAA, participante_b_cnpj_raiz: BBBBBBBB, participante_a_venceu: true, socios_pessoa_fisica: 1, socios_empresa: 0}
+        - {licitacao_id: L2, participante_a_cnpj_raiz: DDDDDDDD, participante_b_cnpj_raiz: EEEEEEEE, participante_a_venceu: true, socios_pessoa_fisica: 0, socios_empresa: 1}
+
+  - name: parlamentar_socio_por_nome_e_cpf
+    description: >
+      Deputado casa por nome civil e 6 dígitos do CPF (homônimo com outros dígitos não casa);
+      senador, só pelo nome. A cota soma só a do próprio parlamentar; contratos, todos.
+    model: alerta_parlamentar_socio_fornecedor
+    given:
+      - input: ref('stg_camara__deputados_detalhe')
+        rows:
+          - {id_deputado: '1', nome_civil: José da Silva, cpf: '12345678901', data_referencia: '2026-10-06'}
+      - input: ref('stg_senado__senadores')
+        rows:
+          - {id_senador: '5', nome_completo: Maria Souza}
+      - input: ref('int_rfb__socios')
+        rows:
+          - {cnpj_raiz: AAAAAAAA, tipo_socio: pessoa_fisica, nome_socio_normalizado: JOSE DA SILVA, documento_socio: '***456789**', qualificacao: Sócio-Administrador, data_entrada: '2015-01-01'}
+          - {cnpj_raiz: BBBBBBBB, tipo_socio: pessoa_fisica, nome_socio_normalizado: JOSE DA SILVA, documento_socio: '***000000**', qualificacao: Sócio, data_entrada: '2015-01-01'}
+          - {cnpj_raiz: CCCCCCCC, tipo_socio: pessoa_fisica, nome_socio_normalizado: MARIA SOUZA, documento_socio: '***999999**', qualificacao: Sócio, data_entrada: '2010-01-01'}
+      - input: ref('fct_despesa_cota_parlamentar')
+        rows:
+          - {despesa_id: c1, data_emissao: '2024-02-01', valor_documento: 1000, fornecedor_documento: AAAAAAAA000100, fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: AAAAAAAA, parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c2, data_emissao: '2024-02-01', valor_documento: 500, fornecedor_documento: AAAAAAAA000100, fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: AAAAAAAA, parlamentar_id: 'camara:2', data_emissao_valida: true}
+      - input: ref('fct_emenda_pagamento')
+        rows: []
+      - input: ref('dim_autor_emenda')
+        rows: []
+      - input: ref('fct_contrato_federal')
+        rows:
+          - {contrato_id: k1, data_assinatura: '2024-06-29', valor_final: 2000, fornecedor_documento: AAAAAAAA000100, fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: AAAAAAAA, valor_suspeito: false}
+      - input: ref('int_rfb__empresas')
+        rows: []
+      - input: ref('dim_parlamentar')
+        rows: []
+    expect:
+      rows:
+        - {parlamentar_id: 'camara:1', cnpj_raiz: AAAAAAAA, correspondencia: nome e cpf, cota_do_parlamentar: 1000, emendas_do_parlamentar: 0, contratos_federais: 2000}
+        - {parlamentar_id: 'senado:5', cnpj_raiz: CCCCCCCC, correspondencia: só nome, cota_do_parlamentar: 0, emendas_do_parlamentar: 0, contratos_federais: 0}

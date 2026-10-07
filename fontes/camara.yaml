@@ -35,3 +35,24 @@ recursos:
       arquivo: Ano-{ano}.csv
       encoding: utf-8-sig
       delimitador: ";"
+  - id: deputados_detalhe
+    descricao: >-
+      Detalhe de cada deputado da 53ª legislatura em diante, com nome civil e CPF (só no lago
+      privado: alimenta o alerta de parlamentar sócio de fornecedor)
+    fonte_oficial: https://dadosabertos.camara.leg.br/swagger/api.html
+    condicoes_uso: >-
+      Serviço de Dados Abertos da Câmara dos Deputados: acesso livre, sem necessidade de
+      autorização (https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos).
+    adaptador: api_detalhe
+    url: https://dadosabertos.camara.leg.br/api/v2/deputados
+    url_detalhe: https://dadosabertos.camara.leg.br/api/v2/deputados/{id}
+    parametros: {itens: 100}
+    publicacao: snapshot
+    competencia: {tipo: data_coleta}
+    cadencia: {corrente: mensal}
+    formato: {tipo: json}
+    paginacao: links_next
+    pausa_pagina_segundos: 0.1
+    iteracao: {parametro: idLegislatura, valores: legislaturas, inicio: 53}
+    registros: dados
+    grupo: receita
