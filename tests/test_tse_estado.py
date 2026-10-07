@@ -787,3 +787,32 @@ def test_limpeza_temporario_falho_preserva_erro_original(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="erro original"):
         with pasta_temporaria("tse-preparo-", tmp_path):
             raise ValueError("erro original")
+
+
+def test_validar_estado_tse_publico_puro_sem_artefatos_produtivos(tmp_path):
+    from coletor.tse.estado import validar_estado_tse
+
+    lago, _, _ = remoto(tmp_path)
+    import shutil
+
+    for pasta in (lago / "estado/tse/publicacoes/preparadas").iterdir():
+        for p in pasta.iterdir():
+            if p.name == "recibo.json":
+                continue
+            if p.is_dir():
+                shutil.rmtree(p)
+            else:
+                p.unlink()
+    antes = {p.relative_to(lago): p.read_bytes() for p in lago.rglob("*") if p.is_file()}
+    assert validar_estado_tse(lago) is None
+    assert {p.relative_to(lago): p.read_bytes() for p in lago.rglob("*") if p.is_file()} == antes
+
+
+def test_validar_estado_tse_publico_bloqueia_recuperacao(tmp_path):
+    from coletor.tse.durabilidade import gravar_json
+    from coletor.tse.estado import validar_estado_tse
+
+    lago = tmp_path / "lago"
+    gravar_json(lago / "estado/tse/.recuperacao-pendente/journal.json", {"protocolo": "incerto"})
+    with pytest.raises(OSError):
+        validar_estado_tse(lago)

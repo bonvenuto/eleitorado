@@ -365,3 +365,18 @@ def test_exploracao_sem_hipoteses_ganha_sessao_de_registro(montar):
     assert executor.limites[1].ciclos == 12
     assert "q1" in executor.pedidos[1].prompt and "select 1 as um" in executor.pedidos[1].prompt
     assert [h.id for h in estado.hipoteses] == ["h1", "h2"]
+
+
+def test_retomar_fase_avancada_com_preparo_c2_pendente_inicia_zero_sessoes(montar):
+    from agente.preparar import ErroPreparo
+
+    controlador, executor, config = montar({})
+    pasta = controlador.nova(None)
+    estado = persistencia.carregar(pasta)
+    estado.fase = "explorar"
+    estado.situacao = "pausada"
+    persistencia.salvar(pasta, estado)
+    (config.lago / "preparo-c2-pendente.json").write_bytes(b"conteudo invalido")
+    with pytest.raises(ErroPreparo, match="pendente"):
+        controlador.executar(pasta)
+    assert executor.pedidos == []

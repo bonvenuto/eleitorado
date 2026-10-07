@@ -197,6 +197,12 @@ def _validar(lago: Path) -> None:
         raise ValueError("seleção possui rejeição pendente")
 
 
+def validar_estado_tse(lago: Path) -> None:
+    """Gate público puro do estado restaurado, sem exigir artefatos produtivos locais."""
+    conferir_recuperacao(lago)
+    _validar(lago)
+
+
 def salvar_tse(armazenamento: Armazenamento, prefixo: str, lago: Path) -> Resumo:
     """Envia dependências sem sobrescrever/apagar; vigente é o único objeto mutável."""
     conferir_recuperacao(lago)

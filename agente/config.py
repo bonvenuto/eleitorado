@@ -2,12 +2,55 @@
 
 from __future__ import annotations
 
+import json
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 ARQUIVO = Path(__file__).resolve().parent / "config.toml"
+
+
+FAMILIAS_TSE = (
+    "bens",
+    "candidaturas",
+    "contratadas",
+    "doador_originario",
+    "pagamentos",
+    "receitas",
+)
+
+
+def preparo_c2_pendente(lago: Path) -> bool:
+    """Existência basta: conteúdo inválido ou link pendente também bloqueia."""
+    caminho = lago / "preparo-c2-pendente.json"
+    return caminho.exists() or caminho.is_symlink()
+
+
+def _confinado_tse(lago: Path, relativo: str) -> Path:
+    lago = lago.absolute()
+    destino = lago / relativo
+    atual = lago
+    for parte in Path(relativo).parts:
+        atual /= parte
+        if atual.is_symlink() or atual.is_junction():
+            raise ValueError("diretório TSE simbólico ou junction")
+    if lago.resolve() != lago or destino.resolve() != destino:
+        raise ValueError("diretório TSE fora do lago canônico")
+    return destino
+
+
+def saida_tse_permitida(lago: Path, execucao_id: str, declarada: str | None = None) -> Path:
+    """Deriva somente a saída exata, nunca um caminho livre fornecido pela marca."""
+    if not isinstance(execucao_id, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", execucao_id
+    ):
+        raise ValueError("execução TSE inválida na marca de preparo")
+    saida = _confinado_tse(lago, f"estado/tse/publicacoes/preparadas/{execucao_id}/marts")
+    if declarada is not None and (not isinstance(declarada, str) or Path(declarada) != saida):
+        raise ValueError("saída TSE divergente na marca de preparo")
+    return saida
 
 
 @dataclass(frozen=True)
@@ -43,9 +86,28 @@ class ConfigAgente:
     def caderno(self) -> Path:
         return self.investigacoes / "caderno"
 
+    def diretorios_dados(self) -> list[Path]:
+        """Base restrita para o preparo interno: fontes usuais e seis vazios fixos."""
+        diretorios = [self.lago / "raw", self.lago / "meta", self.publico]
+        diretorios += [
+            _confinado_tse(self.lago, f"estado/tse/ci/{familia}/vazio") for familia in FAMILIAS_TSE
+        ]
+        return diretorios
+
     def diretorios_permitidos(self) -> list[Path]:
-        """Diretórios que as views do banco leem: o raw, o meta e os marts."""
-        return [self.lago / "raw", self.lago / "meta", self.publico]
+        """Leitura normal bloqueada durante tentativa C2 pendente."""
+        if preparo_c2_pendente(self.lago):
+            raise ValueError("preparo C2 pendente; reconstrua antes de consultar")
+        diretorios = self.diretorios_dados()
+        marca = self.lago / "preparo.json"
+        if marca.exists():
+            dados = json.loads(marca.read_bytes())
+            if "tse" in dados:
+                tse = dados["tse"]
+                diretorios.append(
+                    saida_tse_permitida(self.lago, tse["execucao_id"], tse.get("saida"))
+                )
+        return diretorios
 
     def orcamento(self, tema: str | None) -> Orcamento:
         return self.tema if tema else self.livre
