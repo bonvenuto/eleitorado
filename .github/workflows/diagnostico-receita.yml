@@ -1,0 +1,29 @@
+name: diagnostico-receita
+
+# Temporário: testa do runner do GitHub os caminhos de acesso à base do CNPJ da Receita.
+# Não usa segredos nem grava nada; o PR é fechado sem merge.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: testes de acesso
+        run: |
+          base=https://arquivos.receitafederal.gov.br
+          t() { echo "== $1"; shift; curl -sS -o /dev/null -m 60 -w "status=%{http_code} http=%{http_version} tempo=%{time_total}s bytes=%{size_download}\n" "$@" || echo "falhou (curl $?)"; }
+          t "página do compartilhamento (GET)" "$base/index.php/s/YggdBLfdninEJX9"
+          t "WebDAV PROPFIND (http2 padrão)" -u "YggdBLfdninEJX9:" -X PROPFIND -H "Depth: 1" "$base/public.php/webdav/"
+          t "WebDAV PROPFIND (http1.1)" --http1.1 -u "YggdBLfdninEJX9:" -X PROPFIND -H "Depth: 1" "$base/public.php/webdav/"
+          t "WebDAV PROPFIND (user-agent do coletor)" --http1.1 -A "eleitorado-coletor/0.1" -u "YggdBLfdninEJX9:" -X PROPFIND -H "Depth: 1" "$base/public.php/webdav/"
+          t "WebDAV GET Cnaes.zip" -u "YggdBLfdninEJX9:" "$base/public.php/webdav/2026-09/Cnaes.zip"
+          t "WebDAV GET Range de Simples.zip" -u "YggdBLfdninEJX9:" -H "Range: bytes=0-1048575" "$base/public.php/webdav/2026-09/Simples.zip"
+          t "link público de download (Cnaes)" -L "$base/index.php/s/YggdBLfdninEJX9/download?path=%2F2026-09&files=Cnaes.zip"
+          t "link público de download (Range de Simples)" -L -H "Range: bytes=0-1048575" "$base/index.php/s/YggdBLfdninEJX9/download?path=%2F2026-09&files=Simples.zip"
+          t "OCS: listagem via API do compartilhamento" -H "OCS-APIRequest: true" "$base/public.php/dav/files/YggdBLfdninEJX9/"
+          echo "== IP do runner"; curl -sS -m 20 https://api.ipify.org || true; echo
