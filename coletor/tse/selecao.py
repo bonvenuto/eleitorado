@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import tempfile
 from dataclasses import asdict
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,7 +16,13 @@ from coletor.conversao import CAMPOS_CONTROLE
 from coletor.dbt import ResultadoDbt
 from coletor.hashes import json_canonico, sha256_arquivo
 from coletor.nomes import normalizar_cabecalho
-from coletor.tse.durabilidade import gravar_json, sincronizar_pasta
+from coletor.tse.durabilidade import (
+    ErroRecuperacaoTse,
+    conferir_recuperacao,
+    gravar_json,
+    instalar_com_compensacao,
+    pasta_temporaria,
+)
 from coletor.tse.evidencias import (
     PROTOCOLO_PREPARACAO,
     conferir_execucao,
@@ -187,6 +191,10 @@ def _validar_versao(lago: Path, chave: str, versao_id: str) -> None:
 
 def validar_selecao(lago: Path, selecao: SelecaoTse) -> tuple[str, ...]:
     """Retorna impedimentos sem promover ou confundir falhas operacionais com rejeições."""
+    try:
+        conferir_recuperacao(lago)
+    except ErroRecuperacaoTse as erro:
+        return (str(erro),)
     if not isinstance(selecao, SelecaoTse) or not isinstance(selecao.versoes, dict):
         return ("tipo de seleção inválido",)
     if not all(isinstance(k, str) and _hash(v) for k, v in selecao.versoes.items()):
@@ -356,7 +364,8 @@ def emitir_recibo(
 
 
 def promover_selecao(lago: Path, selecao: SelecaoTse, recibo: ReciboValidacaoTse) -> None:
-    """Troca exclusivamente o seletor completo; falha conserva o vigente anterior."""
+    """Troca seletor completo; compensa falhas ou bloqueia recuperação incerta."""
+    conferir_recuperacao(lago)
     impedimentos = validar_selecao(lago, selecao)
     if impedimentos:
         raise ValueError("; ".join(impedimentos))
@@ -423,15 +432,7 @@ def promover_selecao(lago: Path, selecao: SelecaoTse, recibo: ReciboValidacaoTse
             marcador,
             {"protocolo": "tse:inicializado:v1", "primeira_selecao_id": selecao.selecao_id},
         )
-    temporario = None
-    try:
-        with tempfile.NamedTemporaryFile(dir=estado, delete=False) as arquivo:
-            temporario = Path(arquivo.name)
-            arquivo.write(json_canonico(asdict(selecao)).encode("utf-8"))
-            arquivo.flush()
-            os.fsync(arquivo.fileno())
-        os.replace(temporario, _confinado(lago, "estado/tse/vigente.json"))
-        sincronizar_pasta(estado)
-    finally:
-        if temporario is not None:
-            temporario.unlink(missing_ok=True)
+    with pasta_temporaria("tse-seletor-") as pasta:
+        origem = Path(pasta) / "vigente.json"
+        origem.write_text(json_canonico(asdict(selecao)), encoding="utf-8")
+        instalar_com_compensacao(lago, [(origem, estado / "vigente.json")])

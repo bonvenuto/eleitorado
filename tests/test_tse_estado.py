@@ -403,3 +403,387 @@ def test_marcador_confere_identidade_do_vetor_historico(tmp_path):
     with pytest.raises(ValueError):
         restaurar_tse(gcs, PREFIXO, local)
     assert not local.exists()
+
+
+def retificacao_sintetica(lago, selecao):
+    import hashlib
+    import shutil
+
+    from coletor.hashes import json_canonico
+    from coletor.tse.selecao import criar_selecao
+
+    anterior = lago / f"estado/tse/versoes/{selecao.versoes['tse.bens:2024']}.json"
+    dados = json.loads(anterior.read_bytes())
+    dados["sha256_zip"] = hashlib.sha256(b"retificacao privada").hexdigest()
+    dados["versao_id"] = hashlib.sha256(
+        json_canonico(["tse.bens", 2024, dados["sha256_zip"]]).encode()
+    ).hexdigest()
+    raw = f"raw/tse/bens/2024/{dados['sha256_zip']}/dados.parquet"
+    (lago / raw).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lago / dados["familias"]["bens"], lago / raw)
+    dados["familias"]["bens"] = raw
+    (lago / f"estado/tse/versoes/{dados['versao_id']}.json").write_text(
+        json_canonico(dados), encoding="utf-8"
+    )
+    return criar_selecao({**selecao.versoes, "tse.bens:2024": dados["versao_id"]})
+
+
+def remoto_retificado(tmp_path):
+    import shutil
+
+    lago, primeira, gcs = remoto(tmp_path)
+    local = tmp_path / "local"
+    shutil.copytree(lago, local)
+    segunda = retificacao_sintetica(lago, primeira)
+    promover_selecao(lago, segunda, execucao(lago, segunda, "retificacao"))
+    for arquivo in lago.rglob("*"):
+        if arquivo.is_file():
+            caminho = PREFIXO + arquivo.relative_to(lago).as_posix()
+            if caminho.endswith("/vigente.json"):
+                gcs.substituir(arquivo, caminho)
+            else:
+                gcs.enviar(arquivo, caminho)
+    return local, primeira, segunda, gcs
+
+
+def falhar_sync_apos_vigente(monkeypatch, lago):
+    from coletor.tse import durabilidade
+    from coletor.tse import estado as estado_tse
+    from coletor.tse import selecao as modulo_selecao
+
+    estado_local = lago / "estado/tse"
+    anterior = (estado_local / "vigente.json").read_bytes()
+    original = durabilidade.sincronizar_pasta
+    falhou = False
+
+    def sincronizar(pasta):
+        nonlocal falhou
+        vigente = estado_local / "vigente.json"
+        if (
+            not falhou
+            and pasta == estado_local
+            and vigente.exists()
+            and vigente.read_bytes() != anterior
+        ):
+            falhou = True
+            raise OSError("fsync apos trocar vigente")
+        original(pasta)
+
+    for modulo in (durabilidade, estado_tse, modulo_selecao):
+        monkeypatch.setattr(modulo, "sincronizar_pasta", sincronizar, raising=False)
+
+
+def test_fsync_pos_troca_restaura_ponteiro_e_estado_operavel(tmp_path, monkeypatch):
+    salvar_tse, restaurar_tse = operacoes()
+    local, _, _, gcs = remoto_retificado(tmp_path)
+    anterior = (local / "estado/tse/vigente.json").read_bytes()
+    falhar_sync_apos_vigente(monkeypatch, local)
+    with pytest.raises(OSError, match="fsync apos"):
+        restaurar_tse(gcs, PREFIXO, local)
+    assert (local / "estado/tse/vigente.json").read_bytes() == anterior
+    salvar_tse(FakeArmazenamento(tmp_path / "backup-anterior"), PREFIXO, local)
+
+
+@pytest.mark.parametrize("fronteira", ["raw", "tentativa"])
+def test_instalacao_parcial_compensa_e_preserva_operacao(tmp_path, monkeypatch, fronteira):
+    import os
+
+    from coletor.hashes import sha256_arquivo
+    from coletor.tse.durabilidade import gravar_json
+
+    salvar_tse, restaurar_tse = operacoes()
+    local, _, segunda, gcs = remoto_retificado(tmp_path)
+    versao_id = segunda.versoes["tse.bens:2024"]
+    descritor = json.loads(
+        gcs.objetos[PREFIXO + f"estado/tse/versoes/{versao_id}.json"].read_bytes()
+    )
+    tentativa = tmp_path / "extra" / versao_id
+    tentativa.mkdir(parents=True)
+    (tentativa / "bens.parquet").write_bytes(b"tentativa privada")
+    gravar_json(
+        tentativa / "manifesto.json",
+        {
+            "protocolo": "tse:tentativa:v1",
+            "descritor": {
+                "versao_id": versao_id,
+                "hashes_parquet": {"bens": sha256_arquivo(tentativa / "bens.parquet")},
+            },
+            "controle": {},
+        },
+        checksum=True,
+    )
+    for p in tentativa.iterdir():
+        gcs.enviar(p, PREFIXO + f"estado/tse/tentativas/{versao_id}/{p.name}")
+    antes = {
+        p.relative_to(local).as_posix(): p.read_bytes() for p in local.rglob("*") if p.is_file()
+    }
+    alvo = (
+        local / descritor["familias"]["bens"]
+        if fronteira == "raw"
+        else local / f"estado/tse/tentativas/{versao_id}/manifesto.json"
+    )
+    original = os.replace
+
+    def substituir(origem, destino):
+        if Path(destino) == alvo:
+            raise OSError("instalacao parcial")
+        original(origem, destino)
+
+    from pathlib import Path
+
+    monkeypatch.setattr(os, "replace", substituir)
+    with pytest.raises(OSError, match="instalacao parcial"):
+        restaurar_tse(gcs, PREFIXO, local)
+    assert {
+        p.relative_to(local).as_posix(): p.read_bytes() for p in local.rglob("*") if p.is_file()
+    } == antes
+    salvar_tse(FakeArmazenamento(tmp_path / "backup-anterior"), PREFIXO, local)
+
+
+def test_salvar_conta_downloads_de_validacao(tmp_path):
+    salvar_tse, _ = operacoes()
+    lago, _, gcs = remoto(tmp_path)
+    resumo = salvar_tse(gcs, PREFIXO, lago)
+    assert resumo.enviados == 0
+    assert resumo.baixados == len(gcs.objetos) - 2  # vigente/marcador não são baixados no envio
+
+
+def test_compensacao_falha_preserva_backup_e_bloqueia_consumidores(tmp_path, monkeypatch):
+    import os
+    from pathlib import Path
+
+    from coletor.tse.durabilidade import ErroCompensacaoTse, ErroRecuperacaoTse
+    from coletor.tse.selecao import validar_selecao
+
+    salvar_tse, restaurar_tse = operacoes()
+    local, primeira, _, gcs = remoto_retificado(tmp_path)
+    anterior = (local / "estado/tse/vigente.json").read_bytes()
+    falhar_sync_apos_vigente(monkeypatch, local)
+    original = os.replace
+
+    def substituir(origem, destino):
+        if Path(origem).name.startswith(".repor-"):
+            raise OSError("compensacao indisponivel")
+        original(origem, destino)
+
+    monkeypatch.setattr(os, "replace", substituir)
+    with pytest.raises(ErroCompensacaoTse) as falha:
+        restaurar_tse(gcs, PREFIXO, local)
+    area = falha.value.area
+    assert area.is_dir()
+    assert (area / "plano.json").is_file()
+    assert anterior in [p.read_bytes() for p in (area / "anteriores").iterdir()]
+    assert validar_selecao(local, primeira)
+    with pytest.raises(ErroRecuperacaoTse):
+        salvar_tse(gcs, PREFIXO, local)
+    with pytest.raises(ErroRecuperacaoTse):
+        restaurar_tse(gcs, PREFIXO, local)
+    with pytest.raises(ErroRecuperacaoTse):
+        promover_selecao(local, primeira, None)
+
+
+def test_instalacao_prepara_replace_no_diretorio_destino(tmp_path, monkeypatch):
+    import os
+    from pathlib import Path
+
+    from coletor.tse.durabilidade import instalar_com_compensacao
+
+    lago = tmp_path / "lago"
+    origem = _arquivo(tmp_path / "outro-volume", "novo.json", b"novo")
+    destino = _arquivo(lago, "estado/tse/vigente.json", b"anterior")
+    original = os.replace
+
+    def substituir(de, para):
+        if Path(de).parent != Path(para).parent:
+            raise OSError("replace entre volumes proibido")
+        original(de, para)
+
+    monkeypatch.setattr(os, "replace", substituir)
+    instalar_com_compensacao(lago, [(origem, destino)])
+    assert destino.read_bytes() == b"novo"
+    assert origem.read_bytes() == b"novo"
+
+
+def test_limpeza_pos_commit_avisa_sem_bloquear_estado(tmp_path, monkeypatch, caplog):
+    import shutil
+    from pathlib import Path
+
+    from coletor.tse.durabilidade import conferir_recuperacao, instalar_com_compensacao
+
+    lago = tmp_path / "lago"
+    origem = _arquivo(tmp_path / "origem", "novo.json", b"novo")
+    destino = _arquivo(lago, "estado/tse/vigente.json", b"anterior")
+    original = shutil.rmtree
+
+    def remover(pasta, *args, **kwargs):
+        if Path(pasta).name.startswith(".limpeza-"):
+            raise OSError("limpeza indisponivel")
+        return original(pasta, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "rmtree", remover)
+    instalar_com_compensacao(lago, [(origem, destino)])
+    assert destino.read_bytes() == b"novo"
+    assert list((lago / "estado/tse").glob(".limpeza-*/concluida.json"))
+    conferir_recuperacao(lago)
+    assert "limpeza" in caplog.text
+
+
+@pytest.mark.parametrize("compensacao_falha", [False, True])
+def test_conclusao_criada_sem_fsync_nao_prova_commit(tmp_path, monkeypatch, compensacao_falha):
+    import os
+    from pathlib import Path
+
+    from coletor.tse import durabilidade
+
+    lago = tmp_path / "lago"
+    origem = _arquivo(tmp_path / "origem", "novo.json", b"novo")
+    destino = _arquivo(lago, "estado/tse/vigente.json", b"anterior")
+    sincronizar_original = durabilidade.sincronizar_pasta
+    substituir_original = os.replace
+    falhou = False
+
+    def sincronizar(pasta):
+        nonlocal falhou
+        if not falhou and (pasta / "concluida.json").exists():
+            falhou = True
+            raise OSError("fsync conclusao")
+        sincronizar_original(pasta)
+
+    def substituir(de, para):
+        if compensacao_falha and Path(de).name.startswith(".repor-"):
+            raise OSError("compensacao indisponivel")
+        substituir_original(de, para)
+
+    monkeypatch.setattr(durabilidade, "sincronizar_pasta", sincronizar)
+    monkeypatch.setattr(os, "replace", substituir)
+    with pytest.raises(OSError):
+        durabilidade.instalar_com_compensacao(lago, [(origem, destino)])
+    if compensacao_falha:
+        area = next((lago / "estado/tse").glob(".recuperacao-*"))
+        assert (area / "concluida.json").exists()
+        assert not (area / "confirmada.json").exists()
+        assert (area / "compensacao.json").exists()
+        with pytest.raises(durabilidade.ErroRecuperacaoTse):
+            durabilidade.conferir_recuperacao(lago)
+    else:
+        assert destino.read_bytes() == b"anterior"
+        durabilidade.conferir_recuperacao(lago)
+
+
+def test_journal_incompleto_bloqueia_mesmo_sem_vigente(tmp_path):
+    from coletor.tse.durabilidade import ErroRecuperacaoTse
+    from coletor.tse.selecao import criar_selecao, validar_selecao
+
+    salvar_tse, restaurar_tse = operacoes()
+    lago = tmp_path / "lago"
+    (lago / "estado/tse/.recuperacao-incompleta").mkdir(parents=True)
+    assert "recuperação" in validar_selecao(lago, criar_selecao({}))[0]
+    gcs = FakeArmazenamento(tmp_path / "bucket")
+    with pytest.raises(ErroRecuperacaoTse):
+        salvar_tse(gcs, PREFIXO, lago)
+    with pytest.raises(ErroRecuperacaoTse):
+        restaurar_tse(gcs, PREFIXO, lago)
+
+
+def test_journal_concluido_historico_nao_confere_destino_atual(tmp_path, monkeypatch, caplog):
+    import os
+    from pathlib import Path
+
+    from coletor.tse import durabilidade
+
+    lago = tmp_path / "lago"
+    origem = _arquivo(tmp_path / "origem", "novo.json", b"novo")
+    destino = _arquivo(lago, "estado/tse/vigente.json", b"anterior")
+    original = os.rename
+
+    def renomear(de, para):
+        if Path(de).name.startswith(".recuperacao-"):
+            raise OSError("limpeza indisponivel")
+        original(de, para)
+
+    monkeypatch.setattr(os, "rename", renomear)
+    durabilidade.instalar_com_compensacao(lago, [(origem, destino)])
+    assert list((lago / "estado/tse").glob(".recuperacao-*/confirmada.json"))
+    segunda = _arquivo(tmp_path / "origem", "outra.json", b"outra")
+    durabilidade.instalar_com_compensacao(lago, [(segunda, destino)])
+    assert destino.read_bytes() == b"outra"
+    durabilidade.conferir_recuperacao(lago)
+    assert "limpeza" in caplog.text
+    area = next((lago / "estado/tse").glob(".recuperacao-*"))
+    (area / "compensacao.json").write_bytes(b"pendencia prevalece")
+    with pytest.raises(durabilidade.ErroRecuperacaoTse):
+        durabilidade.conferir_recuperacao(lago)
+
+
+def test_fsync_preparo_nao_deixa_arquivo_novo_parcial(tmp_path, monkeypatch):
+    import os
+
+    from coletor.tse.durabilidade import instalar_com_compensacao
+
+    lago = tmp_path / "lago"
+    origem = _arquivo(tmp_path / "origem", "novo.json", b"novo")
+    destino = _arquivo(lago, "estado/tse/vigente.json", b"anterior")
+    original = os.fsync
+    falhou = False
+
+    def sincronizar(descritor):
+        nonlocal falhou
+        if not falhou:
+            falhou = True
+            raise OSError("preparo indisponivel")
+        original(descritor)
+
+    monkeypatch.setattr(os, "fsync", sincronizar)
+    with pytest.raises(OSError, match="preparo indisponivel"):
+        instalar_com_compensacao(lago, [(origem, destino)])
+    assert destino.read_bytes() == b"anterior"
+    assert not list(lago.rglob(".instalacao-*"))
+    assert not list(lago.rglob(".recuperacao-*"))
+
+
+@pytest.mark.parametrize("operacao", ["restauro", "promocao"])
+def test_limpeza_temporario_pos_commit_nao_gera_falha_ambigua(
+    tmp_path, monkeypatch, caplog, operacao
+):
+    import shutil
+    from pathlib import Path
+
+    if operacao == "restauro":
+        local, _, segunda, gcs = remoto_retificado(tmp_path)
+
+        def acao():
+            return operacoes()[1](gcs, PREFIXO, local)
+    else:
+        local, primeira = montar_vetor(tmp_path)
+        promover_selecao(local, primeira, execucao(local, primeira))
+        segunda = retificacao_sintetica(local, primeira)
+        recibo = execucao(local, segunda, "segunda")
+
+        def acao():
+            return promover_selecao(local, segunda, recibo)
+
+    original = shutil.rmtree
+
+    def remover(pasta, *args, **kwargs):
+        if Path(pasta).name.startswith(("tse-restauro-", "tse-seletor-")):
+            raise OSError("limpeza temporaria indisponivel")
+        return original(pasta, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "rmtree", remover)
+    acao()
+    assert json.loads((local / "estado/tse/vigente.json").read_bytes()) == asdict(segunda)
+    assert "limpeza" in caplog.text
+
+
+def test_limpeza_temporario_falho_preserva_erro_original(tmp_path, monkeypatch):
+    import shutil
+
+    from coletor.tse.durabilidade import pasta_temporaria
+
+    def remover(*args, **kwargs):
+        raise OSError("limpeza indisponivel")
+
+    monkeypatch.setattr(shutil, "rmtree", remover)
+    with pytest.raises(ValueError, match="erro original"):
+        with pasta_temporaria("tse-preparo-", tmp_path):
+            raise ValueError("erro original")

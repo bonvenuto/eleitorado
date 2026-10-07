@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import shutil
 import tempfile
@@ -14,7 +13,12 @@ from pathlib import Path
 from coletor.armazenamento import Armazenamento
 from coletor.estado import PREFIXOS_TSE, Resumo, md5_arquivo
 from coletor.hashes import json_canonico, sha256_arquivo
-from coletor.tse.durabilidade import ler_json_conferido, sincronizar_pasta
+from coletor.tse.durabilidade import (
+    conferir_recuperacao,
+    instalar_com_compensacao,
+    ler_json_conferido,
+    pasta_temporaria,
+)
 from coletor.tse.modelos import SelecaoTse
 from coletor.tse.selecao import (
     COBERTURA,
@@ -195,12 +199,14 @@ def _validar(lago: Path) -> None:
 
 def salvar_tse(armazenamento: Armazenamento, prefixo: str, lago: Path) -> Resumo:
     """Envia dependências sem sobrescrever/apagar; vigente é o único objeto mutável."""
+    conferir_recuperacao(lago)
     locais = _locais(lago)
     _validar(lago)
     remotos = {
         c: o for p in PREFIXOS_TSE for c, o in armazenamento.listar_objetos(prefixo + p).items()
     }
     envios = []
+    baixados = 0
     for relativo, local in sorted(locais.items()):
         _caminho(lago, relativo)
         remoto = remotos.get(prefixo + relativo)
@@ -222,6 +228,7 @@ def salvar_tse(armazenamento: Armazenamento, prefixo: str, lago: Path) -> Resumo
                 continue
             destino.parent.mkdir(parents=True, exist_ok=True)
             armazenamento.baixar(caminho, destino)
+            baixados += 1
             if destino.stat().st_size != objeto.tamanho or md5_arquivo(destino) != objeto.md5:
                 raise ValueError("download TSE com integridade divergente")
         for relativo, local in locais.items():
@@ -240,17 +247,18 @@ def salvar_tse(armazenamento: Armazenamento, prefixo: str, lago: Path) -> Resumo
             armazenamento.substituir(local, prefixo + relativo)
         else:
             armazenamento.enviar(local, prefixo + relativo)
-    return Resumo(enviados=len(envios))
+    return Resumo(enviados=len(envios), baixados=baixados)
 
 
 def restaurar_tse(armazenamento: Armazenamento, prefixo: str, lago: Path) -> Resumo:
     """Baixa e valida em isolamento; só então instala imutáveis, marcador e seletor."""
+    conferir_recuperacao(lago)
     remotos = {
         c: o for p in PREFIXOS_TSE for c, o in armazenamento.listar_objetos(prefixo + p).items()
     }
-    # Mesmo filesystem permite instalação atômica por arquivo, inclusive no Windows.
+    # Preparo isolado; a instalação usa stages irmãos de cada destino, inclusive no Windows.
     lago.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="tse-restauro-", dir=lago.parent) as temporario:
+    with pasta_temporaria("tse-restauro-", lago.parent) as temporario:
         preparo = Path(temporario)
         baixados = {}
         for caminho, objeto in sorted(remotos.items()):
@@ -290,10 +298,5 @@ def restaurar_tse(armazenamento: Armazenamento, prefixo: str, lago: Path) -> Res
         instalar.sort(
             key=lambda item: (item[0] in (VIGENTE, MARCADOR), item[0] == VIGENTE, item[0])
         )
-        for _, origem, destino in instalar:
-            destino.parent.mkdir(parents=True, exist_ok=True)
-            with origem.open("rb+") as entrada:
-                os.fsync(entrada.fileno())
-            os.replace(origem, destino)
-            sincronizar_pasta(destino.parent)
+        instalar_com_compensacao(lago, [(origem, destino) for _, origem, destino in instalar])
         return Resumo(baixados=len(baixados))

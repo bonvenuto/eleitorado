@@ -573,3 +573,49 @@ def test_novo_recibo_exige_referencias_mesmo_apos_aprovacao_isolada(vetor):
     novo = execucao(lago, selecao, "nova-com-referencias", superadas=(rejeicao,))
     promover_selecao(lago, selecao, novo)
     assert json.loads(vigente(lago))["selecao_id"] == selecao.selecao_id
+
+
+def test_promocao_compensa_fsync_pos_troca(tmp_path, monkeypatch):
+    from tests.test_tse_estado import falhar_sync_apos_vigente, retificacao_sintetica
+
+    lago, primeira = montar_vetor(tmp_path)
+    promover_selecao(lago, primeira, execucao(lago, primeira))
+    segunda = retificacao_sintetica(lago, primeira)
+    recibo = execucao(lago, segunda, "segunda")
+    anterior = vigente(lago)
+    falhar_sync_apos_vigente(monkeypatch, lago)
+    with pytest.raises(OSError, match="fsync apos"):
+        promover_selecao(lago, segunda, recibo)
+    assert vigente(lago) == anterior
+
+
+def test_primeira_promocao_falha_preserva_marcador_e_bloqueia(tmp_path, monkeypatch):
+    import os
+    from pathlib import Path
+
+    from coletor.tse.durabilidade import (
+        ErroCompensacaoTse,
+        ErroRecuperacaoTse,
+        conferir_recuperacao,
+    )
+
+    lago, selecao = montar_vetor(tmp_path)
+    recibo = execucao(lago, selecao)
+    original = os.replace
+
+    def substituir(de, para):
+        if Path(para) == lago / "estado/tse/vigente.json":
+            raise OSError("falha primeira troca")
+        original(de, para)
+
+    monkeypatch.setattr(os, "replace", substituir)
+    with pytest.raises(ErroCompensacaoTse):
+        promover_selecao(lago, selecao, recibo)
+    assert json.loads((lago / "estado/tse/inicializado.json").read_bytes()) == {
+        "protocolo": "tse:inicializado:v1",
+        "primeira_selecao_id": selecao.selecao_id,
+    }
+    assert not (lago / "estado/tse/vigente.json").exists()
+    assert validar_selecao(lago, selecao)
+    with pytest.raises(ErroRecuperacaoTse):
+        conferir_recuperacao(lago)
