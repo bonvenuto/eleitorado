@@ -36,3 +36,6 @@ avaliacao/
 # Claude Code: só as definições de agentes vão para o git (o resto é configuração pessoal)
 .claude/*
 !.claude/agents/
+
+# Codex: configuração local
+.codex/
