@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: alerta_pagamento_empresa_irregular
+    data_tests:
+      - sem_dados_pessoais
+      - sem_cpf_completo
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+  - name: alerta_empresa_recem_aberta
+    data_tests:
+      - sem_dados_pessoais
+      - sem_cpf_completo
+    columns:
+      - name: alerta_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: empresa_irregular_na_data_do_fato
+    description: >
+      Fato no mesmo dia da baixa gera alerta; na véspera, não. Vale o estabelecimento exato
+      (filial ativa não dispara mesmo com a matriz baixada); sem ele, a matriz. Incorporação não
+      dispara. Despesa com data impossível e contrato com valor suspeito ficam de fora.
+    model: alerta_pagamento_empresa_irregular
+    given:
+      - input: ref('fct_despesa_cota_parlamentar')
+        rows:
+          - {despesa_id: c1, data_emissao: '2024-05-10', valor_documento: 100, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c2, data_emissao: '2024-05-09', valor_documento: 100, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c3, data_emissao: '2024-06-01', valor_documento: 100, fornecedor_documento: '11222333000262', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c4, data_emissao: '2024-06-01', valor_documento: 100, fornecedor_documento: '44555666000199', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '44555666', parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c5, data_emissao: '2024-06-01', valor_documento: 100, fornecedor_documento: '77888999000100', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '77888999', parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c6, data_emissao: '2105-01-01', valor_documento: 100, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', parlamentar_id: 'camara:1', data_emissao_valida: false}
+      - input: ref('fct_emenda_pagamento')
+        rows: []
+      - input: ref('dim_autor_emenda')
+        rows: []
+      - input: ref('fct_contrato_federal')
+        rows:
+          - {contrato_id: k1, data_assinatura: '2025-01-01', valor_final: 58840000000, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', valor_suspeito: true}
+      - input: ref('int_rfb__estabelecimentos')
+        rows:
+          - {cnpj: '11222333000181', cnpj_raiz: '11222333', matriz: true, situacao_codigo: '08', situacao: BAIXADA, data_situacao: '2024-05-10', motivo_codigo: '01', motivo: EXTINCAO}
+          - {cnpj: '11222333000262', cnpj_raiz: '11222333', matriz: false, situacao_codigo: '02', situacao: ATIVA, data_situacao: '2005-01-01', motivo_codigo: '00', motivo: SEM MOTIVO}
+          - {cnpj: '44555666000110', cnpj_raiz: '44555666', matriz: true, situacao_codigo: '04', situacao: INAPTA, data_situacao: '2020-01-01', motivo_codigo: '63', motivo: OMISSAO DE DECLARACOES}
+          - {cnpj: '77888999000100', cnpj_raiz: '77888999', matriz: true, situacao_codigo: '08', situacao: BAIXADA, data_situacao: '2020-01-01', motivo_codigo: '02', motivo: INCORPORACAO}
+      - input: ref('int_rfb__empresas')
+        rows:
+          - {cnpj_raiz: '11222333', razao_social: EMPRESA A}
+          - {cnpj_raiz: '44555666', razao_social: EMPRESA B}
+    expect:
+      rows:
+        - {fato_id: c1, estabelecimento_cnpj: '11222333000181', estabelecimento_exato: true, situacao: BAIXADA, dias_desde_a_situacao: 0}
+        - {fato_id: c4, estabelecimento_cnpj: '44555666000110', estabelecimento_exato: false, situacao: INAPTA, dias_desde_a_situacao: 1613}
+
+  - name: empresa_recem_aberta_ate_180_dias
+    description: >
+      180 dias depois da abertura dispara; 181, não. O piso é R$ 10 mil na cota e R$ 50 mil no
+      contrato. Consórcio de Sociedades não dispara. Fato antes da abertura sai como tipo próprio.
+      Contrato com valor suspeito fica de fora.
+    model: alerta_empresa_recem_aberta
+    given:
+      - input: ref('fct_despesa_cota_parlamentar')
+        rows:
+          - {despesa_id: c1, data_emissao: '2024-02-01', valor_documento: 9999.99, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', parlamentar_id: 'camara:1', data_emissao_valida: true}
+          - {despesa_id: c2, data_emissao: '2024-02-01', valor_documento: 10000, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', parlamentar_id: 'camara:1', data_emissao_valida: true}
+      - input: ref('fct_emenda_pagamento')
+        rows: []
+      - input: ref('dim_autor_emenda')
+        rows: []
+      - input: ref('fct_contrato_federal')
+        rows:
+          - {contrato_id: k1, data_assinatura: '2024-06-29', valor_final: 50000, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', valor_suspeito: false}
+          - {contrato_id: k2, data_assinatura: '2024-06-30', valor_final: 50000, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', valor_suspeito: false}
+          - {contrato_id: k3, data_assinatura: '2023-12-01', valor_final: 60000, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', valor_suspeito: false}
+          - {contrato_id: k4, data_assinatura: '2024-02-01', valor_final: 100000, fornecedor_documento: '44555666000110', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '44555666', valor_suspeito: false}
+          - {contrato_id: k5, data_assinatura: '2024-02-01', valor_final: 99000000000, fornecedor_documento: '11222333000181', fornecedor_tipo_documento: CNPJ, fornecedor_cnpj_raiz: '11222333', valor_suspeito: true}
+      - input: ref('int_rfb__empresas')
+        rows:
+          - {cnpj_raiz: '11222333', razao_social: EMPRESA A, natureza_juridica_codigo: '2062', data_abertura: '2024-01-01'}
+          - {cnpj_raiz: '44555666', razao_social: CONSORCIO B, natureza_juridica_codigo: '2151', data_abertura: '2024-01-01'}
+    expect:
+      rows:
+        - {fato_id: c2, dias_desde_a_abertura: 31, tipo: recem_aberta}
+        - {fato_id: k1, dias_desde_a_abertura: 180, tipo: recem_aberta}
+        - {fato_id: k3, dias_desde_a_abertura: -31, tipo: fato_antes_da_abertura}
