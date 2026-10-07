@@ -34,6 +34,10 @@ RECURSOS_HISTORICO = ("cgu.ceis", "cgu.cnep", "camara.deputados", "senado.senado
 SELECAO_HISTORICOS = ["+int_cgu__sancoes_eventos+", "+int_parlamentares__eventos+"]
 
 
+GRUPOS = ("diario", "receita")
+AJUDA_GRUPO = "grupo de recursos quando --recursos não é dado (padrão: diario)"
+
+
 class ErroUso(Exception):
     """Uso incorreto da CLI; sai com código 2."""
 
@@ -52,6 +56,7 @@ def _parser() -> argparse.ArgumentParser:
     executar = sub.add_parser("executar", help="coleta o que está com o prazo vencido")
     executar.add_argument("--recursos", help="ids separados por vírgula (padrão: todos)")
     executar.add_argument("--forcar", action="store_true", help="ignora a deduplicação por hash")
+    executar.add_argument("--grupo", choices=GRUPOS, default="diario", help=AJUDA_GRUPO)
 
     coletar = sub.add_parser("coletar", help="coleta manual e backfill de um recurso")
     coletar.add_argument("recurso")
@@ -63,6 +68,7 @@ def _parser() -> argparse.ArgumentParser:
 
     pipeline = sub.add_parser("pipeline", help="coleta o que está vencido e roda o dbt build")
     pipeline.add_argument("--recursos", help="ids separados por vírgula (padrão: todos)")
+    pipeline.add_argument("--grupo", choices=GRUPOS, default="diario", help=AJUDA_GRUPO)
 
     estado = sub.add_parser("estado", help="sincroniza o lago local com o bucket privado")
     estado.add_argument("acao", choices=["restaurar", "salvar"])
@@ -129,7 +135,7 @@ def _fontes(manifesto: Manifesto, repo: RepositorioMeta) -> int:
 def _recursos(args: argparse.Namespace, manifesto: Manifesto) -> list:
     if args.recursos:
         return [manifesto.obter(item.strip()) for item in args.recursos.split(",")]
-    return manifesto.todos()
+    return [rc for rc in manifesto.todos() if rc.recurso.grupo == args.grupo]
 
 
 def _executar(

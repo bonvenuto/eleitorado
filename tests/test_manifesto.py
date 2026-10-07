@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from coletor.manifesto import ErroManifesto, carregar_manifesto
-from tests.amostras import RAIZ, recurso
+from coletor.manifesto import ErroManifesto, Recurso, carregar_manifesto
+from tests.amostras import RAIZ, recurso, recurso_webdav
 
 
 def test_manifesto_do_repositorio_tem_os_sete_recursos_da_onda_a():
@@ -10,6 +10,7 @@ def test_manifesto_do_repositorio_tem_os_sete_recursos_da_onda_a():
     assert sorted(manifesto.recursos) == [
         "camara.ceap",
         "camara.deputados",
+        "camara.deputados_detalhe",
         "cgu.ceis",
         "cgu.cnep",
         "cgu.contratos",
@@ -22,6 +23,16 @@ def test_manifesto_do_repositorio_tem_os_sete_recursos_da_onda_a():
         "ibge.municipios",
         "pncp.contratos",
         "pncp.contratos_atualizacao",
+        "rfb.cnaes",
+        "rfb.empresas",
+        "rfb.estabelecimentos",
+        "rfb.motivos",
+        "rfb.municipios",
+        "rfb.naturezas",
+        "rfb.paises",
+        "rfb.qualificacoes",
+        "rfb.simples",
+        "rfb.socios",
         "senado.ceaps",
         "senado.senadores",
     ]
@@ -78,3 +89,54 @@ def test_competencia_dia_e_cadencia_anual():
 
     assert RegraCompetencia(tipo="dia", inicio=2021).tipo == "dia"
     assert RegraCadencia(corrente="semanal", anteriores="anual").anteriores == "anual"
+
+
+def test_recursos_da_receita_ficam_fora_do_pipeline_diario():
+    manifesto = carregar_manifesto(RAIZ / "fontes")
+    receita = sorted(rc.id for rc in manifesto.todos() if rc.recurso.grupo == "receita")
+    assert receita == [
+        "camara.deputados_detalhe",
+        *(
+            f"rfb.{nome}"
+            for nome in sorted(
+                [
+                    "cnaes",
+                    "empresas",
+                    "estabelecimentos",
+                    "motivos",
+                    "municipios",
+                    "naturezas",
+                    "paises",
+                    "qualificacoes",
+                    "simples",
+                    "socios",
+                ]
+            )
+        ),
+    ]
+    empresas = manifesto.obter("rfb.empresas").recurso
+    assert empresas.recorte.raizes == "rfb_raizes_interesse.parquet"
+    assert len(empresas.recorte.colunas) == 7
+    colunas = {"estabelecimentos": 30, "socios": 11, "simples": 7, "cnaes": 2}
+    for nome, quantidade in colunas.items():
+        assert len(manifesto.obter(f"rfb.{nome}").recurso.recorte.colunas) == quantidade
+
+
+def test_webdav_zip_exige_recorte():
+    with pytest.raises(ValidationError, match="exige recorte"):
+        Recurso.model_validate(recurso_webdav().model_dump() | {"recorte": None})
+
+
+def test_recorte_so_vale_para_webdav_zip():
+    with pytest.raises(ValidationError, match="recorte só vale"):
+        recurso(recorte={"arquivos": "x.zip", "colunas": ["a"]})
+
+
+def test_api_detalhe_exige_url_detalhe_com_id():
+    with pytest.raises(ValidationError, match="url_detalhe"):
+        recurso(
+            adaptador="api_detalhe",
+            url_detalhe="https://dadosabertos.camara.leg.br/api/v2/deputados",
+            competencia={"tipo": "data_coleta"},
+            formato={"tipo": "json"},
+        )

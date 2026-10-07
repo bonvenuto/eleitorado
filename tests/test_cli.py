@@ -30,7 +30,7 @@ def test_executar_coleta_o_recurso_pedido_e_registra_tudo(respx_mock, deps, ware
         1,
         "manual",
     )
-    assert len(warehouse.linhas["meta/fontes"]) == 16
+    assert len(warehouse.linhas["meta/fontes"]) == 27
     assert "meta/coletas" in warehouse.tabelas
 
 
@@ -99,3 +99,18 @@ def test_coletar_competencia_diaria(respx_mock, deps, warehouse):
         "2026-06-01",
         "carregada",
     )
+
+
+def test_executar_sem_recursos_so_coleta_o_grupo_pedido(deps, warehouse, monkeypatch):
+    pedidas = []
+
+    def tarefas(recursos, historico, hoje):
+        pedidas.append(sorted(rc.recurso.grupo for rc in recursos))
+        return []
+
+    monkeypatch.setattr("coletor.cli.tarefas_pendentes", tarefas)
+    assert _rodar(["executar"], deps) == 0
+    assert _rodar(["executar", "--grupo", "receita"], deps) == 0
+    assert set(pedidas[0]) == {"diario"}
+    assert set(pedidas[1]) == {"receita"}
+    assert len(pedidas[1]) == 11

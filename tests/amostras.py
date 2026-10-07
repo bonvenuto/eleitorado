@@ -128,3 +128,42 @@ def recurso(**sobrescritas: Any) -> Recurso:
     }
     base.update(sobrescritas)
     return Recurso.model_validate(base)
+
+
+RAIZ_WEBDAV = "https://arquivos.receitafederal.gov.br/public.php/webdav/"
+
+
+def propfind_webdav(pasta: str, itens: list[tuple[str, int | None]]) -> str:
+    """Resposta PROPFIND com a própria pasta e os itens (tamanho None = subpasta)."""
+
+    def resposta(href: str, tamanho: int | None) -> str:
+        if tamanho is None:
+            propriedades = "<d:resourcetype><d:collection/></d:resourcetype>"
+        else:
+            propriedades = f"<d:resourcetype/><d:getcontentlength>{tamanho}</d:getcontentlength>"
+        return (
+            f"<d:response><d:href>{href}</d:href><d:propstat><d:prop>{propriedades}"
+            "</d:prop></d:propstat></d:response>"
+        )
+
+    corpo = resposta(pasta, None) + "".join(resposta(f"{pasta}{n}", t) for n, t in itens)
+    return f'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">{corpo}</d:multistatus>'
+
+
+def recurso_webdav(
+    raizes: str | None = "rfb/raizes.parquet", arquivos: str = "Empresas*.zip"
+) -> Recurso:
+    """Recurso `webdav_zip` de teste com três colunas."""
+    recorte = {"arquivos": arquivos, "colunas": ["cnpj_basico", "razao_social", "porte"]}
+    if raizes:
+        recorte["raizes"] = raizes
+    return recurso(
+        id="empresas",
+        adaptador="webdav_zip",
+        url=RAIZ_WEBDAV,
+        parametros={"usuario": "token"},
+        competencia={"tipo": "data_arquivo", "pagina": RAIZ_WEBDAV},
+        cadencia={"corrente": "semanal"},
+        formato={"tipo": "csv"},
+        recorte=recorte,
+    )
