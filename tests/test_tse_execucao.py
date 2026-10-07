@@ -1,0 +1,179 @@
+"""Execução fixada: trocar vigente ou acrescentar raw nunca altera o SQL selecionado."""
+
+import hashlib
+import importlib
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import duckdb
+import pytest
+from jinja2 import Environment
+
+from coletor.esquemas import carregar_esquemas, garantir_fontes
+from coletor.hashes import json_canonico
+from tests.test_tse_selecao import montar_vetor
+
+
+def preparar(*args, **kwargs):
+    return importlib.import_module("coletor.tse.execucao").preparar_execucao_tse(*args, **kwargs)
+
+
+def macro(nome, variaveis, lago, *args, target="prod"):
+    def erro(mensagem):
+        raise ValueError(mensagem)
+
+    ambiente = Environment(extensions=["jinja2.ext.do"])
+    modulo = ambiente.from_string(
+        Path("dbt/macros/tse.sql").read_text(encoding="utf-8")
+    ).make_module(
+        {
+            "var": lambda chave, default=None: variaveis.get(chave, default),
+            "env_var": lambda chave, default=None: str(lago).replace("\\", "/"),
+            "target": SimpleNamespace(name=target),
+            "exceptions": SimpleNamespace(raise_compiler_error=erro),
+        }
+    )
+    return str(getattr(modulo, nome)(*args))
+
+
+def ler_bens(execucao, lago):
+    sql = macro("fonte_tse", execucao.vars_dbt, lago, "bens")
+    with duckdb.connect() as conexao:
+        return conexao.execute(f"select vr_bem_candidato from {sql}").fetchall()
+
+
+def test_selecao_lida_uma_vez(tmp_path):
+    lago, selecao = montar_vetor(tmp_path / "d'agua")
+    vigente = lago / "estado/tse/vigente.json"
+    vigente.write_text(
+        json_canonico({"selecao_id": selecao.selecao_id, "versoes": selecao.versoes})
+    )
+    rejeitado = lago / "raw/tse/bens/2024/rejeitada/dados.parquet"
+    rejeitado.parent.mkdir(parents=True)
+    with duckdb.connect() as conexao:
+        conexao.execute(
+            "copy (select '999' vr_bem_candidato) to ? (format parquet)", [str(rejeitado)]
+        )
+    execucao = preparar(lago, "execucao-1", "prod")
+    vigente.write_text("corrompido")
+    assert ler_bens(execucao, lago) == [("100",)] * 4
+    assert execucao.publicavel
+    assert execucao.selecao_id == selecao.selecao_id
+    assert list(execucao.saida.iterdir()) == []
+    documento = json.loads((execucao.saida.parent / "preparacao.json").read_bytes())
+    assert documento["vars"] == execucao.vars_dbt
+    assert (
+        documento["vars_digest"]
+        == hashlib.sha256(json_canonico(execucao.vars_dbt).encode()).hexdigest()
+    )
+    assert documento["selecao"]["versoes"] == selecao.versoes
+    assert documento["protocolo"] == "tse:preparacao:v1"
+    assert documento["saida"] == "estado/tse/publicacoes/preparadas/execucao-1/marts"
+    assert (
+        macro("tse_saida_mart", execucao.vars_dbt, lago, "resumo")
+        == (execucao.saida / "resumo.parquet").as_posix()
+    )
+
+
+def test_selecao_explicita_nao_le_vigente(tmp_path):
+    lago, selecao = montar_vetor(tmp_path)
+    (lago / "estado/tse/vigente.json").write_text("corrompido")
+    execucao = preparar(lago, "candidato", "prod", selecao)
+    assert ler_bens(execucao, lago) == [("100",)] * 4
+    assert (lago / "estado/tse/vigente.json").read_text() == "corrompido"
+
+
+def test_seletor_corrompido_nao_vira_vazio(tmp_path):
+    lago, _ = montar_vetor(tmp_path)
+    (lago / "estado/tse/vigente.json").write_text("corrompido")
+    with pytest.raises(ValueError):
+        preparar(lago, "invalida", "prod")
+    assert not (lago / "estado/tse/publicacoes/preparadas/invalida").exists()
+
+
+@pytest.mark.parametrize("parcial", [False, True])
+def test_bootstrap_sem_marcador_nao_publica(tmp_path, parcial):
+    lago = tmp_path / "lago"
+    if parcial:
+        raw = lago / "raw/tse/bens/2024/rejeitada/dados.parquet"
+        raw.parent.mkdir(parents=True)
+        raw.write_bytes(b"rejeitado")
+    execucao = preparar(lago, "bootstrap", "prod")
+    assert not execucao.publicavel
+    assert execucao.selecao_id is None
+    assert ler_bens(execucao, lago) == []
+    assert not (lago / "raw/tse/bens/vazio").exists()
+
+
+def test_marcador_sem_vigente_falha(tmp_path):
+    marcador = tmp_path / "estado/tse/inicializado.json"
+    marcador.parent.mkdir(parents=True)
+    marcador.write_text('{"protocolo":"tse:inicializado:v1"}')
+    with pytest.raises(ValueError):
+        preparar(tmp_path, "ausente", "prod")
+
+
+def test_recuperacao_bloqueia_antes_do_bootstrap(tmp_path):
+    (tmp_path / "estado/tse/.recuperacao-incerta").mkdir(parents=True)
+    with pytest.raises(OSError):
+        preparar(tmp_path, "incerta", "prod")
+    assert not (tmp_path / "estado/tse/publicacoes").exists()
+
+
+def test_preparacao_exclusiva_nao_sobrescreve(tmp_path):
+    execucao = preparar(tmp_path, "uma-vez", "ci")
+    documento = execucao.saida.parent / "preparacao.json"
+    original = documento.read_bytes()
+    with pytest.raises(FileExistsError):
+        preparar(tmp_path, "uma-vez", "ci")
+    assert documento.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "identidade", ["../fora", "a/b", "", ".", "a\\b", "com.ponto", "a" * 129, None]
+)
+def test_execucao_confinada(tmp_path, identidade):
+    with pytest.raises(ValueError):
+        preparar(tmp_path, identidade, "ci")
+
+
+def test_garantir_fontes_nao_cria_raw_tse(tmp_path):
+    garantir_fontes(tmp_path, {"raw/tse/bens": {"x": "VARCHAR"}})
+    assert not (tmp_path / "raw/tse").exists()
+
+
+def test_defaults_ci_tipados_privados(tmp_path):
+    from scripts import lago_vazio
+
+    esquemas = carregar_esquemas(Path("dbt"))
+    lago_vazio.PASTA = tmp_path
+    try:
+        lago_vazio.gerar(esquemas)
+    finally:
+        lago_vazio.PASTA = Path("dbt/tests/lago_vazio").resolve()
+    sql = macro("fonte_tse", {}, tmp_path, "bens", target="ci")
+    with duckdb.connect() as conexao:
+        assert conexao.execute(f"select count(*) from {sql}").fetchone() == (0,)
+        colunas = dict(
+            (r[0], r[1]) for r in conexao.execute(f"describe select * from {sql}").fetchall()
+        )
+    assert colunas["vr_bem_candidato"] == "VARCHAR"
+    assert colunas["_competencia_data"] == "DATE"
+    assert colunas["_linha"] == "BIGINT"
+    assert not (tmp_path / "raw/tse").exists()
+    with pytest.raises(ValueError):
+        macro("fonte_tse", {}, tmp_path, "bens")
+
+
+@pytest.mark.parametrize("fontes", [{}, {"bens": []}, {"bens": ["raw/tse/**/*.parquet"]}])
+def test_macro_recusa_fontes_nao_explicitas(tmp_path, fontes):
+    with pytest.raises(ValueError):
+        macro("fonte_tse", {"tse_fontes": fontes}, tmp_path, "bens")
+
+
+def test_saida_mart_explicita_e_confinada(tmp_path):
+    with pytest.raises(ValueError):
+        macro("tse_saida_mart", {}, tmp_path, "resumo")
+    with pytest.raises(ValueError):
+        macro("tse_saida_mart", {"tse_saida": str(tmp_path)}, tmp_path, "../fora")
