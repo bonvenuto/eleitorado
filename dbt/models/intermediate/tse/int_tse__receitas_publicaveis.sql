@@ -32,12 +32,13 @@ with campanhas as (
         exists(select 1 from campanhas c where c.documento = r.nr_cpf_cnpj_doador)
             as doador_campanha,
         exists(select 1 from originarios o
-            where (o.cd_eleicao is null or o.cd_eleicao = r.cd_eleicao)
+            where (o.cd_eleicao is null and o.sq_prestador_contas is null)
+                or ((o.cd_eleicao is null or o.cd_eleicao = r.cd_eleicao)
                 and (o.sq_prestador_contas is null
                     or o.sq_prestador_contas = r.sq_prestador_contas)
                 and (o.tipo_prestacao is null or o.data_prestacao is null
                     or (o.tipo_prestacao = r.tipo_prestacao
-                        and o.data_prestacao = r.data_prestacao))) as originario_no_escopo
+                        and o.data_prestacao = r.data_prestacao)))) as originario_no_escopo
     from {{ ref('int_tse__receitas') }} r
 ), papeis as (
     select *, coalesce(
