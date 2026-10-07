@@ -20,12 +20,18 @@ Estado em 2026-10-07.
 
 ## 1. Fechar a onda C1 (em andamento)
 
-O código está na `main` (PR #33) e a primeira coleta foi disparada em 2026-10-07.
+O código está na `main` (PR #33). A primeira coleta pelo GitHub Actions falhou: a Receita
+derruba a conexão de IPs do GitHub (todas as URLs, inclusive a página web; diagnóstico no PR
+#35). A coleta passou a rodar do computador do mantenedor (`scripts/receita_local.ps1`); o
+detalhe de deputados funciona do GitHub e foi para o pipeline diário (cadência mensal).
 
-- [ ] Conferir a execução do `receita.yml`: tempo total (no protótipo local, ~50 min; se passar de
-  90 min, dividir os grupos em semanas, spec seção 8), linhas mantidas por grupo (esperado:
-  ~250 mil empresas, ~657 mil estabelecimentos, ~388 mil sócios, ~159 mil no Simples) e 1.814
-  deputados no detalhe.
+- [ ] Primeira coleta local: linhas mantidas por grupo (esperado: ~250 mil empresas, ~657 mil
+  estabelecimentos, ~388 mil sócios, ~159 mil no Simples), tempo (~50 min no protótipo) e o
+  envio ao bucket.
+- [ ] **Usuário:** agendar a coleta (`.\scripts\agendar_receita.ps1`, segundas às 02:00).
+- [ ] Se o computador ficar desligado mais de 40 dias, o `monitor_fontes` acusa atraso e o
+  pipeline deixa de publicar. Avaliar uma alternativa fora da máquina local (job ou runner
+  em São Paulo, se os IPs do Google não forem bloqueados) se isso virar problema.
 - [ ] No pipeline diário seguinte: `dim_empresa`, `dim_estabelecimento` e os 4 alertas publicados
   no R2; números dos alertas perto dos da spec, seção 10.
 - [ ] Rodar o `preparar` do agente e a avaliação (`uv run agente avaliar`) com o caso plantado novo
@@ -85,7 +91,7 @@ atuais:
 ## 6. Pendências operacionais
 
 - [ ] **Dependabot:** PRs #13 a #17 (versões maiores das ações e `google-cloud-storage`). Ao
-  atualizar uma ação, atualizar o SHA nos três workflows (`pipeline.yml`, `receita.yml`, `ci.yml`).
+  atualizar uma ação, atualizar o SHA nos dois workflows (`pipeline.yml` e `ci.yml`).
 - [ ] **Usuário:** agendar o agente semanal (`.\agente\agendar.ps1`).
 - [ ] **Usuário:** desativar no GCP as APIs que não usamos mais desde a migração (Cloud Run, Cloud
   Scheduler, Artifact Registry, BigQuery).

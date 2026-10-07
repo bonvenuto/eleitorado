@@ -19,8 +19,10 @@ governo e achar inconsistências. O repositório é **público**.
   Targets: `prod`, `dev`, `ci` (lago vazio de `dbt/tests/lago_vazio`) e `agente`.
 - `agente/`: agente investigador L1 (controlador Python + sessões `claude -p` com servidor MCP
   próprio). Recomenda; não decide nem age. Relatórios só para uso interno.
-- `.github/workflows/`: `pipeline.yml` (diário: coleta do grupo `diario`, dbt build, publica),
-  `receita.yml` (segundas: base do CNPJ da Receita, grupo `receita`, não publica), `ci.yml`.
+- `.github/workflows/`: `pipeline.yml` (diário: coleta do grupo `diario`, dbt build, publica) e
+  `ci.yml`. A base do CNPJ da Receita (grupo `receita`) não roda no GitHub: a Receita bloqueia
+  os IPs do Actions, então ela é coletada do computador do mantenedor
+  (`scripts/receita_local.ps1`, agendado por `scripts/agendar_receita.ps1`).
 - `infra/`: Terraform (bucket, conta de serviço `pipeline` com WIF, orçamento).
 
 ## Regras que não se negociam
@@ -46,6 +48,35 @@ governo e achar inconsistências. O repositório é **público**.
 - **Ações do GitHub fixadas por SHA**, com a versão em comentário (`# v4.4.0`).
 
 ## Como trabalhamos
+
+### Modelos e delegação no Codex
+
+O usuário autorizou a delegação automática de tarefas de desenvolvimento conforme esta política.
+O coordenador usa GPT-6.1 Sol com esforço `medium` como padrão salvo em `.codex/config.toml`.
+Ele classifica as solicitações e delega aos agentes de `.codex/agents/`:
+
+| Agente | Modelo | Esforço | Responsabilidade |
+|---|---|---|---|
+| `arquiteto` | `gpt-6-astra` | `high` | Arquitetura, specs e revisão crítica |
+| `planejador` | `gpt-6.1-sol` | `high` | Planos, diagnóstico complexo e estratégia de testes |
+| `desenvolvedor` | `gpt-6.1-sol` | `medium` | Implementação, testes e acompanhamento da CI |
+| `manutencao` | `gpt-6-luna` | `medium` | Ajustes pequenos, documentação e tarefas repetitivas |
+
+- Use a delegação quando houver trabalho concreto para o agente; responda perguntas simples
+  diretamente, sem criar agentes desnecessários.
+- Informe brevemente a escolha. Ao criar um subagente, explicite modelo e esforço, com contexto
+  limitado à tarefa, escopo de arquivos e critérios de aceite. Preserve alterações alheias.
+- Paralelize somente tarefas independentes. O coordenador integra e confere os resultados.
+- Encaminhe decisões críticas sobre históricos, identidade, privacidade, permissões e publicação
+  ao `arquiteto`; problemas complexos ao `planejador`. Revisões críticas devem ser independentes
+  de quem implementou. Não aumente esforço para `xhigh`, `max` ou `ultra` por padrão.
+- Esta política não altera automaticamente o modelo da conversa principal em andamento.
+  Se um agente ou modelo não estiver disponível, informe a limitação e use uma alternativa
+  disponível, sem alegar que a seleção configurada foi executada.
+- Os agentes `investigador` e `validador` têm funções próprias e não substituem os agentes de
+  desenvolvimento. As autorizações e restrições das demais seções continuam valendo.
+
+### Fluxo de entrega
 
 1. **Spec** em `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md`, aprovada pelo usuário.
 2. **Protótipo** com dados reais antes do plano (medir volumes, tempos e quantos casos cada regra
@@ -102,6 +133,10 @@ uv run dbt build --project-dir dbt --profiles-dir dbt --target ci
 - **Fonte com defeito conhecido:** o ZIP de licitações da CGU de 2018-12 vem truncado na própria
   fonte e falha todo dia (ver o roteiro).
 - **Receita:** a base mensal tem 7,6 GB; o adaptador `webdav_zip` recorta em fluxo só as raízes de
-  CNPJ que aparecem nos dados (`<lago>/rfb_raizes_interesse.parquet`, gerado pelo dbt).
+  CNPJ que aparecem nos dados (`<lago>/rfb_raizes_interesse.parquet`, gerado pelo dbt). O
+  servidor da Receita derruba a conexão de IPs do GitHub Actions (diagnóstico de 2026-10-07, PR
+  #35), por isso a coleta é local, num lago próprio (`dados-receita/`), e sobe ao bucket com
+  `coletor estado salvar --aditivo` (só arquivos novos de `raw/` e `meta/`; nunca apaga nem
+  sobrescreve), sempre com o pipeline parado: ele espelha o lago e apagaria o que não conhece.
 - **Windows:** o desenvolvimento local é em Windows (PowerShell e Git Bash). Use caminhos com `/`
   ou caminhos Windows; caminhos `/c/...` quebram em subprocessos Python.

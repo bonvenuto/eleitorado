@@ -2,9 +2,10 @@ orgao: rfb
 nome: Receita Federal do Brasil
 portal: https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj
 # Base aberta do CNPJ: uma pasta por competência (AAAA-MM) no compartilhamento WebDAV da Receita.
-# Coletada pelo workflow receita.yml (grupo receita), recortada às raízes de CNPJ que aparecem nos
-# dados do eleitorado (int_rfb__raizes_interesse). O usuário é o token público do
-# compartilhamento.
+# Recortada às raízes de CNPJ que aparecem nos dados do eleitorado (int_rfb__raizes_interesse). O
+# usuário é o token público do compartilhamento. Grupo receita: a Receita bloqueia os IPs do GitHub
+# Actions, então a coleta roda do computador do mantenedor (scripts/receita_local.ps1), fora do
+# pipeline diário. Cadência mensal: o monitor só acusa atraso depois de 40 dias.
 recursos:
   - id: empresas
     descricao: Empresas (cadastro por CNPJ básico)
@@ -19,7 +20,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -40,7 +41,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -65,7 +66,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -87,7 +88,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -108,7 +109,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -127,7 +128,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -146,7 +147,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -165,7 +166,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -184,7 +185,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -203,7 +204,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:

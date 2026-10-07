@@ -39,3 +39,6 @@ avaliacao/
 
 # Codex: configuração local
 .codex/
+
+# coleta local da Receita (scripts/receita_local.ps1)
+dados-receita/
