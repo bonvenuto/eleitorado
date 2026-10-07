@@ -65,7 +65,8 @@ próprios.
 - **Códigos:** situação cadastral 01 nula, 02 ativa, 03 suspensa, 04 inapta, 08 baixada; porte 00
   não informado, 01 microempresa, 03 empresa de pequeno porte, 05 demais; identificador do sócio
   1 pessoa jurídica, 2 pessoa física, 3 estrangeiro. O CPF de sócio pessoa física (e do
-  representante legal) vem mascarado pela Receita: `***456789**` (6 dígitos do meio).
+  representante legal) vem mascarado pela Receita: `***456789**` (6 dígitos do meio). O sócio
+  pessoa jurídica vem só com a raiz do CNPJ (8 posições), não com os 14 (visto em 2026-09).
 - **Município:** a Receita usa código próprio (tabela `Municipios`), não o do IBGE.
 - **Detalhe de deputados** (para o alerta 4): `https://dadosabertos.camara.leg.br/api/v2/deputados/{id}`
   traz `cpf` e `nomeCivil`, que a lista de deputados que já coletamos não tem.
@@ -74,7 +75,8 @@ próprios.
 
 ### 3.1 Conjunto de interesse
 
-Modelo novo `int_rfb__raizes_interesse` (dbt, tabela): raízes distintas de CNPJ (8 posições) que
+Modelo novo `int_rfb__raizes_interesse` (dbt, Parquet externo em `<lago>/rfb_raizes_interesse.parquet`,
+que o coletor lê): raízes distintas de CNPJ (8 posições) que
 aparecem em fornecedores da cota, favorecidos e documentos de emendas, contratos federais (Portal e
 PNCP), **todos** os participantes de licitação (não só os vencedores) e sancionadas, com a origem
 de cada raiz.
@@ -85,8 +87,10 @@ de cada raiz.
   concorrência do `pipeline.yml` (os dois nunca escrevem no lago ao mesmo tempo), as mesmas
   credenciais (WIF da conta `pipeline`) e o mesmo cache cifrado do lago.
 - Passos: restaurar o lago; `dbt run --select +int_rfb__raizes_interesse` (só o necessário para o
-  conjunto); exportar as raízes para um Parquet local; `coletor coletar rfb.<recurso>` para os
-  recursos vencidos; salvar o estado.
+  conjunto, que já grava o Parquet das raízes); `coletor executar --grupo receita`; salvar o
+  estado. Não roda o dbt inteiro nem publica: o pipeline diário faz isso no dia seguinte.
+- Os recursos da Receita e o detalhe de deputados têm `grupo: receita` no manifesto; o pipeline
+  diário (`--grupo diario`, o padrão) não os coleta.
 - A competência é a pasta mais recente do WebDAV. Recurso já coletado naquela competência não é
   coletado de novo, então na prática a coleta acontece uma vez por mês.
 
@@ -105,7 +109,11 @@ de cada raiz.
   lê esse CSV pequeno e grava o Parquet. Não dá para usar o leitor Latin-1 do DuckDB direto: os
   arquivos da Receita têm bytes NUL e 0x8F soltos, que ele recusa. O ZIP é apagado em seguida: o
   disco nunca guarda mais que um ZIP e o seu recorte.
-- Cada ZIP do grupo é uma coleta própria (retomada por arquivo). As tabelas de apoio vão inteiras.
+- Cada grupo é uma coleta: os ZIPs do grupo são baixados em sequência e vão para um recorte só.
+  A retomada é por download (`Range`); uma falha no meio do grupo repete o grupo na semana
+  seguinte. As tabelas de apoio vão inteiras.
+- O recorte (CSV em UTF-8 com cabeçalho) é o que se arquiva em `originais/`; o registro da
+  coleta guarda, por ZIP, nome, tamanho, SHA-256, linhas lidas e mantidas.
 - O número de colunas do CSV é conferido contra o layout; diferente, a coleta falha com erro claro
   e não grava nada parcial.
 - Os metadados de coleta registram, por arquivo-fonte: nome, tamanho, SHA-256, linhas lidas e
@@ -120,8 +128,8 @@ lago privado (tem CPF completo).
 ### 3.5 Lago privado
 
 ```
-raw/rfb/{empresas,estabelecimentos,socios,simples}/<AAAA-MM>/<coleta_id>.parquet   recorte do mês
-raw/rfb/{cnaes,municipios,naturezas,qualificacoes,motivos,paises}/<AAAA-MM>/...    inteiras
+raw/rfb/{empresas,estabelecimentos,socios,simples}/<AAAAMM>/<coleta_id>.parquet   recorte do mês
+raw/rfb/{cnaes,municipios,naturezas,qualificacoes,motivos,paises}/<AAAAMM>/...    inteiras
 raw/camara/deputados_detalhe/<data>/...
 ```
 
@@ -195,10 +203,11 @@ origem, fato, data, valor, CNPJ, razão social, data de abertura, dias desde a a
 ### 5.3 `alerta_licitacao_socios_em_comum`
 
 Dois participantes de raízes diferentes na mesma licitação do Portal com um sócio em comum: sócio
-empresa pelo CNPJ; sócio pessoa física pelo nome **e** pelos 6 dígitos visíveis do CPF. O sócio
-precisa ter entrado nas duas empresas antes da data da licitação. Publica o par de participantes,
-quem venceu, o tipo e a qualificação do sócio e, quando o sócio é empresa, o CNPJ dele; nunca o
-nome nem o CPF de sócio pessoa física.
+empresa pela raiz do CNPJ (é o que a Receita publica); sócio pessoa física pelo nome **e** pelos 6
+dígitos visíveis do CPF. O sócio precisa ter entrado nas duas empresas até a data da licitação.
+Uma linha por licitação e par de participantes: quem venceu, quantos sócios pessoa física e
+empresa em comum, as qualificações e as raízes dos sócios empresa; nunca o nome nem o CPF de sócio
+pessoa física.
 
 ### 5.4 `alerta_parlamentar_socio_fornecedor`
 
@@ -211,8 +220,9 @@ nome nem o CPF de sócio pessoa física.
 
 ## 6. Agente investigador
 
-- O `preparar` passa a incluir as tabelas novas no contexto (automático); `docs/modelos-de-dados.md`
-  documenta os marts e alertas novos.
+- O `preparar` passa a incluir as tabelas novas no contexto (automático) e cria Parquet vazio
+  para fonte ainda sem coleta (como o pipeline), para o dbt do agente não falhar antes da
+  primeira coleta da Receita; `docs/modelos-de-dados.md` documenta os marts e alertas novos.
 - `investigador.md`: códigos de situação, porte e MEI; sócios só em `intermediate.int_rfb__socios`
   (CPF de pessoa física mascarado pela Receita); lentes novas (capital social baixo para o valor do
   contrato, fornecedoras no mesmo endereço, sócio em comum com empresa sancionada, alertas da C1).
@@ -227,8 +237,10 @@ nome nem o CPF de sócio pessoa física.
 - **dbt:** um teste unitário por alerta, com as bordas: fato no mesmo dia da baixa; sócio que
   entrou depois da licitação; senador só por nome; fato antes da abertura; registro com
   `valor_suspeito` excluído.
-- **LGPD:** `sem_cpf_completo` em `dim_empresa`, `dim_estabelecimento` e nos alertas novos; um
-  teste que falha se um mart público tiver coluna de endereço, contato ou sócio pessoa física.
+- **LGPD:** `sem_cpf_completo` em `dim_empresa`, `dim_estabelecimento` e nos alertas novos; o
+  teste genérico `sem_dados_pessoais` (nos mesmos modelos) falha se o mart tiver coluna de
+  endereço, contato ou sócio pessoa física. Genérico, e não um teste singular sobre o
+  `information_schema`, porque assim depende do modelo e roda depois dele.
 - **Coletor (do protótipo):** registro com quebra de linha dentro de campo entre aspas; byte NUL e
   0x8F no meio do CSV; download interrompido que retoma por `Range`; servidor que ignora o `Range`
   (resposta 200) falha em vez de corromper o arquivo.
