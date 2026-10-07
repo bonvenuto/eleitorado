@@ -1,0 +1,65 @@
+version: 2
+
+unit_tests:
+  - name: site_parlamentar_corta_alertas_e_fornecedores
+    description: >
+      O arquivo do parlamentar traz os `site_max_alertas` alertas mais recentes com o total, e os
+      `site_top` maiores fornecedores. Parlamentar sem dados também tem arquivo.
+    model: site_arquivos_parlamentar
+    overrides:
+      vars: {site_max_alertas: 1, site_top: 2}
+    given:
+      - input: ref('dim_parlamentar')
+        rows:
+          - {parlamentar_id: 'camara:1', casa: camara, id_origem: '1', nome: ANA}
+          - {parlamentar_id: 'senado:2', casa: senado, id_origem: '2', nome: JOAO}
+      - input: ref('site_cota')
+        rows:
+          - {parlamentar_id: 'camara:1', ano: 2025, categoria: COMBUSTIVEIS, fornecedor_documento: '11222333000181', fornecedor_nome: POSTO A, valor: 300, despesas: 3}
+          - {parlamentar_id: 'camara:1', ano: 2025, categoria: COMBUSTIVEIS, fornecedor_documento: '44555666000110', fornecedor_nome: POSTO B, valor: 200, despesas: 2}
+          - {parlamentar_id: 'camara:1', ano: 2026, categoria: TELEFONIA, fornecedor_documento: '77888999000100', fornecedor_nome: TELE C, valor: 100, despesas: 1}
+      - input: ref('site_emendas')
+        rows: []
+      - input: ref('site_alertas')
+        rows:
+          - {alerta_id: a1, tipo: cota_fornecedor_sancionado, data_fato: '2026-01-01', parlamentar_id: 'camara:1', descricao: x, correspondencia: forte, regra: r}
+          - {alerta_id: a2, tipo: cota_fornecedor_sancionado, data_fato: '2026-02-01', parlamentar_id: 'camara:1', descricao: x, correspondencia: forte, regra: r}
+    expect:
+      rows:
+        - {caminho: parlamentar/camara-1.json, alertas_total: 2, alertas_no_arquivo: 1, fornecedores_no_arquivo: 2}
+        - {caminho: parlamentar/senado-2.json, alertas_total: 0, alertas_no_arquivo: 0, fornecedores_no_arquivo: 0}
+
+  - name: site_empresa_em_blocos_com_socios_nas_duas
+    description: >
+      Empresas agrupadas pelos 3 primeiros caracteres da raiz (alfanumérica inclusive). O alerta
+      de sócios em comum entra no arquivo das duas empresas.
+    model: site_arquivos_empresa
+    given:
+      - input: ref('dim_empresa')
+        rows:
+          - {cnpj_raiz: '11222333', razao_social: EMPRESA A}
+          - {cnpj_raiz: '11299999', razao_social: EMPRESA C}
+          - {cnpj_raiz: '44555666', razao_social: EMPRESA B}
+          - {cnpj_raiz: '1AB2C3D4', razao_social: EMPRESA ALFANUMERICA}
+      - input: ref('dim_municipio')
+        rows: []
+      - input: ref('dim_parlamentar')
+        rows: []
+      - input: ref('site_cota')
+        rows: []
+      - input: ref('site_emendas')
+        rows: []
+      - input: ref('site_contratos')
+        rows: []
+      - input: ref('site_licitacoes')
+        rows: []
+      - input: ref('fct_sancao')
+        rows: []
+      - input: ref('site_alertas')
+        rows:
+          - {alerta_id: s1, tipo: licitacao_socios_em_comum, data_fato: '2023-05-05', cnpj_raiz: '11222333', cnpj_raiz_2: '44555666', descricao: x, correspondencia: forte, regra: r}
+    expect:
+      rows:
+        - {caminho: empresa/b_112.json, empresas_no_arquivo: 2, alertas_total: 1}
+        - {caminho: empresa/b_1AB.json, empresas_no_arquivo: 1, alertas_total: 0}
+        - {caminho: empresa/b_445.json, empresas_no_arquivo: 1, alertas_total: 1}
