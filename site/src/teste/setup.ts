@@ -7,6 +7,7 @@ import { servir } from './exemplos'
 beforeEach(() => {
   limparCache()
   servir()
+  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo
 })
 
 afterEach(() => {

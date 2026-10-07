@@ -2,6 +2,7 @@ import { render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
+import { Rotas } from '../Rotas'
 
 function LocalAtual() {
   const local = useLocation()
@@ -22,4 +23,9 @@ export function renderizarComRotas(ui: ReactNode, rota = '/') {
     </MemoryRouter>,
   )
   return { usuario, ...resultado, local: () => resultado.getByTestId('local').textContent }
+}
+
+/** o site inteiro, aberto em `rota` */
+export function renderizarSite(rota: string) {
+  return renderizarComRotas(<Rotas />, rota)
 }

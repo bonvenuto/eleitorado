@@ -28,6 +28,6 @@ describe('estrutura do site', () => {
         <Rotas />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('heading', { name: 'Eleitorado' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Pular para o conteúdo' })).toBeInTheDocument()
   })
 })
