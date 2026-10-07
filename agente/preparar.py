@@ -251,6 +251,8 @@ REGRAS_C2 = (
     "dbt/macros/generate_schema_name.sql",
     "dbt/tests/generic/sem_cpf_completo.sql",
     "dbt/tests/generic/sem_dados_pessoais.sql",
+    # O monitor T16 depende dos hashes oficiais projetados neste staging compartilhado.
+    "dbt/models/staging/stg_meta__coletas.sql",
     "dbt/models/staging/tse",
     "dbt/models/intermediate/tse",
     "dbt/models/marts/tse",

@@ -12,8 +12,8 @@ Federal), modela com dbt sobre DuckDB e publica marts em Parquet no Cloudflare R
 governo e achar inconsistências. O repositório é **público**.
 
 - `coletor/`: CLI `coletor` (Python 3.12, uv). Fontes declaradas em `fontes/*.yaml`; adaptadores em
-  `coletor/adaptadores/` (`arquivo`, `api_json`, `api_detalhe`, `webdav_zip`). Cada coleta arquiva
-  o original no bucket privado do GCS, grava o raw em Parquet no lago local
+  `coletor/adaptadores/` (`arquivo`, `api_json`, `api_detalhe`, `webdav_zip`, `tse_zip`). Cada coleta
+  arquiva o original no bucket privado do GCS, grava o raw em Parquet no lago local
   (`dados/raw/<órgão>/<recurso>/<partição>/`) e registra em `dados/meta/`.
 - `dbt/`: staging (views), intermediate (tabelas, privadas) e marts (Parquet externo, públicos).
   Targets: `prod`, `dev`, `ci` (lago vazio de `dbt/tests/lago_vazio`) e `agente`.
@@ -47,8 +47,9 @@ governo e achar inconsistências. O repositório é **público**.
     `intermediate`).
   - Nunca vão para o git: `dados/`, `dados-*/`, `investigacoes/`, `avaliacao/`,
     `.claude/settings.local.json`.
-- **Hosts:** o coletor só acessa `.gov.br` e `.leg.br` (`SUFIXOS_OFICIAIS` em `coletor/http.py`).
-  Fonte nova fora disso precisa de decisão do usuário.
+- **Hosts:** o coletor acessa `.gov.br` e `.leg.br` (`SUFIXOS_OFICIAIS` em `coletor/http.py`),
+  com exceção autorizada para `tse.jus.br` e seus subdomínios. Outros `.jus.br` continuam
+  proibidos; fonte nova fora desses hosts precisa de decisão do usuário.
 - **Ações do GitHub fixadas por SHA**, com a versão em comentário (`# v4.4.0`).
 
 ## Como trabalhamos

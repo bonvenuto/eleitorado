@@ -206,16 +206,21 @@ def preparar_e_promover_tse(
     except FalhaSemanticaTse:
         raise
     except (Exception, KeyboardInterrupt) as erro:
-        gravar_avaliacao(
-            lago,
-            escopo="selecao",
-            identidade=selecao.selecao_id,
-            entradas_digest=preparacao["entradas_digest"],
-            contrato=CONTRATO,
-            execucao_id=execucao_id,
-            resultado="inconclusiva",
-            motivos=[{"codigo": "execucao_inconclusiva", "detalhe": type(erro).__name__}],
-        )
+        try:
+            gravar_avaliacao(
+                lago,
+                escopo="selecao",
+                identidade=selecao.selecao_id,
+                entradas_digest=preparacao["entradas_digest"],
+                contrato=CONTRATO,
+                execucao_id=execucao_id,
+                resultado="inconclusiva",
+                motivos=[{"codigo": "execucao_inconclusiva", "detalhe": type(erro).__name__}],
+            )
+        except Exception as falha_persistencia:
+            if isinstance(erro, KeyboardInterrupt):
+                raise erro from falha_persistencia
+            raise
         if isinstance(erro, KeyboardInterrupt):
             raise
         raise ValueError("execucao TSE inconclusiva; selecao anterior preservada") from erro

@@ -372,3 +372,31 @@ def test_entrada_alterada_durante_falha_nao_rejeita_digest_antigo(candidato, alt
     ]
     assert avaliacoes and all(a["resultado"] == "inconclusiva" for a in avaliacoes)
     assert not (lago / "estado/tse/vigente.json").exists()
+
+
+def test_interrupcao_original_preservada_se_avaliacao_falha(candidato, monkeypatch):
+    import coletor.tse.pipeline as pipeline
+
+    lago, selecao = candidato
+    vigente = lago / "estado/tse/vigente.json"
+    vigente.write_bytes(b"selecao anterior preservada")
+    interrupcao = KeyboardInterrupt("interrupcao original")
+    persistencia = OSError("persistencia diagnostica indisponivel")
+
+    def interromper(**kwargs):
+        raise interrupcao
+
+    def falhar_avaliacao(*args, **kwargs):
+        raise persistencia
+
+    monkeypatch.setattr(pipeline, "gravar_avaliacao", falhar_avaliacao)
+    monkeypatch.setattr(pipeline, "promover_selecao", lambda *a: pytest.fail("nao pode promover"))
+    with pytest.raises(KeyboardInterrupt) as capturada:
+        controlador(lago, selecao, "dupla-falha", "ci", interromper)
+    assert capturada.value is interrupcao
+    assert capturada.value.__cause__ is persistencia
+    assert vigente.read_bytes() == b"selecao anterior preservada"
+    pasta = lago / "estado/tse/publicacoes/preparadas/dupla-falha"
+    assert not (pasta / "recibo.json").exists()
+    assert not (pasta / "execucao.json").exists()
+    assert not list((lago / "estado/tse/validacoes").glob("*.json"))

@@ -677,3 +677,34 @@ def test_falha_sync_diretorio_bloqueia_build_ou_liberacao(c2, monkeypatch, etapa
         # Rename já ocorreu: nova marca visível não prova persistência após falha de fsync.
         assert marca.read_bytes() != antiga
         assert json.loads(marca.read_bytes())["dbt"] == "sucesso"
+
+
+def test_meta_coletas_alterado_invalida_cache_c2_causalmente(c2):
+    import json
+
+    from agente.preparar import _regras_c2
+
+    config, _ = c2
+    regra = config.raiz / "dbt/models/staging/stg_meta__coletas.sql"
+    regra.parent.mkdir(parents=True, exist_ok=True)
+    regra.write_text("select sha256_arquivo from fonte", encoding="utf-8")
+    chamadas = []
+    construtor = construtor_c2(config, chamadas)
+    assert preparar(config, {}, construtor, lambda: AGORA).dbt_rodou
+    assert not preparar(config, {}, construtor, lambda: AGORA).dbt_rodou
+    assert len(chamadas) == 1
+    marca = config.lago / "preparo.json"
+    marca_antes = marca.read_bytes()
+    saida = Path(json.loads(marca_antes)["tse"]["saida"]) / "c2.parquet"
+    saida_antes = saida.read_bytes()
+    lago_antes = impressao_lago(config.lago)
+    regras_antes = _regras_c2(config.raiz)
+    regra.write_text("select sha256_conteudo from fonte", encoding="utf-8")
+    assert marca.read_bytes() == marca_antes
+    assert saida.read_bytes() == saida_antes
+    assert impressao_lago(config.lago) == lago_antes
+    assert _regras_c2(config.raiz) != regras_antes
+    assert preparar(config, {}, construtor, lambda: AGORA).dbt_rodou
+    assert len(chamadas) == 2
+    assert not preparar(config, {}, construtor, lambda: AGORA).dbt_rodou
+    assert len(chamadas) == 2
