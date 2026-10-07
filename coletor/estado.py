@@ -21,6 +21,7 @@ SCHEMA_HISTORICOS = "intermediate"
 PASTAS = ("raw/", "meta/", "estado/")
 PASTAS_ADITIVO = ("raw/", "meta/")  # coleta fora do pipeline: nunca os históricos
 ESPELHADAS = ("raw/", "estado/")  # o que sumiu do lago some do bucket; meta/ só cresce
+PREFIXOS_TSE = ("raw/tse/", "estado/tse/")
 LIMITE_REMOCAO = 0.5  # fração do bucket que uma execução pode apagar
 
 
@@ -60,6 +61,8 @@ def restaurar(armazenamento: Armazenamento, prefixo: str, lago: Path, banco: Pat
     for pasta in PASTAS:
         for caminho, objeto in armazenamento.listar_objetos(prefixo + pasta).items():
             relativo = caminho.removeprefix(prefixo)
+            if relativo.startswith(PREFIXOS_TSE):
+                continue
             local = lago / relativo
             if local.exists() and local.stat().st_size == objeto.tamanho:
                 if md5_arquivo(local) == objeto.md5:
@@ -141,8 +144,12 @@ def salvar(
     envios: list[tuple[Path, str]] = []
     remocoes: list[str] = []
     for pasta in PASTAS_ADITIVO if aditivo else PASTAS:
-        remotos = armazenamento.listar_objetos(prefixo + pasta)
-        locais = _locais(lago, pasta)
+        remotos = {
+            c: o
+            for c, o in armazenamento.listar_objetos(prefixo + pasta).items()
+            if not c.removeprefix(prefixo).startswith(PREFIXOS_TSE)
+        }
+        locais = {c: p for c, p in _locais(lago, pasta).items() if not c.startswith(PREFIXOS_TSE)}
         for relativo, local in sorted(locais.items()):
             objeto = remotos.get(prefixo + relativo)
             if objeto is not None and (aditivo or objeto.tamanho == local.stat().st_size):
