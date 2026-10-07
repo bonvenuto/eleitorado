@@ -9,6 +9,7 @@ sources:
     tables:
       - name: ceap
       - name: deputados
+      - name: deputados_detalhe
   - name: raw_senado
     meta:
       external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/senado/{name}/*/*.parquet', union_by_name = true)"
@@ -41,6 +42,22 @@ sources:
     tables:
       - name: contratos
       - name: contratos_atualizacao
+
+  # recorte mensal da base do CNPJ (onda C1): só as raízes que aparecem nos nossos dados
+  - name: raw_rfb
+    meta:
+      external_location: "read_parquet('{{ env_var('ELEITORADO_LAGO', 'dados') }}/raw/rfb/{name}/*/*.parquet', union_by_name = true)"
+    tables:
+      - name: empresas
+      - name: estabelecimentos
+      - name: socios
+      - name: simples
+      - name: cnaes
+      - name: municipios
+      - name: naturezas
+      - name: qualificacoes
+      - name: motivos
+      - name: paises
 
   # snapshots de todas as datas, recriados dos originais pelo `coletor reconstruir` (seção 7.4)
   - name: replay
