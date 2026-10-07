@@ -2,9 +2,10 @@ orgao: rfb
 nome: Receita Federal do Brasil
 portal: https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj
 # Base aberta do CNPJ: uma pasta por competência (AAAA-MM) no compartilhamento WebDAV da Receita.
-# Coletada pelo workflow receita.yml (grupo receita), recortada às raízes de CNPJ que aparecem nos
-# dados do eleitorado (int_rfb__raizes_interesse). O usuário é o token público do
-# compartilhamento.
+# Recortada às raízes de CNPJ que aparecem nos dados do eleitorado (int_rfb__raizes_interesse). O
+# usuário é o token público do compartilhamento. Grupo receita: a Receita bloqueia os IPs do GitHub
+# Actions, então a coleta roda do computador do mantenedor (scripts/receita_local.ps1), fora do
+# pipeline diário. Cadência mensal: o monitor só acusa atraso depois de 40 dias.
 recursos:
   - id: empresas
     descricao: Empresas (cadastro por CNPJ básico)
@@ -19,14 +20,14 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
       arquivos: "Empresas*.zip"
       colunas: [cnpj_basico, razao_social, natureza_juridica, qualificacao_responsavel,
         capital_social, porte_empresa, ente_federativo_responsavel]
-      raizes: rfb_raizes_interesse.parquet
+      raizes: estado/rfb_raizes_interesse.parquet
   - id: estabelecimentos
     descricao: Estabelecimentos (matriz e filiais)
     fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
@@ -40,7 +41,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -51,7 +52,7 @@ recursos:
         cnae_fiscal_secundaria, tipo_logradouro, logradouro, numero, complemento, bairro, cep,
         uf, municipio, ddd_1, telefone_1, ddd_2, telefone_2, ddd_fax, fax, correio_eletronico,
         situacao_especial, data_situacao_especial]
-      raizes: rfb_raizes_interesse.parquet
+      raizes: estado/rfb_raizes_interesse.parquet
   - id: socios
     descricao: Sócios (quadro societário)
     fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
@@ -65,7 +66,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -73,7 +74,7 @@ recursos:
       colunas: [cnpj_basico, identificador_socio, nome_socio_razao_social, cnpj_cpf_socio,
         qualificacao_socio, data_entrada_sociedade, pais, representante_legal,
         nome_representante, qualificacao_representante_legal, faixa_etaria]
-      raizes: rfb_raizes_interesse.parquet
+      raizes: estado/rfb_raizes_interesse.parquet
   - id: simples
     descricao: Opção pelo Simples Nacional e pelo MEI
     fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
@@ -87,14 +88,14 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
       arquivos: "Simples.zip"
       colunas: [cnpj_basico, opcao_pelo_simples, data_opcao_simples, data_exclusao_simples,
         opcao_mei, data_opcao_mei, data_exclusao_mei]
-      raizes: rfb_raizes_interesse.parquet
+      raizes: estado/rfb_raizes_interesse.parquet
   - id: cnaes
     descricao: Tabela de apoio de CNAEs (atividades econômicas)
     fonte_oficial: https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
@@ -108,7 +109,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -127,7 +128,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -146,7 +147,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -165,7 +166,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -184,7 +185,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:
@@ -203,7 +204,7 @@ recursos:
     competencia:
       tipo: data_arquivo
       pagina: https://arquivos.receitafederal.gov.br/public.php/webdav/
-    cadencia: {corrente: semanal}
+    cadencia: {corrente: mensal}
     formato: {tipo: csv}
     grupo: receita
     recorte:

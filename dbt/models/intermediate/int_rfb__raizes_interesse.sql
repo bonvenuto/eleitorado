@@ -1,9 +1,11 @@
 {{ config(
     materialized='external',
-    location=env_var('ELEITORADO_LAGO', 'dados') ~ '/rfb_raizes_interesse.parquet'
+    location=env_var('ELEITORADO_LAGO', 'dados') ~ '/estado/rfb_raizes_interesse.parquet'
 ) }}
 -- Raízes de CNPJ (8 posições) que aparecem nos dados do eleitorado, com a origem de cada uma: o
--- recorte da base da Receita. Vai para um Parquet no lago, que o coletor (webdav_zip) lê.
+-- recorte da base da Receita. Vai para um Parquet em `estado/` no lago, que o pipeline diário
+-- sincroniza com o bucket: a coleta da Receita (fora do GitHub, que ela bloqueia) só restaura
+-- esse arquivo, sem rodar o dbt.
 with origens as (
     select fornecedor_cnpj_raiz as raiz, 'cota' as origem from {{ ref('int_cota__despesas') }}
     union all

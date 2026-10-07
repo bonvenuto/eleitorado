@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 HISTORICOS = ("int_cgu__sancoes_eventos", "int_parlamentares__eventos")
 SCHEMA_HISTORICOS = "intermediate"
 PASTAS = ("raw/", "meta/", "estado/")
+PASTAS_ADITIVO = ("raw/", "meta/")  # coleta fora do pipeline: nunca os históricos
 ESPELHADAS = ("raw/", "estado/")  # o que sumiu do lago some do bucket; meta/ só cresce
 LIMITE_REMOCAO = 0.5  # fração do bucket que uma execução pode apagar
 
@@ -123,25 +124,32 @@ def exportar_historicos(banco: Path, pasta: Path) -> list[str]:
     return exportados
 
 
-def salvar(armazenamento: Armazenamento, prefixo: str, lago: Path, banco: Path) -> Resumo:
+def salvar(
+    armazenamento: Armazenamento, prefixo: str, lago: Path, banco: Path, aditivo: bool = False
+) -> Resumo:
     """Exporta os históricos e envia ao bucket o que mudou; apaga o que sumiu do lago.
 
     Primeiro monta o plano inteiro e confere o limite de remoção; só então altera o bucket.
+
+    `aditivo`: para coletas fora do pipeline (a Receita, que bloqueia o GitHub Actions e é coletada
+    do computador do mantenedor). O lago local pode estar atrás do bucket, então só envia arquivos
+    de `raw/` e `meta/` que o bucket ainda não tem: nada é apagado nem sobrescrito, e os
+    históricos não vão.
     """
-    if banco.exists():
+    if banco.exists() and not aditivo:
         exportar_historicos(banco, lago / "estado" / "historicos")
     envios: list[tuple[Path, str]] = []
     remocoes: list[str] = []
-    for pasta in PASTAS:
+    for pasta in PASTAS_ADITIVO if aditivo else PASTAS:
         remotos = armazenamento.listar_objetos(prefixo + pasta)
         locais = _locais(lago, pasta)
         for relativo, local in sorted(locais.items()):
             objeto = remotos.get(prefixo + relativo)
-            if objeto is not None and objeto.tamanho == local.stat().st_size:
-                if objeto.md5 == md5_arquivo(local):
+            if objeto is not None and (aditivo or objeto.tamanho == local.stat().st_size):
+                if aditivo or objeto.md5 == md5_arquivo(local):
                     continue
             envios.append((local, prefixo + relativo))
-        if pasta not in ESPELHADAS:
+        if pasta not in ESPELHADAS or aditivo:
             continue
         sobrando = sorted(set(remotos) - {prefixo + relativo for relativo in locais})
         if remotos and len(sobrando) > max(10, LIMITE_REMOCAO * len(remotos)):

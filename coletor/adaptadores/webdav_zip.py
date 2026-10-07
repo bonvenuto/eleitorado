@@ -57,7 +57,10 @@ def carregar_raizes(caminho: Path) -> frozenset[bytes]:
     import duckdb
 
     if not caminho.exists():
-        raise ErroColeta(f"{caminho} não existe: rode antes o dbt de int_rfb__raizes_interesse")
+        raise ErroColeta(
+            f"{caminho} não existe: o pipeline diário gera (int_rfb__raizes_interesse) e o "
+            "estado restaurar traz do bucket"
+        )
     linhas = duckdb.sql(f"select raiz from read_parquet('{caminho.as_posix()}')").fetchall()
     raizes = frozenset(raiz.encode("ascii") for (raiz,) in linhas if raiz)
     if not raizes:

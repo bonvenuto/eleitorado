@@ -95,7 +95,6 @@ def test_recursos_da_receita_ficam_fora_do_pipeline_diario():
     manifesto = carregar_manifesto(RAIZ / "fontes")
     receita = sorted(rc.id for rc in manifesto.todos() if rc.recurso.grupo == "receita")
     assert receita == [
-        "camara.deputados_detalhe",
         *(
             f"rfb.{nome}"
             for nome in sorted(
@@ -115,7 +114,7 @@ def test_recursos_da_receita_ficam_fora_do_pipeline_diario():
         ),
     ]
     empresas = manifesto.obter("rfb.empresas").recurso
-    assert empresas.recorte.raizes == "rfb_raizes_interesse.parquet"
+    assert empresas.recorte.raizes == "estado/rfb_raizes_interesse.parquet"
     assert len(empresas.recorte.colunas) == 7
     colunas = {"estabelecimentos": 30, "socios": 11, "simples": 7, "cnaes": 2}
     for nome, quantidade in colunas.items():

@@ -113,4 +113,4 @@ def test_executar_sem_recursos_so_coleta_o_grupo_pedido(deps, warehouse, monkeyp
     assert _rodar(["executar", "--grupo", "receita"], deps) == 0
     assert set(pedidas[0]) == {"diario"}
     assert set(pedidas[1]) == {"receita"}
-    assert len(pedidas[1]) == 11
+    assert len(pedidas[1]) == 10

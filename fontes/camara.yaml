@@ -55,4 +55,3 @@ recursos:
     pausa_pagina_segundos: 0.1
     iteracao: {parametro: idLegislatura, valores: legislaturas, inicio: 53}
     registros: dados
-    grupo: receita
