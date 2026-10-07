@@ -1,0 +1,10 @@
+{
+  // Cloudflare (Workers com assets estáticos): publica a pasta dist; rota que não existe cai no
+  // index.html, para os links diretos de /parlamentar/... e /empresa/... funcionarem (SPA)
+  "name": "eleitorado",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
