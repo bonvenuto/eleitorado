@@ -1,0 +1,665 @@
+version: 2
+models:
+- name: int_tse__mapa_despesas
+  description: Mapa privado único por despesa/prestação; NULL participa do consenso.
+    Metadados conflitantes não são escolhidos.
+  data_tests:
+  - unique:
+      arguments:
+        column_name: to_json(struct_pack(cd_eleicao := cd_eleicao, sq_prestador_contas
+          := sq_prestador_contas, sq_despesa := sq_despesa, tipo_prestacao :=
+          tipo_prestacao, data_prestacao := data_prestacao))
+- name: int_tse__pagamentos
+  description: Parcelas privadas. Colapso só com igualdade integral da fonte na
+    mesma origem, chave completa e gate comum elegível. Fato inelegível nunca
+    autoriza publicação.
+  columns:
+  - name: item_id
+    data_tests:
+    - not_null
+  - name: politica_versao
+    data_tests:
+    - not_null
+- name: int_tse__auditoria_pagamentos
+  description: Auditoria sempre privada. Valor retido é soma física, inclusive
+    pendências; consumidores exigem fato_elegivel. Bruto = retido + removido para
+    valores conhecidos. Política fixa tse_pagamentos_identicos_v1.
+  data_tests:
+  - unique:
+      arguments:
+        column_name: to_json(struct_pack(cd_eleicao := cd_eleicao, sq_prestador_contas
+          := sq_prestador_contas, sq_despesa := sq_despesa, tipo_prestacao :=
+          tipo_prestacao, data_prestacao := data_prestacao, sq_parcelamento_despesa
+          := sq_parcelamento_despesa, ano_arquivo := ano_arquivo, versao_id :=
+          versao_id))
+  columns:
+  - name: valor_bruto
+    description: Soma monetária privada em DECIMAL(38,2).
+  - name: valor_retido
+    description: Soma monetária privada em DECIMAL(38,2).
+  - name: valor_removido
+    description: Soma monetária privada em DECIMAL(38,2).
+unit_tests:
+- name: mapa_distinto_antes_join
+  model: int_tse__mapa_despesas
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_contratada_elegivel: true
+      valor: 10
+      candidatura_elegivel: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_contratada_elegivel: true
+      valor: 20
+      candidatura_elegivel: true
+  expect:
+    rows:
+    - candidatura_id: tse:1:4
+      mapa_elegivel: true
+      quantidade_metadados: 1
+- name: mapa_candidatura_conflitante
+  model: int_tse__mapa_despesas
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - &id001
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_contratada_elegivel: true
+      candidatura_elegivel: true
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:9
+      sq_candidato: '9'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_contratada_elegivel: true
+      candidatura_elegivel: true
+  expect:
+    rows:
+    - mapa_elegivel: false
+      quantidade_metadados: 2
+      candidatura_id: null
+      fornecedor_documento: null
+- name: mapa_fornecedor_conflitante
+  model: int_tse__mapa_despesas
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '19131243000197'
+      fornecedor_documento_valido: true
+      mapa_contratada_elegivel: true
+      candidatura_elegivel: true
+  expect:
+    rows:
+    - mapa_elegivel: false
+      quantidade_metadados: 2
+      candidatura_id: null
+      fornecedor_documento: null
+- name: mapa_null_nao_e_consenso
+  model: int_tse__mapa_despesas
+  given:
+  - input: ref('int_tse__contratadas')
+    rows:
+    - *id001
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: null
+      fornecedor_documento_valido: true
+      mapa_contratada_elegivel: true
+      candidatura_elegivel: true
+  expect:
+    rows:
+    - mapa_elegivel: false
+      quantidade_metadados: 2
+      candidatura_id: null
+      fornecedor_documento: null
+- name: pagamento_sem_fanout
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 30
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - &id002
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_elegivel: true
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - &id003
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - valor: 30
+      quantidade_originais: 1
+      fato_elegivel: true
+- name: identicos_colapsados
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+      _linha: 1
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+      _linha: 2
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+      _linha: 3
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - valor: 100
+      quantidade_originais: 3
+      fato_elegivel: true
+- name: parcela_divergente_privada
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - &id004
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 90
+      linha_original: '{"VR_PAGTO_DESPESA":"90,00"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - valor: 100
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
+    - valor: 90
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
+- name: campo_original_divergente
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id004
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"02/11/2024"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - &id005
+      valor: 100
+      parcela_divergente: true
+      fato_elegivel: false
+      quantidade_originais: 1
+    - *id005
+- name: descricao_original_divergente
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id004
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DS_DESPESA":"outra"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - &id006
+      valor: 100
+      parcela_divergente: true
+      fato_elegivel: false
+      quantidade_originais: 1
+    - *id006
+- name: lexico_original_divergente
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id004
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"0100,00","DT_GERACAO":"01/11/2024"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - &id007
+      valor: 100
+      parcela_divergente: true
+      fato_elegivel: false
+      quantidade_originais: 1
+    - *id007
+- name: origens_distintas_nao_colapsam
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id004
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: b
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: true
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - &id008
+      valor: 100
+      quantidade_originais: 1
+      fato_elegivel: false
+    - *id008
+- name: parcela_incompleta_nao_colapsa
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - &id009
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: null
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+    - *id009
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - &id010
+      quantidade_originais: 1
+      fato_elegivel: false
+    - *id010
+- name: representacao_ausente_nao_colapsa
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - &id011
+      cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: null
+    - *id011
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - &id012
+      quantidade_originais: 1
+      fato_elegivel: false
+    - *id012
+- name: mapa_conflitante_bloqueia
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id004
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_elegivel: false
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - *id003
+  expect:
+    rows:
+    - fato_elegivel: false
+      candidatura_elegivel: true
+- name: prestacao_bloqueada_nao_colapsa
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - *id004
+    - *id004
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - *id002
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: true
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: false
+  expect:
+    rows:
+    - &id013
+      quantidade_originais: 1
+      fato_elegivel: false
+    - *id013
+- name: identicos_auditados
+  model: int_tse__auditoria_pagamentos
+  given:
+  - input: ref('int_tse__pagamentos')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+      valor: 100
+      quantidade_originais: 3
+      parcela_divergente: false
+      fato_elegivel: true
+      motivo_pendencia: null
+  expect:
+    rows:
+    - linhas_brutas: 3
+      linhas_retidas: 1
+      repeticoes_removidas: 2
+      valor_bruto: 300
+      valor_retido: 100
+      valor_removido: 200
+      pendente: false
+- name: divergentes_auditados
+  model: int_tse__auditoria_pagamentos
+  given:
+  - input: ref('int_tse__pagamentos')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+      valor: 100
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
+      motivo_pendencia: parcela_divergente
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+      valor: 90
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
+      motivo_pendencia: parcela_divergente
+  expect:
+    rows:
+    - linhas_brutas: 2
+      linhas_retidas: 2
+      repeticoes_removidas: 0
+      valor_bruto: 190
+      valor_retido: 190
+      valor_removido: 0
+      pendente: true
+- name: subgrupo_identico_em_divergencia_preservado
+  model: int_tse__pagamentos
+  given:
+  - input: ref('stg_tse__pagamentos')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 90
+      linha_original: '{"VR_PAGTO_DESPESA":"90,00"}'
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      sq_parcelamento_despesa: '5'
+      ano_arquivo: 2024
+      versao_id: a
+      vr_pagto_despesa: 100
+      linha_original: '{"VR_PAGTO_DESPESA":"100,00","DT_GERACAO":"01/11/2024"}'
+  - input: ref('int_tse__mapa_despesas')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      sq_despesa: '3'
+      tipo_prestacao: Final
+      data_prestacao: '2024-11-01'
+      candidatura_id: tse:1:4
+      sq_candidato: '4'
+      fornecedor_documento: '11222333000181'
+      fornecedor_documento_valido: true
+      mapa_elegivel: true
+      candidatura_elegivel: true
+  - input: ref('int_tse__prestacoes')
+    rows:
+    - cd_eleicao: '1'
+      sq_prestador_contas: '2'
+      prestacao_ambigua: false
+      origem_ambigua: false
+      metadados_incompletos: false
+      prestacao_elegivel: true
+  expect:
+    rows:
+    - valor: 100
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
+    - valor: 90
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
+    - valor: 100
+      quantidade_originais: 1
+      parcela_divergente: true
+      fato_elegivel: false
