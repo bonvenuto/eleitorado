@@ -195,3 +195,42 @@ def test_r2_sem_checksum_no_trailer(monkeypatch):
     R2Publicador("conta", "id", "segredo", "bucket")
     assert vistos["config"].request_checksum_calculation == "when_required"
     assert vistos["config"].response_checksum_validation == "when_required"
+
+
+def test_legado_nao_envia_nem_apaga_c2(publico):
+    protegidos = {
+        "marts/c2/manifesto.json",
+        "marts/c2/edicoes/antiga/a.parquet",
+        "marts/c2/historico/arquivo.json",
+        "marts/c2/outro/nao-apagar",
+    }
+    for chave in protegidos:
+        arquivo = publico / chave
+        arquivo.parent.mkdir(parents=True, exist_ok=True)
+        if arquivo.suffix == ".parquet":
+            pq.write_table(pa.table({"a": [1]}), arquivo)
+        else:
+            arquivo.write_bytes(b"c2 preservada")
+    remoto = FakePublicador(protegidos | {"marts/obsoleto.parquet"})
+    publicar(remoto, publico, AGORA, "v")
+    enviados_c2 = [
+        chave for acao, chave in remoto.ordem if acao == "enviar" and chave.startswith("marts/c2/")
+    ]
+    removidos_c2 = [
+        chave for acao, chave in remoto.ordem if acao == "apagar" and chave.startswith("marts/c2/")
+    ]
+    assert enviados_c2 == []
+    assert removidos_c2 == []
+    assert protegidos <= remoto.chaves
+    assert not any(a["caminho"].startswith("marts/c2/") for a in remoto.manifesto["arquivos"])
+
+
+def test_legado_preserva_c2_que_nao_existe_localmente(publico):
+    protegidos = {"marts/c2/manifesto.json", "marts/c2/edicoes/antiga/a.parquet"}
+    remoto = FakePublicador(protegidos | {"marts/obsoleto.parquet"})
+    publicar(remoto, publico, AGORA, "v")
+    removidos_c2 = [
+        chave for acao, chave in remoto.ordem if acao == "apagar" and chave.startswith("marts/c2/")
+    ]
+    assert removidos_c2 == []
+    assert protegidos <= remoto.chaves

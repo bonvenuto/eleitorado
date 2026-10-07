@@ -630,3 +630,63 @@ def test_proveniencia_trocada_rejeitada_mesmo_com_hashes_recalculados(vetor):
     # execucao recalcula vars_digest e todos os artefatos/evidências usando o mapa adulterado.
     with pytest.raises(ValueError, match="vars obrigatórias divergentes"):
         execucao(lago, selecao, "trocada", vars_extras={"tse_proveniencia": mapa})
+
+
+def test_conferir_recibo_puro_nao_promove_vetor(vetor):
+    from coletor.tse.selecao import conferir_recibo_tse
+
+    lago, selecao = vetor
+    recibo = execucao(lago, selecao)
+    antes = {p.relative_to(lago): p.read_bytes() for p in lago.rglob("*") if p.is_file()}
+    assert conferir_recibo_tse(lago, selecao, recibo) is None
+    assert {p.relative_to(lago): p.read_bytes() for p in lago.rglob("*") if p.is_file()} == antes
+    assert not (lago / "estado/tse/vigente.json").exists()
+
+
+@pytest.mark.parametrize("consumidor", ["conferir", "promover"])
+def test_gate_compartilhado_exige_aprovacao_concreta(vetor, consumidor):
+    from coletor.tse.selecao import conferir_recibo_tse
+
+    lago, selecao = vetor
+    recibo = execucao(lago, selecao)
+    for arquivo in (lago / "estado/tse/validacoes").glob("*.json"):
+        arquivo.unlink()
+    gravar_avaliacao(
+        lago,
+        escopo="selecao",
+        identidade=selecao.selecao_id,
+        entradas_digest=recibo.entradas_digest,
+        contrato="tse:selecao:v1",
+        execucao_id="solta",
+        resultado="aprovada",
+        motivos=[],
+        evidencia="string isolada",
+    )
+    conferir = conferir_recibo_tse if consumidor == "conferir" else promover_selecao
+    with pytest.raises(ValueError, match="aprova"):
+        conferir(lago, selecao, recibo)
+
+
+@pytest.mark.parametrize("consumidor", ["conferir", "promover"])
+@pytest.mark.parametrize("defeito", ["recibo_trocado", "rejeicao_posterior"])
+def test_gate_compartilhado_paridade_causal(vetor, consumidor, defeito):
+    from coletor.tse.selecao import conferir_recibo_tse
+
+    lago, selecao = vetor
+    recibo = execucao(lago, selecao)
+    if defeito == "recibo_trocado":
+        recibo = replace(recibo, saida_digest="0" * 64)
+    else:
+        gravar_avaliacao(
+            lago,
+            escopo="selecao",
+            identidade=selecao.selecao_id,
+            entradas_digest=recibo.entradas_digest,
+            contrato="tse:selecao:v1",
+            execucao_id="posterior",
+            resultado="rejeitada",
+            motivos=[],
+        )
+    conferir = conferir_recibo_tse if consumidor == "conferir" else promover_selecao
+    with pytest.raises(ValueError):
+        conferir(lago, selecao, recibo)

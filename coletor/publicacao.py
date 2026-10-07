@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 PERMITIDOS = ("marts/", "linhagem/", "site/")
 SITE = "site/"
 MANIFESTO = "manifesto.json"
+PREFIXO_C2 = "marts/c2/"
 TIPOS = {
     ".parquet": "application/vnd.apache.parquet",
     ".html": "text/html; charset=utf-8",
@@ -48,6 +49,8 @@ class Publicador(Protocol):
     ) -> None: ...
 
     def apagar(self, chave: str) -> None: ...
+
+    def conferir(self, chave: str, sha256: str, bytes: int) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -85,7 +88,7 @@ def arquivos_publicos(publico: Path) -> dict[str, Path]:
     arquivos = {
         caminho.relative_to(publico).as_posix(): caminho
         for caminho in publico.rglob("*")
-        if caminho.is_file()
+        if caminho.is_file() and not caminho.relative_to(publico).as_posix().startswith(PREFIXO_C2)
     }
     proibidos = sorted(chave for chave in arquivos if not chave.startswith(PERMITIDOS))
     if proibidos:
@@ -151,7 +154,7 @@ def publicar(
     sobrando = sorted(
         chave
         for chave in set(anteriores) - set(arquivos) - {MANIFESTO}
-        if tem_site or not chave.startswith(SITE)
+        if not chave.startswith(PREFIXO_C2) and (tem_site or not chave.startswith(SITE))
     )
     for chave in sobrando:
         publicador.apagar(chave)
@@ -208,9 +211,34 @@ class R2Publicador:
             extras["ContentEncoding"] = codificacao
         if cache:
             extras["CacheControl"] = cache
+        if chave == PREFIXO_C2 + MANIFESTO:
+            extras["CacheControl"] = "no-cache"
+        elif chave.startswith(PREFIXO_C2 + "edicoes/"):
+            extras["CacheControl"] = "public, max-age=31536000, immutable"
         self._s3.upload_file(
             str(origem), self._bucket, chave, ExtraArgs=extras, Config=self._transferencia
         )
 
     def apagar(self, chave: str) -> None:
         self._s3.delete_object(Bucket=self._bucket, Key=chave)
+
+    def conferir(self, chave: str, sha256: str, bytes: int) -> bool:
+        """GET direto da API S3, sem confiar em ETag, ContentLength ou metadata SHA."""
+        from botocore.exceptions import ClientError
+
+        try:
+            resposta = self._s3.get_object(Bucket=self._bucket, Key=chave)
+        except ClientError as erro:
+            if erro.response.get("Error", {}).get("Code") in ("NoSuchKey", "404", "NotFound"):
+                return False
+            raise
+        corpo = resposta["Body"]
+        resumo = hashlib.sha256()
+        tamanho = 0
+        try:
+            for bloco in iter(lambda: corpo.read(1 << 20), b""):
+                tamanho += len(bloco)
+                resumo.update(bloco)
+            return tamanho == bytes and resumo.hexdigest() == sha256
+        finally:
+            corpo.close()

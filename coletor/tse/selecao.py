@@ -371,8 +371,8 @@ def emitir_recibo(
     return recibo
 
 
-def promover_selecao(lago: Path, selecao: SelecaoTse, recibo: ReciboValidacaoTse) -> None:
-    """Troca seletor completo; compensa falhas ou bloqueia recuperação incerta."""
+def conferir_recibo_tse(lago: Path, selecao: SelecaoTse, recibo: ReciboValidacaoTse) -> None:
+    """Confere evidência física e causal atual sem gravar seletores ou avaliações."""
     conferir_recuperacao(lago)
     impedimentos = validar_selecao(lago, selecao)
     if impedimentos:
@@ -423,6 +423,35 @@ def promover_selecao(lago: Path, selecao: SelecaoTse, recibo: ReciboValidacaoTse
         contrato=CONTRATO,
     ):
         raise ValueError("seleção possui rejeição pendente; exige nova avaliação completa")
+    chave_aprovacao = {
+        "escopo": "selecao",
+        "identidade": selecao.selecao_id,
+        "entradas_digest": recibo.entradas_digest,
+        "contrato": CONTRATO,
+        "execucao_id": recibo.execucao_id,
+        "resultado": "aprovada",
+        "evidencia": evidencia,
+    }
+    aprovada = False
+    for caminho in (lago / "estado/tse/validacoes").glob("*.json"):
+        confinado = _confinado(lago, caminho.relative_to(lago).as_posix())
+        if confinado.is_symlink():
+            raise ValueError("avaliação fora do histórico privado")
+        conteudo = confinado.read_bytes()
+        if hashlib.sha256(conteudo).hexdigest() != caminho.stem:
+            raise ValueError("integridade da avaliação divergente")
+        avaliacao = json.loads(conteudo)
+        if all(avaliacao.get(k) == v for k, v in chave_aprovacao.items()) and sorted(
+            avaliacao.get("superadas", [])
+        ) == sorted(referencias):
+            aprovada = True
+    if not aprovada:
+        raise ValueError("seleção sem aprovação concreta vinculada ao recibo atual")
+
+
+def promover_selecao(lago: Path, selecao: SelecaoTse, recibo: ReciboValidacaoTse) -> None:
+    """Troca seletor completo; compensa falhas ou bloqueia recuperação incerta."""
+    conferir_recibo_tse(lago, selecao, recibo)
     estado = _confinado(lago, "estado/tse")
     selecoes = _confinado(lago, f"estado/tse/selecoes/{selecao.selecao_id}.json")
     if selecoes.exists():
