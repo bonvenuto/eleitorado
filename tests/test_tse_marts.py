@@ -10,6 +10,7 @@ from decimal import Decimal
 import duckdb
 import pytest
 import yaml
+from jinja2 import Environment, nodes
 
 from tests.amostras import RAIZ
 
@@ -45,6 +46,18 @@ MARTS = {
         "valor",
     },
     "fct_patrimonio_declarado": {"candidatura_id", "tipo_bem_codigo", "quantidade", "valor"},
+    "monitor_tse": {
+        "cobertura",
+        "auditoria",
+        "selecao_id",
+        "entradas_id",
+        "ano_arquivo",
+        "layout_id",
+        "prazo_dias",
+        "familia",
+        "rechecado_em",
+        "versao_id",
+    },
 }
 
 
@@ -60,7 +73,20 @@ def _sql_linha(row):
 
     return "select " + ", ".join(
         f"{literal(v)}"
-        + ("::date" if k in {"data", "data_eleicao", "data_prestacao"} else "")
+        + (
+            "::date"
+            if k
+            in {
+                "data",
+                "data_eleicao",
+                "data_prestacao",
+                "data_emissao",
+                "data_documento",
+                "data_assinatura",
+            }
+            else ""
+        )
+        + ("::integer" if k == "ano_arquivo" else "")
         + f' as "{k}"'
         for k, v in row.items()
     )
@@ -90,7 +116,11 @@ def marts_c2(tmp_path_factory):
     )
     for nome in MARTS:
         shutil.copyfile(RAIZ / f"dbt/models/marts/tse/{nome}.sql", modelos / f"marts/{nome}.sql")
-    for nome in ["int_tse__fornecedores_elegiveis", "int_tse__receitas_publicaveis"]:
+    for nome in [
+        "int_tse__fornecedores_elegiveis",
+        "int_tse__receitas_publicaveis",
+        "int_tse__cruzamentos",
+    ]:
         shutil.copyfile(
             RAIZ / f"dbt/models/intermediate/tse/{nome}.sql", modelos / f"intermediate/{nome}.sql"
         )
@@ -127,6 +157,9 @@ def marts_c2(tmp_path_factory):
         data="2024-10-01",
         ds_despesa="segredo 52998224725",
         item_id="privado-a",
+        ano_arquivo=2024,
+        versao_id="a" * 64,
+        layout_id="tse:contratadas:2024:v1",
         linha_original='{"cpf":"52998224725"}',
         campo_futuro_sensivel="contato privado",
     )
@@ -228,6 +261,116 @@ def marts_c2(tmp_path_factory):
         "nm_partido_doador": "ABC",
     }
     entradas["int_tse__receitas"].append(fundo)
+    # Um fato de cada fonte C1. Evidências repetidas não podem expandir a cota.
+    entradas.update(
+        {
+            "int_tse__vinculos_parlamentares": [
+                dict(candidatura_id="tse:1:4", parlamentar_id="camara:1", estado="confirmado")
+            ]
+            * 2,
+            "fct_despesa_cota_parlamentar": [
+                dict(
+                    despesa_id="cota-1",
+                    parlamentar_id="camara:1",
+                    fornecedor_tipo_documento="CNPJ",
+                    fornecedor_documento_valido=True,
+                    fornecedor_cnpj_raiz="11222333",
+                    data_emissao="2024-10-02",
+                    data_emissao_valida=True,
+                    valor_reembolsado=Decimal("20"),
+                    _coleta_id="c1-cota",
+                )
+            ],
+            "int_cgu__emendas_pagamentos": [
+                dict(
+                    pagamento_linha_id="emenda-1",
+                    autor_codigo="autor",
+                    fase_despesa="Pagamento",
+                    favorecido_tipo_documento="CNPJ",
+                    favorecido_documento_valido=True,
+                    favorecido_cnpj_raiz="11222333",
+                    data_documento="2024-10-03",
+                    valor_pago=Decimal("30"),
+                    _coleta_id="c1-emenda",
+                )
+            ],
+            "dim_autor_emenda": [dict(autor_codigo="autor", parlamentar_id="camara:1")],
+            "fct_contrato_federal": [
+                dict(
+                    contrato_id="contrato-1",
+                    fornecedor_tipo_documento="CNPJ",
+                    fornecedor_documento_valido=True,
+                    fornecedor_cnpj_raiz="11222333",
+                    data_assinatura="2024-10-04",
+                    valor_final=Decimal("40"),
+                    valor_suspeito=False,
+                    _coleta_id="c1-contrato",
+                )
+            ],
+            "int_rfb__empresas": [dict(cnpj_raiz="outra", competencia_receita="2024-10")],
+            "stg_meta__coletas": [
+                dict(
+                    coleta_id="coleta-selecionada",
+                    orgao="tse",
+                    recurso="contas",
+                    competencia="2024",
+                    status="carregada",
+                    finalizada_em="2024-10-01T00:00:00",
+                    sha256_arquivo="a" * 64,
+                ),
+                dict(
+                    coleta_id="rechecagem",
+                    orgao="tse",
+                    recurso="contas",
+                    competencia="2024",
+                    status="sem_alteracao",
+                    finalizada_em="2024-11-01T00:00:00",
+                    sha256_arquivo="a" * 64,
+                ),
+                dict(
+                    coleta_id="candidata-rejeitada",
+                    orgao="tse",
+                    recurso="contas",
+                    competencia="2024",
+                    status="carregada",
+                    finalizada_em="2024-12-01T00:00:00",
+                    sha256_arquivo="b" * 64,
+                ),
+            ],
+        }
+    )
+    familias = [
+        "candidaturas",
+        "bens",
+        "receitas",
+        "contratadas",
+        "pagamentos",
+        "doador_originario",
+    ]
+    for familia in familias:
+        entrada = "stg_tse__" + familia
+        linhas = entradas.setdefault(entrada, [{}])
+        for linha in linhas:
+            linha.update(
+                ano_arquivo=2024,
+                versao_id="a" * 64,
+                layout_id=f"tse:{familia}:2024:v1",
+                _coleta_id="coleta-selecionada",
+            )
+    for nome, campo in [
+        ("int_cota__despesas", "fornecedor_cnpj_raiz"),
+        ("int_contratos_federais", "fornecedor_cnpj_raiz"),
+        ("int_cgu__licitacao_participantes", "participante_cnpj_raiz"),
+    ]:
+        entradas[nome] = [{campo: "87654321"}]
+    entradas["stg_cgu__emendas_favorecidos"] = [
+        dict(favorecido_tipo_documento="CNPJ", favorecido_documento="87654321000199")
+    ]
+    entradas["int_cgu__sancoes_eventos"] = [dict(documento="87654321000199")]
+    shutil.copyfile(
+        RAIZ / "dbt/models/intermediate/int_rfb__raizes_interesse.sql",
+        modelos / "intermediate/int_rfb__raizes_interesse.sql",
+    )
     for nome, linhas in entradas.items():
         camada = "staging" if nome.startswith("stg_") else "intermediate"
         (modelos / camada / f"{nome}.sql").write_text(
@@ -235,6 +378,7 @@ def marts_c2(tmp_path_factory):
         )
     lago = pasta / "lago"
     lago.mkdir()
+    (lago / "estado").mkdir()
     legado = pasta / "publico-legado"
     saida = pasta / "saida-c2"
     saida.mkdir()
@@ -250,7 +394,24 @@ def marts_c2(tmp_path_factory):
             "--target",
             "ci",
             "--vars",
-            json.dumps({"tse_saida": saida.as_posix()}),
+            json.dumps(
+                {
+                    "tse_saida": saida.as_posix(),
+                    "tse_contexto": {
+                        "selecao_id": "a" * 64,
+                        "entradas_digest": "a12345678901" + "b" * 52,
+                    },
+                    "tse_fontes": {f: [f + ".parquet"] for f in familias},
+                    "tse_proveniencia": {
+                        f + ".parquet": {
+                            "ano_arquivo": 2024,
+                            "versao_id": "a" * 64,
+                            "layout_id": f"tse:{f}:2024:v1",
+                        }
+                        for f in familias
+                    },
+                }
+            ),
         ],
         env={
             **os.environ,
@@ -295,8 +456,8 @@ def test_novo_campo_sensivel_nao_vaza(marts_c2):
             ).fetchall()
             assert {c[0] for c in colunas} == permitidas
             for linha in con.execute("select * from read_parquet(?)", [str(caminho)]).fetchall():
-                for valor in linha:
-                    if isinstance(valor, str):
+                for indice, valor in enumerate(linha):
+                    if isinstance(valor, str) and not colunas[indice][0].endswith("_id"):
                         assert not re.search(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)", valor)
 
 
@@ -336,3 +497,165 @@ def test_correcao_pf_nao_altera_marts(marts_c2):
             con.execute(f"create or replace table intermediate.{nome} as " + sql)
         depois = {nome: con.execute(sql).fetchall() for nome, sql in sqls.items()}
         assert {n: sorted(v) for n, v in antes.items()} == {n: sorted(v) for n, v in depois.items()}
+
+
+def _cruzamentos(marts_c2, con):
+    _, projeto, _, _, _, _ = marts_c2
+    sql = (
+        projeto / "target/compiled/eleitorado/models/intermediate/int_tse__cruzamentos.sql"
+    ).read_text(encoding="utf-8")
+    cursor = con.execute(sql)
+    colunas = [c[0] for c in cursor.description]
+    return [dict(zip(colunas, row, strict=True)) for row in cursor.fetchall()]
+
+
+def test_data_anterior_nao_cruza(marts_c2):
+    with duckdb.connect(str(marts_c2[2] / "ci.duckdb")) as con:
+        antes = _cruzamentos(marts_c2, con)
+        assert len(antes) == 9  # três fatos TSE x três contextos C1; ponte duplicada não expande
+        con.execute("begin")
+        try:
+            con.execute(
+                "update intermediate.fct_despesa_cota_parlamentar "
+                "set data_emissao=date '2024-09-30'"
+            )
+            con.execute(
+                "update intermediate.fct_contrato_federal set data_assinatura=date '2024-10-01'"
+            )
+            assert {r["origem_c1"] for r in _cruzamentos(marts_c2, con)} == {"emenda_pagamento"}
+        finally:
+            con.execute("rollback")
+
+
+def test_fato_invalido_nao_cruza(marts_c2):
+    with duckdb.connect(str(marts_c2[2] / "ci.duckdb")) as con:
+        con.execute("begin")
+        try:
+            con.execute(
+                "update intermediate.fct_despesa_cota_parlamentar set data_emissao_valida=false"
+            )
+            con.execute("update intermediate.fct_contrato_federal set valor_suspeito=true")
+            assert {r["origem_c1"] for r in _cruzamentos(marts_c2, con)} == {"emenda_pagamento"}
+            con.execute("update intermediate.int_tse__contratadas set fato_elegivel=false")
+            con.execute("update intermediate.int_tse__pagamentos set valor=null")
+            assert _cruzamentos(marts_c2, con) == []
+        finally:
+            con.execute("rollback")
+
+
+def test_emenda_so_pagamento_e_autoria_contextual(marts_c2):
+    with duckdb.connect(str(marts_c2[2] / "ci.duckdb")) as con:
+        linhas = _cruzamentos(marts_c2, con)
+        assert {r["estado_autoria"] for r in linhas if r["origem_c1"] == "emenda_pagamento"} == {
+            "autoria_contextual_nome"
+        }
+        assert all(r["parlamentar_id"] is None for r in linhas if r["origem_c1"] == "contrato")
+        con.execute("begin")
+        try:
+            con.execute(
+                "update intermediate.int_cgu__emendas_pagamentos set fase_despesa='Empenho'"
+            )
+            con.execute("delete from intermediate.int_tse__vinculos_parlamentares")
+            restantes = _cruzamentos(marts_c2, con)
+            assert len(restantes) == 3 and {r["origem_c1"] for r in restantes} == {"contrato"}
+            assert {r["estado_autoria"] for r in restantes} == {"sem_autoria_demonstrada"}
+        finally:
+            con.execute("rollback")
+
+
+def test_receita_ausente_cobertura_pendente(marts_c2):
+    with duckdb.connect(str(marts_c2[2] / "ci.duckdb")) as con:
+        linhas = _cruzamentos(marts_c2, con)
+        assert {r["cobertura_receita"] for r in linhas} == {"cobertura_pendente"}
+        assert all(r["competencia_receita"] is None for r in linhas)
+        assert all(r["snapshot_legado_nao_atomico"] for r in linhas)
+        assert {r["coleta_c1_id"] for r in linhas} == {"c1-cota", "c1-emenda", "c1-contrato"}
+
+
+def test_monitor_vinculo_sem_relogio_e_lgpd(marts_c2):
+    _, projeto, lago, _, saida, _ = marts_c2
+    with duckdb.connect(str(lago / "ci.duckdb")) as con:
+        rows = con.execute(
+            "select familia, rechecado_em, cobertura, entradas_id "
+            "from read_parquet(?) order by familia",
+            [str(saida / "monitor_tse.parquet")],
+        ).fetchall()
+        assert len(rows) == 6
+        for familia, instante, cobertura, hash_id in rows:
+            assert "12345678901" in hash_id
+            if familia in {"receitas", "contratadas", "pagamentos", "doador_originario"}:
+                assert str(instante).startswith("2024-11-01") and cobertura == "vinculada"
+            else:
+                assert instante is None and cobertura == "pendente"
+        sql = (projeto / "target/compiled/eleitorado/models/marts/monitor_tse.sql").read_text(
+            encoding="utf-8"
+        )
+        assert not any(
+            x in sql.lower() for x in ["current_timestamp", "current_date", "uuid", "edicao_id"]
+        )
+        antes = con.execute(sql).fetchall()
+        assert antes == sorted(antes, key=lambda r: (r[2], r[3], r[4], r[5]))
+        assert antes == con.execute(sql).fetchall()
+        teste = next(
+            (projeto / "target/compiled/eleitorado/models/marts/tse.yml").glob(
+                "sem_cpf_completo_monitor_tse_*.sql"
+            )
+        )
+        assert con.execute(teste.read_text(encoding="utf-8")).fetchall() == []
+        con.execute(
+            "create or replace view marts.monitor_tse as "
+            "select * replace ('CPF 52998224725' as cobertura) from (" + sql + ")"
+        )
+        assert con.execute(teste.read_text(encoding="utf-8")).fetchall()
+
+
+def test_raiz_tse_sem_ativar_alertas_c1(marts_c2):
+    _, projeto, lago, _, _, manifest = marts_c2
+    sql = (
+        projeto / "target/compiled/eleitorado/models/intermediate/int_rfb__raizes_interesse.sql"
+    ).read_text(encoding="utf-8")
+    with duckdb.connect(str(lago / "ci.duckdb")) as con:
+        origens = dict(con.execute(sql).fetchall())["11222333"]
+        assert "tse_contratacao" in origens and "tse_pagamento" in origens
+    macro = (RAIZ / "dbt/macros/rfb.sql").read_text(encoding="utf-8")
+    arvore = Environment().parse(macro)
+    funcao = next(n for n in arvore.find_all(nodes.Macro) if n.name == "rfb_fatos")
+    referencias = {
+        chamada.args[0].value
+        for chamada in funcao.find_all(nodes.Call)
+        if isinstance(chamada.node, nodes.Name) and chamada.node.name == "ref"
+    }
+    assert referencias == {
+        "fct_despesa_cota_parlamentar",
+        "fct_emenda_pagamento",
+        "dim_autor_emenda",
+        "fct_contrato_federal",
+    }
+    assert (
+        "model.eleitorado.int_tse__cruzamentos"
+        not in manifest["nodes"]["model.eleitorado.int_rfb__raizes_interesse"]["depends_on"][
+            "nodes"
+        ]
+    )
+
+
+def test_monitor_hash_malformado_cobertura_pendente(marts_c2):
+    _, projeto, lago, _, _, _ = marts_c2
+    sql = (projeto / "target/compiled/eleitorado/models/marts/monitor_tse.sql").read_text(
+        encoding="utf-8"
+    )
+    with duckdb.connect(str(lago / "ci.duckdb")) as con:
+        con.execute("begin")
+        try:
+            con.execute(
+                "update staging.stg_meta__coletas set sha256_arquivo='sem-hash' "
+                "where sha256_arquivo='" + "a" * 64 + "'"
+            )
+            cursor = con.execute(sql)
+            rows = [
+                dict(zip([c[0] for c in cursor.description], r, strict=True))
+                for r in cursor.fetchall()
+            ]
+            assert all(r["rechecado_em"] is None and r["cobertura"] == "pendente" for r in rows)
+        finally:
+            con.execute("rollback")

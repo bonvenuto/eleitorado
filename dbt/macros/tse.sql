@@ -116,3 +116,52 @@
     row_number() over (partition by {{ conteudo }}, ano_arquivo, versao_id) as varchar
   )
 {%- endmacro %}
+
+{# Identidade pública de entradas: dois hashes recalculados pelo controlador privado/T5.
+   NULL permitido somente no bootstrap conhecido, cujos seis arquivos são vazios. #}
+{% macro tse_contexto_sql() -%}
+  {% set contexto = var('tse_contexto', none) %}
+  {% set familias = ['candidaturas', 'bens', 'receitas', 'contratadas', 'pagamentos', 'doador_originario'] %}
+  {% set fontes = var('tse_fontes', none) %}
+  {% if contexto is none and fontes is none and target.name == 'ci' %}
+    {% set contexto = {'selecao_id': none, 'entradas_digest': none} %}
+  {% endif %}
+  {% if contexto is not mapping or contexto.keys() | sort != ['entradas_digest', 'selecao_id'] %}
+    {{ exceptions.raise_compiler_error('Execução TSE exige contexto explícito') }}
+  {% endif %}
+  {% if contexto.selecao_id is none and contexto.entradas_digest is none %}
+    {% if fontes is not none %}
+      {% if fontes is not mapping or fontes.keys() | sort != familias | sort %}
+        {{ exceptions.raise_compiler_error('Contexto NULL exige bootstrap completo conhecido') }}
+      {% endif %}
+      {% for familia in familias %}
+        {% set vazio = env_var('ELEITORADO_LAGO', 'dbt/tests/lago_vazio')
+            ~ '/estado/tse/ci/' ~ familia ~ '/vazio/vazio.parquet' %}
+        {% if fontes[familia] != [vazio] %}
+          {{ exceptions.raise_compiler_error('Contexto NULL fora do bootstrap conhecido') }}
+        {% endif %}
+        {% set validacao = fonte_tse(familia) %}
+      {% endfor %}
+    {% elif target.name != 'ci' %}
+      {{ exceptions.raise_compiler_error('Contexto NULL fora do CI vazio conhecido') }}
+    {% else %}
+      {% for familia in familias %}
+        {% set validacao = fonte_tse(familia) %}
+      {% endfor %}
+    {% endif %}
+    select null::varchar as selecao_id, null::varchar as entradas_id
+  {% else %}
+    {% for valor in contexto.values() %}
+      {% if valor is not string or valor | length != 64 %}
+        {{ exceptions.raise_compiler_error('Hash do contexto TSE inválido') }}
+      {% endif %}
+      {% for caractere in valor %}
+        {% if caractere not in '0123456789abcdef' %}
+          {{ exceptions.raise_compiler_error('Hash do contexto TSE inválido') }}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+    select '{{ contexto.selecao_id }}'::varchar as selecao_id,
+        '{{ contexto.entradas_digest }}'::varchar as entradas_id
+  {% endif %}
+{%- endmacro %}

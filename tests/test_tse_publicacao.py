@@ -62,6 +62,18 @@ ARQUIVOS = {
         "quantidade",
         "valor",
     },
+    "monitor_tse.parquet": {
+        "cobertura",
+        "auditoria",
+        "selecao_id",
+        "entradas_id",
+        "ano_arquivo",
+        "layout_id",
+        "prazo_dias",
+        "familia",
+        "rechecado_em",
+        "versao_id",
+    },
 }
 MANIFESTO = "marts/c2/manifesto.json"
 
@@ -191,8 +203,8 @@ def test_manifesto_apos_todos_bytes_conferidos(validada):
     remoto = PublicadorMemoria()
     resumo = publicar(remoto, validada)
     assert [e for e in remoto.eventos if e[0] == "enviar"][-1] == ("enviar", MANIFESTO)
-    assert len([e for e in remoto.eventos if e[0] == "conferir" and e[1] != MANIFESTO]) == 4
-    assert resumo.enviados == 5 and resumo.apagados == 0
+    assert len([e for e in remoto.eventos if e[0] == "conferir" and e[1] != MANIFESTO]) == 5
+    assert resumo.enviados == 6 and resumo.apagados == 0
     manifesto = json.loads(remoto.objetos[MANIFESTO])
     assert len(manifesto["edicao_id"]) == 64
     assert {Path(a["caminho"]).name for a in manifesto["arquivos"]} == set(ARQUIVOS)
@@ -242,7 +254,7 @@ def test_rollback_reponta_edicao_verificada(validada):
     assert json.loads(remoto.objetos[MANIFESTO])["edicao_id"] == primeira
     assert set(remoto.objetos) == anteriores
     assert [e for e in remoto.eventos if e[0] == "enviar"] == [("enviar", MANIFESTO)]
-    assert len([e for e in remoto.eventos if e[0] == "conferir" and e[1] != MANIFESTO]) == 4
+    assert len([e for e in remoto.eventos if e[0] == "conferir" and e[1] != MANIFESTO]) == 5
 
 
 @pytest.mark.parametrize("defeito", ["recibo", "aprovacao", "selo", "saida", "entrada"])
@@ -309,7 +321,7 @@ def test_allowlist_fechada_mesmo_com_recibo_verde(tmp_path, defeito):
 
     def alterar(pasta):
         if defeito == "arquivo_extra":
-            (pasta / "monitor_tse.parquet").write_bytes(b"nao aprovado ainda")
+            (pasta / "monitor_arbitrario.parquet").write_bytes(b"nao aprovado ainda")
         elif defeito == "coluna_privada":
             arquivo = pasta / "dim_candidatura.parquet"
             tabela = pq.read_table(arquivo).append_column(
@@ -519,3 +531,29 @@ def test_get_manifesto_sem_confirmacao_retorna_resultado_incerto(validada):
     remoto = SemConfirmacao()
     with pytest.raises(ErroManifestoIncerto):
         publicar(remoto, validada)
+
+
+def test_rollback_entre_selecoes_nao_muda_vigente(tmp_path):
+    from coletor.tse.selecao import criar_selecao, promover_selecao
+    from tests.test_tse_selecao import versao
+
+    lago, primeira = montar_vetor(tmp_path)
+    antiga = candidata(lago, primeira, "edicao-antiga")
+    promover_selecao(lago, primeira, antiga[2])
+    nova = versao(lago, tmp_path / "retificada", "bens", 2024, total=80)
+    segunda = criar_selecao({**primeira.versoes, "tse.bens:2024": nova.versao_id})
+    atual = candidata(lago, segunda, "edicao-atual")
+    promover_selecao(lago, segunda, atual[2])
+    vigente = (lago / "estado/tse/vigente.json").read_bytes()
+    remoto = PublicadorMemoria()
+    publicar(remoto, antiga)
+    edicao_antiga = json.loads(remoto.objetos[MANIFESTO])["edicao_id"]
+    publicar(remoto, atual)
+    edicao_atual = json.loads(remoto.objetos[MANIFESTO])["edicao_id"]
+    assert edicao_atual != edicao_antiga
+    anteriores = set(remoto.objetos)
+    publicar(remoto, antiga)
+    assert json.loads(remoto.objetos[MANIFESTO])["edicao_id"] == edicao_antiga
+    assert (lago / "estado/tse/vigente.json").read_bytes() == vigente
+    assert json.loads(vigente)["selecao_id"] == segunda.selecao_id
+    assert set(remoto.objetos) == anteriores

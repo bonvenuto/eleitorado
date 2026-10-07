@@ -261,6 +261,10 @@ def vars_selecao(lago: Path, selecao: SelecaoTse, execucao_id: str) -> dict:
                 "layout_id": dados["layouts"][familia],
             }
     return {
+        "tse_contexto": {
+            "selecao_id": selecao.selecao_id,
+            "entradas_digest": digest_entradas(lago, selecao),
+        },
         "tse_fontes": fontes,
         "tse_proveniencia": proveniencia,
         "tse_saida": (_pasta_execucao(lago, execucao_id) / "marts").resolve().as_posix(),

@@ -690,3 +690,17 @@ def test_gate_compartilhado_paridade_causal(vetor, consumidor, defeito):
     conferir = conferir_recibo_tse if consumidor == "conferir" else promover_selecao
     with pytest.raises(ValueError):
         conferir(lago, selecao, recibo)
+
+
+def test_contexto_recalculado_e_obrigatorio(vetor):
+    lago, selecao = vetor
+    esperado = {"selecao_id": selecao.selecao_id, "entradas_digest": digest_entradas(lago, selecao)}
+    assert vars_selecao(lago, selecao, "uma")["tse_contexto"] == esperado
+    assert vars_selecao(lago, selecao, "outra")["tse_contexto"] == esperado
+    with pytest.raises(ValueError, match="vars obrigatórias"):
+        execucao(
+            lago,
+            selecao,
+            "forjada",
+            vars_extras={"tse_contexto": {**esperado, "entradas_digest": "f" * 64}},
+        )

@@ -155,3 +155,22 @@ Se o PR mexe em `site/`, também (em `site/`): `npm ci`, `npm run lint`, `npm ru
 - **Windows:** o desenvolvimento local é em Windows (PowerShell e Git Bash). Use caminhos com `/`
   ou caminhos Windows; caminhos `/c/...` quebram em subprocessos Python. `con`, `prn`, `aux`,
   `nul`, `com1`… são nomes de arquivo reservados (por isso os arquivos do site levam `p_`/`b_`).
+
+## Operação TSE (onda C2)
+
+A autorização de host inclui apenas `tse.jus.br` e subdomínios, não todo `.jus.br`.
+`fontes/tse.yaml` pertence exclusivamente ao grupo `tse`, mensal (30 dias): três recursos ×
+quatro anos = 12 tarefas. O diário coleta zero TSE e `publicar` sem flag não publica C2.
+A candidata exige `pipeline --grupo tse --selecao-tse <JSON>` e publicação exige
+`publicar --execucao-tse <ID exato impresso>`, com preparação/vars/artefatos/recibo daquela execução.
+Bootstrap privado não é publicação. Não escolher latest ou arquivos por glob nem reaproveitar IDs.
+
+O quinto mart C2, `monitor_tse`, publica somente metadados técnicos vinculados à seleção; sua
+identidade de entradas pública `entradas_id` é alias do digest validado, não hash de CPF.
+Auditoria financeira PF, evidências de identidade, cruzamentos e descrições ficam privados.
+Raízes PJ TSE ampliam interesse de coleta Receita, sem ativar `rfb_fatos()` ou alertas C1.
+
+Não afirmar ativação automática, performance integral medida ou correção do WinError 5 em rename.
+Medição pesada e carga/rechecagem real dependem de coordenação com o usuário e término da Receita.
+No investigador, `preparo-c2-pendente.json` bloqueia consultas/sessões até novo preparar integral
+bem-sucedido; não recomendar apagar a pendência manualmente. Detalhes: docs/modelos-de-dados.md.

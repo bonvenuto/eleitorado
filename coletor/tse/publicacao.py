@@ -70,6 +70,20 @@ MARTS_PUBLICOS = {
             "valor",
         }
     ),
+    "monitor_tse.parquet": frozenset(
+        {
+            "selecao_id",
+            "entradas_id",
+            "familia",
+            "ano_arquivo",
+            "versao_id",
+            "layout_id",
+            "rechecado_em",
+            "prazo_dias",
+            "cobertura",
+            "auditoria",
+        }
+    ),
 }
 
 

@@ -31,6 +31,7 @@ def _schemas(projeto, target: str) -> dict[str, str]:
     ]
     fontes = {familia: [(projeto / f"{familia}.parquet").as_posix()] for familia in familias}
     variaveis = {
+        "tse_contexto": {"selecao_id": "a" * 64, "entradas_digest": "b" * 64},
         "tse_fontes": fontes,
         "tse_saida": (projeto / "saida-c2").as_posix(),
         "tse_proveniencia": {

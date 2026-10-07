@@ -76,6 +76,7 @@ def preparar_execucao_tse(
         }
         garantir_fontes(lago, esquemas)
         variaveis = {
+            "tse_contexto": {"selecao_id": None, "entradas_digest": None},
             "tse_fontes": {
                 chave.rsplit("/", 1)[1]: [(lago / chave / "vazio/vazio.parquet").as_posix()]
                 for chave in esquemas

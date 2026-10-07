@@ -249,3 +249,28 @@ def test_macro_recusa_colisao_raw_proveniencia(tmp_path, reservado):
     }
     with pytest.raises(ValueError, match="colide"):
         macro("fonte_tse", variaveis, tmp_path, "bens")
+
+
+def test_contexto_bootstrap_so_vazio_conhecido(tmp_path):
+    execucao = preparar(tmp_path, "bootstrap-contexto", "prod")
+    assert execucao.vars_dbt["tse_contexto"] == {"selecao_id": None, "entradas_digest": None}
+    sql = macro("tse_contexto_sql", execucao.vars_dbt, tmp_path)
+    with duckdb.connect() as con:
+        assert con.execute(sql).fetchall() == [(None, None)]
+    for contexto in (None, {}, {"selecao_id": "a" * 64, "entradas_digest": None}):
+        with pytest.raises(ValueError):
+            macro("tse_contexto_sql", {**execucao.vars_dbt, "tse_contexto": contexto}, tmp_path)
+    vars_reais = {**execucao.vars_dbt, "tse_fontes": {"bens": ["outro.parquet"]}}
+    with pytest.raises(ValueError):
+        macro("tse_contexto_sql", vars_reais, tmp_path)
+
+
+def test_contexto_null_ci_explicito_confere_vazio(tmp_path):
+    preparar(tmp_path, "bootstrap-ci", "ci")
+    variaveis = {"tse_contexto": {"selecao_id": None, "entradas_digest": None}}
+    assert "null::varchar" in macro("tse_contexto_sql", variaveis, tmp_path, target="ci")
+    arquivo = tmp_path / "estado/tse/ci/bens/vazio/vazio.parquet"
+    with duckdb.connect() as con:
+        con.execute("copy (select 1 as dado) to ? (format parquet)", [str(arquivo)])
+    with pytest.raises(ValueError, match="Bootstrap TSE exige arquivo vazio"):
+        macro("tse_contexto_sql", variaveis, tmp_path, target="ci")

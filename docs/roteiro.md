@@ -48,26 +48,33 @@ pula e o `monitor_fontes` mostra; (b) tratar `BadZipFile` de competência antiga
 próprio (`fonte_corrompida`), sem contar como falha. A (a) é explícita e reversível; recomendada.
 Antes, conferir se a CGU já corrigiu o arquivo.
 
-## 3. Onda C2: dados eleitorais do TSE
+## 3. Onda C2: implementação e implantação pendente
 
-Candidaturas, bens declarados, receitas (doações) e despesas de campanha, para cruzar com cota,
-emendas, contratos e a Receita (C1). Precisa de sondagem e spec próprias, no mesmo fluxo da C1
-(protótipo com dados reais antes do plano).
+A implementação cobre candidaturas, bens, receitas, contratações/pagamentos e originários de
+2018, 2020, 2022 e 2024, com seleção explícita de versões e publicação por edição. Contrato,
+comandos, schemas e limites: [modelos de dados](modelos-de-dados.md#onda-c2--tse-contrato-de-publicação-e-análise-privada).
+Somente `tse.jus.br` e subdomínios foram autorizados; outros `.jus.br` continuam bloqueados.
 
-- **Fonte:** Portal de Dados Abertos do TSE (`dadosabertos.tse.jus.br`, CKAN), arquivos por
-  eleição (`consulta_cand_AAAA`, `bem_candidato_AAAA`, prestação de contas de candidatos com
-  receitas e despesas). **O domínio é `.jus.br`**, fora dos hosts permitidos do coletor: incluir
-  `.jus.br` em `SUFIXOS_OFICIAIS` é decisão do usuário.
-- **A verificar na sondagem:** quais eleições (2018, 2020, 2022, 2024), tamanho dos arquivos, como
-  o TSE publica hoje o CPF de candidatos e de doadores (completo, mascarado ou ausente) e como
-  ligar o candidato ao `parlamentar_id` (nome de urna e CPF; para deputados, o CPF do detalhe da
-  Câmara está no lago privado).
-- **Cruzamentos pretendidos:** doador de campanha que vira fornecedor da cota, contratado ou
-  favorecido de emenda do mesmo parlamentar; empresa doadora ou fornecedora de campanha com sócio
-  ligado ao parlamentar (sócios da C1); evolução patrimonial entre eleições; despesa de campanha
-  com empresa irregular ou recém-aberta (alertas da C1).
-- **LGPD:** doador pessoa física e CPF ficam no lago privado; os marts trazem só agregados ou a
-  máscara.
+- [x] Grupo exclusivo `tse`, mensal/30 dias, 12 tarefas. Bootstrap de um ano por três chamadas
+  `coletar tse.<recurso> --competencia <ano>`. Diário coleta zero TSE.
+- [x] Candidata explícita: `uv run coletor pipeline --grupo tse --selecao-tse <JSON>`.
+  Publicação C2 somente com `uv run coletor publicar --execucao-tse <ID exato impresso>`.
+  Sem flag publica só legado; workflow atual não publica C2 automaticamente.
+- [x] Cinco marts com allowlist fechada, monitor técnico sem totalizadores financeiros PF e
+  auditoria completa privada. PF/incerto continuam suprimidos, inclusive em agregados/diferenças.
+- [x] Cruzamentos privados temporais/documentais; cota com ponte confirmada, emenda contextual,
+  contratos sem autoria inferida. Raízes PJ TSE solicitam cobertura, sem ativar alertas C1.
+- [x] Investigador com seleção fixada e pendência local que bloqueia consultas/sessões até
+  novo preparar integral bem-sucedido; não apagar a pendência para contornar o gate.
+- [ ] Revisão independente final e checks globais frescos após integração com a base atual.
+- [ ] Confirmar término da operação Receita antes de carga/rechecagem real ou medição pesada.
+- [ ] Medir execução integral: parede, memória, disco, spill e orçamento de 120 minutos. Os
+  testes sintéticos não comprovam performance dos dados completos.
+- [ ] Resolver/validar o limite Windows WinError 5 em rename documentado na T4; não considerado
+  corrigido por suites verdes. Preservar evidência e bloquear inconclusivamente em caso de erro.
+- [ ] Demonstrar cobertura cadastral Receita utilizável, sem interpretar ausência como irregularidade.
+- [ ] Decidir ativação automática somente após os gates anteriores. Não há workflow novo/manual
+  nem habilitação diária nesta entrega; o usuário coordena a operação real e autorizações externas.
 
 ## 4. Licitações do PNCP
 
