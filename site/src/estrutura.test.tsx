@@ -18,8 +18,10 @@ describe('estrutura do site', () => {
     expect(ler('index.html')).not.toMatch(/(src|href)="(https?:)?\/\//)
   })
 
-  it('toda rota volta para o index.html (SPA no Cloudflare Pages)', () => {
-    expect(ler('public/_redirects')).toBe('/* /index.html 200\n')
+  it('toda rota volta para o index.html (SPA na Cloudflare)', () => {
+    const wrangler = ler('wrangler.jsonc')
+    expect(wrangler).toMatch(/"directory": "\.\/dist"/)
+    expect(wrangler).toMatch(/"not_found_handling": "single-page-application"/)
   })
 
   it('a aplicação renderiza', () => {
