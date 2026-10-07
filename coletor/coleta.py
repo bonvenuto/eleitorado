@@ -35,6 +35,8 @@ class Dependencias:
 
 
 def particionamento(recurso: Recurso, destino: str) -> Particionamento:
+    if recurso.adaptador == "webdav_zip":
+        return Particionamento("MONTH")  # recorte mensal da Receita: o histórico fica, sem expirar
     if recurso.publicacao == "snapshot":
         return Particionamento("DAY", EXPIRACAO_SNAPSHOT_DIAS if destino == "raw" else None)
     if recurso.competencia.tipo == "dia":
@@ -124,6 +126,15 @@ def coletar(
     with tempfile.TemporaryDirectory(prefix="coletor-") as temporario:
         pasta = Path(temporario)
         try:
+            # fonte que informa a competência disponível: a já coletada não é baixada de novo
+            disponivel = getattr(adaptador, "competencia_disponivel", None)
+            if competencia is None and disponivel is not None:
+                competencia = disponivel(recurso.recurso, deps.http)
+                registro.definir_competencia(competencia)
+                anterior = historico.ultimo_sha(recurso.id, competencia.rotulo)
+                if not forcar and anterior is not None:
+                    registro.sha256_conteudo = anterior
+                    return registro.finalizar("sem_alteracao", deps.agora())
             extracao = adaptador.extrair(recurso.recurso, competencia, pasta, deps.http, hoje)
             registro.definir_competencia(extracao.competencia)
             registro.url = extracao.url

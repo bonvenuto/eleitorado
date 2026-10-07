@@ -6,7 +6,7 @@ from coletor.coleta import coletar, recarregar
 from coletor.competencias import Competencia
 from coletor.execucao import ResumoColetas
 from coletor.manifesto import RecursoCompleto
-from coletor.meta import HistoricoColetas
+from coletor.meta import HistoricoColetas, Sucesso
 from tests.amostras import CNEP_CSV, PAGINA_CGU, recurso, zip_com
 
 PAGINA = "https://portaldatransparencia.gov.br/download-de-dados/cnep"
@@ -236,3 +236,64 @@ def test_bloqueio_anti_robo_vira_adiada(respx_mock, deps):
     )
     registro = coletar(CNEP, None, HistoricoColetas(), deps, "e1")
     assert (registro.status, registro.http_status) == ("adiada", 405)
+
+
+def _webdav(respx_mock, competencias: list[str]):
+    from tests.amostras import RAIZ_WEBDAV, propfind_webdav
+
+    itens = [(f"{c}/", None) for c in competencias]
+    respx_mock.route(method="PROPFIND", url=RAIZ_WEBDAV).mock(
+        return_value=httpx.Response(207, text=propfind_webdav("/public.php/webdav/", itens))
+    )
+
+
+def test_competencia_da_receita_ja_coletada_nao_e_baixada(respx_mock, deps):
+    from tests.amostras import recurso_webdav
+
+    _webdav(respx_mock, ["2026-08", "2026-09"])
+    historico = HistoricoColetas(
+        {
+            ("rfb.empresas", "2026-09"): Sucesso(
+                datetime(2026, 9, 20, tzinfo=UTC), "sha-do-recorte", date(2026, 9, 1), None
+            )
+        }
+    )
+    rc = RecursoCompleto("rfb", recurso_webdav())
+    registro = coletar(rc, None, historico, deps, "exec-1")
+    assert (registro.status, registro.competencia) == ("sem_alteracao", "2026-09")
+    assert registro.sha256_conteudo == "sha-do-recorte"  # a próxima execução também pula
+    assert [c.request.method for c in respx_mock.calls] == ["PROPFIND"]  # nada baixado
+
+
+def test_recorte_da_receita_carrega_na_particao_mensal_sem_expirar(
+    respx_mock, deps, warehouse, tmp_path, monkeypatch
+):
+    import duckdb
+
+    from tests.amostras import RAIZ_WEBDAV, propfind_webdav, recurso_webdav
+
+    (tmp_path / "lago" / "rfb").mkdir(parents=True)
+    duckdb.sql(
+        "copy (select '11222333' as raiz) "
+        f"to '{(tmp_path / 'lago' / 'rfb' / 'raizes.parquet').as_posix()}' (format parquet)"
+    )
+    monkeypatch.setenv("ELEITORADO_LAGO", str(tmp_path / "lago"))
+    _webdav(respx_mock, ["2026-09"])
+    conteudo = zip_com({"K.EMPRECSV": b'"11222333";"A";"01"\n"99999999";"B";"05"\n'})
+    pasta = f"{RAIZ_WEBDAV}2026-09/"
+    respx_mock.route(method="PROPFIND", url=pasta).mock(
+        return_value=httpx.Response(
+            207,
+            text=propfind_webdav("/public.php/webdav/2026-09/", [("Empresas0.zip", len(conteudo))]),
+        )
+    )
+    respx_mock.get(f"{pasta}Empresas0.zip").mock(return_value=httpx.Response(200, content=conteudo))
+    registro = coletar(
+        RecursoCompleto("rfb", recurso_webdav()), None, HistoricoColetas(), deps, "e"
+    )
+    assert registro.status == "carregada", registro.erro
+    assert (registro.competencia, registro.linhas) == ("2026-09", 1)
+    assert ("raw/rfb/empresas", "202609") in warehouse.particoes
+    particionamento = warehouse.particionamentos["raw/rfb/empresas"]
+    assert (particionamento.granularidade, particionamento.expiracao_dias) == ("MONTH", None)
+    assert registro.parametros["arquivos"][0]["linhas_mantidas"] == 1
