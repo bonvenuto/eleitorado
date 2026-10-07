@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import re
 import shutil
 import sys
 import uuid
 from collections.abc import Callable, Mapping
 from datetime import date, datetime
+from functools import partial
 from pathlib import Path
 
 from coletor.agenda import Tarefa, tarefa_snapshot, tarefas_pendentes
 from coletor.coleta import Dependencias, recarregar
 from coletor.competencias import Competencia, data_brasilia, meses
 from coletor.config import Config, ErroConfig, carregar_config
-from coletor.dbt import ResultadoDbt, banco_do_target, gerar_linhagem, rodar_dbt
+from coletor.dbt import ResultadoDbt, ambiente_dbt, banco_do_target, gerar_linhagem, rodar_dbt
 from coletor.execucao import ResumoColetas, registro_execucao, rodar
 from coletor.manifesto import ErroManifesto, Manifesto, carregar_manifesto
 from coletor.meta import HistoricoColetas, RepositorioMeta
@@ -37,7 +40,7 @@ SELECAO_HISTORICOS = ["+int_cgu__sancoes_eventos+", "+int_parlamentares__eventos
 SELECAO_SITE = ["path:models/site", "site_alerta_tipos"]
 
 
-GRUPOS = ("diario", "receita")
+GRUPOS = ("diario", "receita", "tse")
 AJUDA_GRUPO = "grupo de recursos quando --recursos não é dado (padrão: diario)"
 
 
@@ -72,6 +75,7 @@ def _parser() -> argparse.ArgumentParser:
     pipeline = sub.add_parser("pipeline", help="coleta o que está vencido e roda o dbt build")
     pipeline.add_argument("--recursos", help="ids separados por vírgula (padrão: todos)")
     pipeline.add_argument("--grupo", choices=GRUPOS, default="diario", help=AJUDA_GRUPO)
+    pipeline.add_argument("--selecao-tse", type=Path, help="JSON do vetor candidato explicito")
 
     estado = sub.add_parser("estado", help="sincroniza o lago local com o bucket privado")
     estado.add_argument("acao", choices=["restaurar", "salvar"])
@@ -86,7 +90,8 @@ def _parser() -> argparse.ArgumentParser:
         "--esquemas", type=Path, default=Path("site/esquemas"), help="JSON Schemas do site"
     )
 
-    sub.add_parser("publicar", help="gera a linhagem e envia marts, linhagem e site ao R2")
+    publicar = sub.add_parser("publicar", help="gera linhagem e publica dados validados")
+    publicar.add_argument("--execucao-tse", help="ID explicito do build C2 aprovado")
 
     reconstruir = sub.add_parser(
         "reconstruir", help="refaz os históricos a partir dos originais no bucket"
@@ -107,6 +112,7 @@ def _rodar_tarefas(
     inicio: datetime,
     forcar: bool,
     dbt: Callable[[], ResultadoDbt] | None = None,
+    dbt_com_coleta_falha: bool = True,
 ) -> int:
     """Roda as coletas e, se pedido, o dbt; a execução é sempre registrada."""
     execucao_id = str(uuid.uuid4())
@@ -120,7 +126,10 @@ def _rodar_tarefas(
     try:
         if dbt is not None:
             resultado_dbt = ResultadoDbt("falha", None)
-            resultado_dbt = dbt()
+            if dbt_com_coleta_falha or (
+                resumo.sucesso and resumo.adiadas == 0 and resumo.nao_publicadas == 0
+            ):
+                resultado_dbt = dbt()
     except Exception:
         log.exception("dbt interrompido")
     finally:
@@ -169,10 +178,23 @@ def _pipeline(
     repo: RepositorioMeta,
     rodar_dbt_: RodarDbt,
 ) -> int:
+    from coletor.tse.execucao import preparar_execucao_tse
+    from coletor.tse.modelos import SelecaoTse
+    from coletor.tse.pipeline import preparar_e_promover_tse
+
+    recursos = _recursos(args, manifesto)
+    selecao = None
+    if args.selecao_tse:
+        if any(rc.orgao != "tse" for rc in recursos) or args.grupo != "tse":
+            raise ErroUso("--selecao-tse exige grupo tse e somente recursos TSE")
+        try:
+            selecao = SelecaoTse(**json.loads(args.selecao_tse.read_bytes()))
+        except (OSError, TypeError, ValueError) as erro:
+            raise ErroUso("JSON da selecao TSE invalido") from erro
     inicio = deps.agora()
     repo.publicar_fontes(manifesto, inicio)
     historico = repo.carregar_historico()
-    tarefas = tarefas_pendentes(_recursos(args, manifesto), historico, data_brasilia(inicio))
+    tarefas = tarefas_pendentes(recursos, historico, data_brasilia(inicio))
     log.info("%d tarefa(s) pendente(s)", len(tarefas))
 
     def dbt() -> ResultadoDbt:
@@ -181,18 +203,36 @@ def _pipeline(
         criadas = garantir_fontes(deps.config.lago, carregar_esquemas(args.dbt_dir))
         if criadas:
             log.warning("fontes ainda sem dados (Parquet vazio criado): %s", ", ".join(criadas))
-        return rodar_dbt_(
-            args.dbt_dir, args.target, deps.config.publico, ["--exclude", *SELECAO_SITE]
-        )
+        execucao_id = str(uuid.uuid4())
+        modo = "candidato" if selecao is not None else "privado-legado"
+        print(f"execucao_tse={execucao_id} modo={modo}")
+        if selecao is not None:
+            recibo = preparar_e_promover_tse(
+                deps.config.lago,
+                selecao,
+                execucao_id,
+                args.target,
+                partial(rodar_dbt_, args.dbt_dir),
+            )
+            print(f"execucao_tse={execucao_id} validacao=aprovada")
+            return recibo.resultado
+        preparada = preparar_execucao_tse(deps.config.lago, execucao_id, args.target)
+        with ambiente_dbt(deps.config.lago, deps.config.publico):
+            return rodar_dbt_(
+                args.dbt_dir,
+                args.target,
+                deps.config.publico,
+                [
+                    "--exclude", *SELECAO_SITE,
+                    "--vars",
+                    json.dumps(preparada.vars_dbt),
+                    "--target-path",
+                    (preparada.saida.parent / "dbt-target").as_posix(),
+                ],
+            )
 
     return _rodar_tarefas(
-        tarefas,
-        historico,
-        deps,
-        repo,
-        inicio,
-        False,
-        dbt=dbt,
+        tarefas, historico, deps, repo, inicio, False, dbt=dbt, dbt_com_coleta_falha=selecao is None
     )
 
 
@@ -263,13 +303,36 @@ def _publicar(args: argparse.Namespace, deps: Dependencias, env: Mapping[str, st
     ]
     if faltando:
         raise ErroConfig(f"variáveis de ambiente ausentes: {', '.join(faltando)}")
-    if not gerar_linhagem(args.dbt_dir, args.target, deps.config.publico):
-        log.error("dbt docs generate falhou: nada foi publicado")
-        return 1
+    from coletor.tse.execucao import preparar_execucao_tse
+    from coletor.tse.publicacao import publicar_tse
+
+    selecao = recibo = None
+    if args.execucao_tse:
+        preparada, selecao, recibo, variaveis = _publicacao_tse_preparada(
+            deps.config.lago, args.execucao_tse, args.target
+        )
+    else:
+        # Somente docs privados: nao afirma continuidade com build anterior nem envia C2.
+        execucao = preparar_execucao_tse(deps.config.lago, str(uuid.uuid4()), args.target)
+        preparada, variaveis = execucao.saida, execucao.vars_dbt
+    argumentos = [
+        "--vars",
+        json.dumps(variaveis),
+        "--target-path",
+        (preparada.parent / "dbt-target").as_posix(),
+    ]
+    with ambiente_dbt(deps.config.lago, deps.config.publico):
+        if not gerar_linhagem(
+            args.dbt_dir, args.target, deps.config.publico, argumentos=argumentos
+        ):
+            log.error("dbt docs generate falhou: nada foi publicado")
+            return 1
     publicador = R2Publicador(
         env["R2_CONTA"], env["R2_CHAVE_ID"], env["R2_SEGREDO"], env["R2_BUCKET"]
     )
     publicar(publicador, deps.config.publico, deps.agora(), deps.config.versao)
+    if recibo is not None:
+        publicar_tse(publicador, preparada, selecao, deps.agora(), deps.config.versao, recibo)
     return 0
 
 
@@ -290,6 +353,33 @@ def _site(args: argparse.Namespace, env: Mapping[str, str], rodar_dbt_: RodarDbt
         return 1
     log.info("site: %d arquivo(s) em %s", quantidade, publico / "site")
     return 0
+
+
+def _publicacao_tse_preparada(lago: Path, execucao_id: str, target: str):
+    from coletor.tse.modelos import ReciboValidacaoTse, SelecaoTse
+    from coletor.tse.selecao import conferir_recibo_tse
+
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", execucao_id):
+        raise ErroUso("ID de execucao TSE invalido")
+    lago = lago.resolve()
+    pasta = lago / "estado/tse/publicacoes/preparadas" / execucao_id
+    try:
+        prep = json.loads((pasta / "preparacao.json").read_bytes())
+        if (
+            prep["execucao_id"] != execucao_id
+            or prep["target"] != target
+            or prep["vars"]["tse_saida"] != (pasta / "marts").as_posix()
+        ):
+            raise ValueError("preparacao de outra execucao/target/saida")
+        selecao = SelecaoTse(**prep["selecao"])
+        dados = json.loads((pasta / "recibo.json").read_bytes())["recibo"]
+        recibo = ReciboValidacaoTse(**{**dados, "resultado": ResultadoDbt(**dados["resultado"])})
+        if recibo.execucao_id != execucao_id:
+            raise ValueError("recibo de outra execucao")
+        conferir_recibo_tse(lago, selecao, recibo)
+    except (OSError, TypeError, KeyError, ValueError) as erro:
+        raise ErroUso("execucao TSE nao possui evidencia publicavel") from erro
+    return pasta / "marts", selecao, recibo, prep["vars"]
 
 
 def _reconstruir(
@@ -337,23 +427,33 @@ def _reconstruir(
     if falhas:
         log.error("%d original(is) com falha: os históricos não foram refeitos", falhas)
         return 1
-    resultado = rodar_dbt_(
-        args.dbt_dir,
-        args.target,
-        config.publico,
-        [
-            "--full-refresh",
-            "--vars",
-            "{fonte_historico: replay}",
-            "--select",
-            *SELECAO_HISTORICOS,
-        ],
-    )
+    from coletor.tse.execucao import preparar_execucao_tse
+
+    preparada = preparar_execucao_tse(config.lago, execucao_id, args.target)
+    with ambiente_dbt(config.lago, config.publico):
+        resultado = rodar_dbt_(
+            args.dbt_dir,
+            args.target,
+            config.publico,
+            [
+                "--full-refresh",
+                "--vars",
+                json.dumps({**preparada.vars_dbt, "fonte_historico": "replay"}),
+                "--select",
+                *SELECAO_HISTORICOS,
+            ],
+        )
     if resultado.status != "sucesso":
         log.error("dbt da reconstrução falhou: %s", resultado)
         return 1
     # as views de staging ficaram apontando para o replay: volta a apontá-las para o raw
-    resultado = rodar_dbt_(args.dbt_dir, args.target, config.publico, ["--select", "staging"])
+    with ambiente_dbt(config.lago, config.publico):
+        resultado = rodar_dbt_(
+            args.dbt_dir,
+            args.target,
+            config.publico,
+            ["--select", "staging", "--vars", json.dumps(preparada.vars_dbt)],
+        )
     shutil.rmtree(replay)
     return 0 if resultado.status == "sucesso" else 1
 

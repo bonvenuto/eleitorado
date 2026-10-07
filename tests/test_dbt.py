@@ -95,3 +95,55 @@ def test_banco_de_cada_target():
     lago = pathlib.Path("dados")
     assert banco_do_target(lago, "prod") == lago / "eleitorado.duckdb"
     assert banco_do_target(lago, "dev") == lago / "dev.duckdb"
+
+
+def test_linhagem_mesmas_vars(tmp_path):
+    vars_dbt = {"tse_fontes": {"bens": ["fixado.parquet"]}, "tse_saida": "privado/marts"}
+    argumentos = ["--vars", json.dumps(vars_dbt), "--target-path", str(tmp_path / "exclusivo")]
+
+    def executar(comando):
+        assert comando[comando.index("--vars") + 1] == argumentos[1]
+        alvo = pathlib.Path(comando[comando.index("--target-path") + 1])
+        alvo.mkdir()
+        (alvo / "static_index.html").write_text("linhagem fixada")
+        return 0
+
+    assert gerar_linhagem(tmp_path, "ci", tmp_path / "publico", executar, argumentos)
+
+
+def test_build_captura_artefatos_no_target_exclusivo(tmp_path):
+    alvo = tmp_path / "exclusivo"
+    chamadas = []
+
+    def executar(comando):
+        alvo.mkdir()
+        (alvo / "run_results.json").write_text('{"results": []}')
+        return 0
+
+    resultado = rodar_dbt(
+        tmp_path,
+        "ci",
+        tmp_path / "publico",
+        ["--target-path", str(alvo)],
+        executar,
+        capturar=lambda comando, retorno, caminho: chamadas.append((comando, retorno, caminho)),
+    )
+    assert resultado == ResultadoDbt("sucesso", 0)
+    assert chamadas[0][1:] == (0, alvo)
+
+
+def test_ambiente_dbt_absoluto_e_restaurado_na_falha(tmp_path, monkeypatch):
+    import os
+
+    import pytest
+
+    from coletor.dbt import ambiente_dbt
+
+    monkeypatch.setenv("ELEITORADO_LAGO", "relativo-anterior")
+    monkeypatch.delenv("ELEITORADO_PUBLICO", raising=False)
+    with pytest.raises(RuntimeError), ambiente_dbt(tmp_path / "lago", tmp_path / "publico"):
+        assert os.environ["ELEITORADO_LAGO"] == (tmp_path / "lago").as_posix()
+        assert os.environ["ELEITORADO_PUBLICO"] == (tmp_path / "publico").as_posix()
+        raise RuntimeError("falha operacional")
+    assert os.environ["ELEITORADO_LAGO"] == "relativo-anterior"
+    assert "ELEITORADO_PUBLICO" not in os.environ

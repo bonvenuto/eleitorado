@@ -90,7 +90,7 @@ class Recurso(_Modelo):
     limite_por_execucao: int | None = None  # competências por execução (carga histórica parcelada)
     acesso: Literal["publico"] = "publico"
     # "receita": coletado pelo workflow mensal da Receita, fora do pipeline diário
-    grupo: Literal["diario", "receita"] = "diario"
+    grupo: Literal["diario", "receita", "tse"] = "diario"
     recorte: Recorte | None = None
     familias: dict[str, str] | None = None
 
