@@ -103,7 +103,8 @@ Desenho em `docs/superpowers/specs/2026-10-06-agente-investigador-design.md`.
 - **Primeira carga:** dispare o workflow à mão com `reconstruir` marcado.
 - **Público:** `manifesto.json`, `marts/` e `linhagem/index.html` no bucket R2, em
   <https://pub-e140b10136c94c9eb7cdb0a31fe603f3.r2.dev> (endereço `r2.dev`, até haver domínio próprio). Os arquivos são
-  enviados antes do manifesto; quem lê o manifesto sempre vê um conjunto completo.
+  enviados antes do manifesto; quem lê o manifesto sempre vê um conjunto completo. Os arquivos do
+  site público ficam em `site/` (ver `docs/modelos-de-dados.md`).
 - **Recuperação:** objetos sobrescritos ou apagados no bucket privado ficam 30 dias na exclusão
   reversível; `coletor reconstruir` refaz os históricos a partir dos originais.
 - **Infraestrutura:** só o bucket privado (GCS), a conta `pipeline` com WIF e o orçamento no GCP;

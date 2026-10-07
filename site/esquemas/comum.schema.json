@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/comum.schema.json",
+  "title": "Definições comuns aos arquivos do site",
+  "$defs": {
+    "esquema": { "const": 1 },
+    "data": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "data_ou_nulo": { "anyOf": [{ "$ref": "#/$defs/data" }, { "type": "null" }] },
+    "instante": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "instante_ou_nulo": { "anyOf": [{ "$ref": "#/$defs/instante" }, { "type": "null" }] },
+    "valor": { "type": "number" },
+    "valor_ou_nulo": { "type": ["number", "null"] },
+    "inteiro": { "type": "integer", "minimum": 0 },
+    "inteiro_ou_nulo": { "type": ["integer", "null"] },
+    "texto": { "type": "string" },
+    "texto_ou_nulo": { "type": ["string", "null"] },
+    "raiz": { "type": "string", "pattern": "^[0-9A-Z]{8}$" },
+    "raiz_ou_nulo": { "anyOf": [{ "$ref": "#/$defs/raiz" }, { "type": "null" }] },
+    "parlamentar_id": { "type": "string", "pattern": "^(camara|senado):[0-9A-Za-z]+$" },
+    "parlamentar_id_ou_nulo": {
+      "anyOf": [{ "$ref": "#/$defs/parlamentar_id" }, { "type": "null" }]
+    },
+    "casa": { "enum": ["camara", "senado"] },
+    "alerta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alerta_id", "tipo", "data", "valor", "parlamentar_id", "parlamentar_nome", "cnpj_raiz",
+        "empresa_nome", "cnpj_raiz_2", "empresa_nome_2", "descricao", "correspondencia", "regra"
+      ],
+      "properties": {
+        "alerta_id": { "$ref": "#/$defs/texto" },
+        "tipo": { "type": "string", "pattern": "^[a-z_]+$" },
+        "data": { "$ref": "#/$defs/data_ou_nulo" },
+        "valor": { "$ref": "#/$defs/valor_ou_nulo" },
+        "parlamentar_id": { "$ref": "#/$defs/parlamentar_id_ou_nulo" },
+        "parlamentar_nome": { "$ref": "#/$defs/texto_ou_nulo" },
+        "cnpj_raiz": { "$ref": "#/$defs/raiz_ou_nulo" },
+        "empresa_nome": { "$ref": "#/$defs/texto_ou_nulo" },
+        "cnpj_raiz_2": { "$ref": "#/$defs/raiz_ou_nulo" },
+        "empresa_nome_2": { "$ref": "#/$defs/texto_ou_nulo" },
+        "descricao": { "$ref": "#/$defs/texto" },
+        "correspondencia": { "enum": ["forte", "fraca"] },
+        "regra": { "$ref": "#/$defs/texto" }
+      }
+    },
+    "alertas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "itens"],
+      "properties": {
+        "total": { "$ref": "#/$defs/inteiro" },
+        "itens": { "type": "array", "items": { "$ref": "#/$defs/alerta" } }
+      }
+    },
+    "parlamentar_resumo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nome", "casa", "uf", "partido", "foto", "legislaturas"],
+      "properties": {
+        "id": { "$ref": "#/$defs/parlamentar_id" },
+        "nome": { "$ref": "#/$defs/texto_ou_nulo" },
+        "casa": { "$ref": "#/$defs/casa" },
+        "uf": { "$ref": "#/$defs/texto_ou_nulo" },
+        "partido": { "$ref": "#/$defs/texto_ou_nulo" },
+        "foto": { "$ref": "#/$defs/texto_ou_nulo" },
+        "legislaturas": { "type": "array", "items": { "type": "integer" } }
+      }
+    }
+  }
+}

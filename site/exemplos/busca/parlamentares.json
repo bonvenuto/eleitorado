@@ -1,0 +1,28 @@
+{
+  "esquema": 1,
+  "parlamentares": [
+    {
+      "id": "camara:900001",
+      "nome": "ANA EXEMPLO",
+      "casa": "camara",
+      "uf": "DF",
+      "partido": "PEX",
+      "foto": null,
+      "legislaturas": [
+        56,
+        57
+      ]
+    },
+    {
+      "id": "senado:900002",
+      "nome": "JOAO MODELO",
+      "casa": "senado",
+      "uf": "SP",
+      "partido": "PMO",
+      "foto": null,
+      "legislaturas": [
+        57
+      ]
+    }
+  ]
+}

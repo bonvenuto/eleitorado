@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/empresa.schema.json",
+  "title": "empresa/<bloco>.json: empresas cuja raiz do CNPJ começa pelo bloco",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["esquema", "bloco", "empresas"],
+  "properties": {
+    "esquema": { "$ref": "comum.schema.json#/$defs/esquema" },
+    "bloco": { "type": "string", "pattern": "^[0-9A-Z]{3}$" },
+    "empresas": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[0-9A-Z]{8}$" },
+      "additionalProperties": { "$ref": "#/$defs/empresa" }
+    }
+  },
+  "$defs": {
+    "empresa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cadastro", "cota", "emendas", "contratos", "licitacoes", "sancoes", "alertas"
+      ],
+      "properties": {
+        "cadastro": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "razao_social", "natureza_juridica", "porte", "capital_social", "abertura",
+            "situacao", "data_situacao", "motivo_situacao", "atividade", "municipio", "uf",
+            "optante_simples", "optante_mei", "estabelecimentos", "socios", "matriz_cnpj",
+            "url_portal", "competencia_receita"
+          ],
+          "properties": {
+            "razao_social": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "natureza_juridica": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "porte": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "capital_social": { "$ref": "comum.schema.json#/$defs/valor_ou_nulo" },
+            "abertura": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+            "situacao": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "data_situacao": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+            "motivo_situacao": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "atividade": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "municipio": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "uf": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "optante_simples": { "type": ["boolean", "null"] },
+            "optante_mei": { "type": ["boolean", "null"] },
+            "estabelecimentos": { "$ref": "comum.schema.json#/$defs/inteiro_ou_nulo" },
+            "socios": { "$ref": "comum.schema.json#/$defs/inteiro_ou_nulo" },
+            "matriz_cnpj": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+            "url_portal": { "type": ["string", "null"], "pattern": "^https://" },
+            "competencia_receita": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" }
+          }
+        },
+        "cota": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "parlamentares"],
+          "properties": {
+            "total": { "$ref": "comum.schema.json#/$defs/valor" },
+            "parlamentares": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["parlamentar_id", "nome", "valor"],
+                "properties": {
+                  "parlamentar_id": { "$ref": "comum.schema.json#/$defs/parlamentar_id" },
+                  "nome": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+                  "valor": { "$ref": "comum.schema.json#/$defs/valor" }
+                }
+              }
+            }
+          }
+        },
+        "emendas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total_pago", "autores"],
+          "properties": {
+            "total_pago": { "$ref": "comum.schema.json#/$defs/valor" },
+            "autores": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["autor", "parlamentar_id", "pago"],
+                "properties": {
+                  "autor": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+                  "parlamentar_id": { "$ref": "comum.schema.json#/$defs/parlamentar_id_ou_nulo" },
+                  "pago": { "$ref": "comum.schema.json#/$defs/valor" }
+                }
+              }
+            }
+          }
+        },
+        "contratos": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "quantidade", "orgaos"],
+          "properties": {
+            "total": { "$ref": "comum.schema.json#/$defs/valor" },
+            "quantidade": { "$ref": "comum.schema.json#/$defs/inteiro" },
+            "orgaos": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["orgao", "valor", "contratos"],
+                "properties": {
+                  "orgao": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+                  "valor": { "$ref": "comum.schema.json#/$defs/valor" },
+                  "contratos": { "$ref": "comum.schema.json#/$defs/inteiro" }
+                }
+              }
+            }
+          }
+        },
+        "licitacoes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["vencidas"],
+          "properties": { "vencidas": { "$ref": "comum.schema.json#/$defs/inteiro" } }
+        },
+        "sancoes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sancao_id", "cadastro", "categoria", "orgao", "inicio", "fim", "vigente"],
+            "properties": {
+              "sancao_id": { "$ref": "comum.schema.json#/$defs/texto" },
+              "cadastro": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "categoria": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "orgao": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "inicio": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+              "fim": { "$ref": "comum.schema.json#/$defs/data_ou_nulo" },
+              "vigente": { "type": "boolean" }
+            }
+          }
+        },
+        "alertas": { "$ref": "comum.schema.json#/$defs/alertas" }
+      }
+    }
+  }
+}

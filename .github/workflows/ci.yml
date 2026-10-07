@@ -24,8 +24,11 @@ jobs:
         run: |
           uv run python scripts/lago_vazio.py
           mkdir -p "$ELEITORADO_PUBLICO/marts"
+          uv run dbt seed --project-dir dbt --profiles-dir dbt --target ci
           uv run dbt run --project-dir dbt --profiles-dir dbt --target ci
           uv run dbt test --project-dir dbt --profiles-dir dbt --target ci
+          # os arquivos do site saem válidos mesmo sem dado nenhum
+          uv run coletor --target ci site
         env:
           ELEITORADO_LAGO: dbt/tests/lago_vazio
           ELEITORADO_PUBLICO: ${{ runner.temp }}/publico

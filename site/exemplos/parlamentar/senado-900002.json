@@ -1,0 +1,46 @@
+{
+  "esquema": 1,
+  "parlamentar": {
+    "id": "senado:900002",
+    "nome": "JOAO MODELO",
+    "casa": "senado",
+    "uf": "SP",
+    "partido": "PMO",
+    "foto": null,
+    "legislaturas": [
+      57
+    ],
+    "url_oficial": "https://www25.senado.leg.br/web/senadores/senador/-/perfil/900002"
+  },
+  "cota": {
+    "total": 0,
+    "por_ano": [],
+    "por_categoria": [],
+    "fornecedores": []
+  },
+  "emendas": {
+    "total_pago": 0,
+    "por_ano": [],
+    "favorecidos": []
+  },
+  "alertas": {
+    "total": 1,
+    "itens": [
+      {
+        "alerta_id": "b2f6a1c3d4e5f60718293a4b5c6d7e8f",
+        "tipo": "parlamentar_socio_fornecedor",
+        "data": "2019-05-20",
+        "valor": null,
+        "parlamentar_id": "senado:900002",
+        "parlamentar_nome": "JOAO MODELO",
+        "cnpj_raiz": "11222333",
+        "empresa_nome": "EMPRESA EXEMPLO LTDA",
+        "cnpj_raiz_2": null,
+        "empresa_nome_2": null,
+        "descricao": "Parlamentar sócio da empresa desde 20/05/2019",
+        "correspondencia": "fraca",
+        "regra": "Parlamentar sócio (pessoa física) de empresa que aparece nos dados; senador só pelo nome"
+      }
+    ]
+  }
+}

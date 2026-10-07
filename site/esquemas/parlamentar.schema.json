@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/parlamentar.schema.json",
+  "title": "parlamentar/<casa>-<id>.json: cota, emendas e alertas de um parlamentar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["esquema", "parlamentar", "cota", "emendas", "alertas"],
+  "properties": {
+    "esquema": { "$ref": "comum.schema.json#/$defs/esquema" },
+    "parlamentar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nome", "casa", "uf", "partido", "foto", "legislaturas", "url_oficial"],
+      "properties": {
+        "id": { "$ref": "comum.schema.json#/$defs/parlamentar_id" },
+        "nome": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+        "casa": { "$ref": "comum.schema.json#/$defs/casa" },
+        "uf": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+        "partido": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+        "foto": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+        "legislaturas": { "type": "array", "items": { "type": "integer" } },
+        "url_oficial": { "type": "string", "pattern": "^https://" }
+      }
+    },
+    "cota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "por_ano", "por_categoria", "fornecedores"],
+      "properties": {
+        "total": { "$ref": "comum.schema.json#/$defs/valor" },
+        "por_ano": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ano", "valor"],
+            "properties": {
+              "ano": { "type": "integer" },
+              "valor": { "$ref": "comum.schema.json#/$defs/valor" }
+            }
+          }
+        },
+        "por_categoria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["categoria", "valor"],
+            "properties": {
+              "categoria": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "valor": { "$ref": "comum.schema.json#/$defs/valor" }
+            }
+          }
+        },
+        "fornecedores": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nome", "documento", "cnpj_raiz", "valor", "despesas"],
+            "properties": {
+              "nome": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "documento": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "cnpj_raiz": { "$ref": "comum.schema.json#/$defs/raiz_ou_nulo" },
+              "valor": { "$ref": "comum.schema.json#/$defs/valor" },
+              "despesas": { "$ref": "comum.schema.json#/$defs/inteiro" }
+            }
+          }
+        }
+      }
+    },
+    "emendas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_pago", "por_ano", "favorecidos"],
+      "properties": {
+        "total_pago": { "$ref": "comum.schema.json#/$defs/valor" },
+        "por_ano": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ano", "pago"],
+            "properties": {
+              "ano": { "type": "integer" },
+              "pago": { "$ref": "comum.schema.json#/$defs/valor" }
+            }
+          }
+        },
+        "favorecidos": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nome", "documento", "cnpj_raiz", "pago"],
+            "properties": {
+              "nome": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "documento": { "$ref": "comum.schema.json#/$defs/texto_ou_nulo" },
+              "cnpj_raiz": { "$ref": "comum.schema.json#/$defs/raiz_ou_nulo" },
+              "pago": { "$ref": "comum.schema.json#/$defs/valor" }
+            }
+          }
+        }
+      }
+    },
+    "alertas": { "$ref": "comum.schema.json#/$defs/alertas" }
+  }
+}

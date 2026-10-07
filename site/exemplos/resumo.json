@@ -1,0 +1,151 @@
+{
+  "esquema": 1,
+  "gerado_em": "2026-10-07T11:02:13Z",
+  "dados_ate": {
+    "cota": "2026-09-01",
+    "emendas": "2026-10-03",
+    "contratos": "2026-10-05",
+    "receita": "2026-09"
+  },
+  "totais": {
+    "cota": 1500.0,
+    "emendas_pago": 250000.0,
+    "contratos": 350000.0,
+    "parlamentares": 2,
+    "empresas": 2
+  },
+  "alerta_tipos": [
+    {
+      "tipo": "cota_fornecedor_sancionado",
+      "titulo": "Cota paga a fornecedor sancionado",
+      "explicacao": "O parlamentar foi reembolsado pela cota por uma despesa com fornecedor que, na data da nota, estava no cadastro de punidos da CGU (CEIS ou CNEP).",
+      "cautela": "A cota reembolsa gastos do parlamentar (não é contratação pública), e a sanção pode valer só para o órgão que a aplicou.",
+      "ordem": 1,
+      "quantidade": 1
+    },
+    {
+      "tipo": "cota_documento_invalido",
+      "titulo": "Cota com CPF ou CNPJ inválido",
+      "explicacao": "A despesa de cota traz um CPF ou CNPJ de fornecedor com tamanho ou dígito verificador errado.",
+      "cautela": "Pode ser só um erro de digitação na prestação de contas.",
+      "ordem": 2,
+      "quantidade": 0
+    },
+    {
+      "tipo": "emenda_favorecido_sancionado",
+      "titulo": "Emenda paga a favorecido sancionado",
+      "explicacao": "Um pagamento de emenda parlamentar foi feito a empresa que, na data do pagamento, estava no CEIS ou no CNEP.",
+      "cautela": "A sanção pode valer só para o órgão que a aplicou; o parlamentar indica a emenda, mas quem paga é o órgão executor.",
+      "ordem": 3,
+      "quantidade": 0
+    },
+    {
+      "tipo": "contrato_fornecedor_sancionado",
+      "titulo": "Contrato com fornecedor sancionado",
+      "explicacao": "Um contrato federal foi assinado com empresa que, na data da assinatura, estava no CEIS ou no CNEP.",
+      "cautela": "A sanção pode valer só para o órgão que a aplicou.",
+      "ordem": 4,
+      "quantidade": 0
+    },
+    {
+      "tipo": "licitacao_vencedor_sancionado",
+      "titulo": "Licitação vencida por sancionado",
+      "explicacao": "O vencedor de uma licitação federal estava no CEIS ou no CNEP na data da licitação.",
+      "cautela": "A sanção pode valer só para o órgão que a aplicou.",
+      "ordem": 5,
+      "quantidade": 0
+    },
+    {
+      "tipo": "pagamento_empresa_irregular",
+      "titulo": "Pagamento a empresa irregular na Receita",
+      "explicacao": "Despesa de cota, pagamento de emenda ou contrato com empresa que já estava baixada, inapta, suspensa ou nula na Receita na data do fato.",
+      "cautela": "A Receita informa só a situação atual e desde quando ela vale; reativações anteriores não aparecem.",
+      "ordem": 6,
+      "quantidade": 0
+    },
+    {
+      "tipo": "empresa_recem_aberta",
+      "titulo": "Empresa recém-aberta",
+      "explicacao": "Contrato ou pagamento de emenda de pelo menos R$ 50 mil, ou despesa de cota de pelo menos R$ 10 mil, com empresa aberta até 180 dias antes.",
+      "cautela": "Empresa nova não é irregular: o alerta só aponta onde vale olhar com mais atenção.",
+      "ordem": 7,
+      "quantidade": 0
+    },
+    {
+      "tipo": "licitacao_socios_em_comum",
+      "titulo": "Concorrentes com sócios em comum",
+      "explicacao": "Duas empresas que disputaram a mesma licitação tinham pelo menos um sócio em comum desde antes da licitação.",
+      "cautela": "Os sócios são os da base mais recente da Receita: quem saiu antes não aparece, e ter sócio em comum não prova combinação.",
+      "ordem": 8,
+      "quantidade": 1
+    },
+    {
+      "tipo": "parlamentar_socio_fornecedor",
+      "titulo": "Parlamentar sócio de empresa",
+      "explicacao": "O parlamentar aparece como sócio de uma empresa que está nos dados públicos (fornecedor, favorecido ou contratada).",
+      "cautela": "Deputados são identificados pelo nome e por parte do CPF; senadores, só pelo nome, e podem ser homônimos.",
+      "ordem": 9,
+      "quantidade": 1
+    }
+  ],
+  "alertas_recentes": [
+    {
+      "alerta_id": "7c1e0d2a9f4b4e6a8d3c2b1a0f9e8d7c",
+      "tipo": "cota_fornecedor_sancionado",
+      "data": "2026-08-14",
+      "valor": 1200.0,
+      "parlamentar_id": "camara:900001",
+      "parlamentar_nome": "ANA EXEMPLO",
+      "cnpj_raiz": "11222333",
+      "empresa_nome": "EMPRESA EXEMPLO LTDA",
+      "cnpj_raiz_2": null,
+      "empresa_nome_2": null,
+      "descricao": "Despesa de cota com fornecedor sancionado no CEIS por MINISTERIO EXEMPLO desde 01/03/2025",
+      "correspondencia": "forte",
+      "regra": "Despesa de cota com fornecedor que tinha sanção vigente (CEIS ou CNEP) na data de emissão do documento"
+    },
+    {
+      "alerta_id": "c3a7b2d4e6f8091a2b3c4d5e6f708192",
+      "tipo": "licitacao_socios_em_comum",
+      "data": "2023-05-05",
+      "valor": null,
+      "parlamentar_id": null,
+      "parlamentar_nome": null,
+      "cnpj_raiz": "11222333",
+      "empresa_nome": "EMPRESA EXEMPLO LTDA",
+      "cnpj_raiz_2": "44555666",
+      "empresa_nome_2": "EMPREITEIRA MODELO SA",
+      "descricao": "Participantes da mesma licitação de MINISTERIO EXEMPLO com 2 sócio(s) em comum",
+      "correspondencia": "forte",
+      "regra": "Dois participantes da mesma licitação com sócio em comum desde antes da licitação"
+    }
+  ],
+  "fontes": [
+    {
+      "recurso_id": "camara.cota",
+      "cadencia": "diaria",
+      "ultimo_sucesso": "2026-10-07T10:40:00Z",
+      "status": "carregada",
+      "atraso_horas": 0,
+      "situacao": "ok"
+    },
+    {
+      "recurso_id": "rfb.empresas",
+      "cadencia": "mensal",
+      "ultimo_sucesso": null,
+      "status": null,
+      "atraso_horas": null,
+      "situacao": "erro"
+    }
+  ],
+  "fontes_reduzidas": [
+    {
+      "recurso_id": "camara.cota",
+      "competencia": "2015",
+      "coletada_em": "2026-10-05T11:00:00Z",
+      "linhas_antes": 1000,
+      "linhas_depois": 850,
+      "variacao_pct": -15.0
+    }
+  ]
+}

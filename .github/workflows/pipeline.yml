@@ -103,7 +103,15 @@ jobs:
           key: lago-cifrado-${{ github.run_id }}
       - name: publicar
         if: always() && (steps.pipeline.outputs.codigo == '0' || steps.pipeline.outputs.codigo == '3')
-        run: uv run coletor publicar
+        # o site não impede a publicação dos marts: sem site/ local, o do bucket fica como está
+        run: |
+          site=0
+          uv run coletor site || site=$?
+          uv run coletor publicar
+          if [ "$site" -ne 0 ]; then
+            echo "::error::coletor site falhou: o site público ficou com os dados anteriores"
+            exit 1
+          fi
         env:
           R2_CONTA: ${{ secrets.R2_CONTA }}
           R2_CHAVE_ID: ${{ secrets.R2_CHAVE_ID }}

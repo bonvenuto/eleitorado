@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: site_cota
+    data_tests: [sem_dados_pessoais, sem_cpf_completo]
+  - name: site_emendas
+    data_tests: [sem_dados_pessoais, sem_cpf_completo]
+  - name: site_contratos
+    data_tests: [sem_dados_pessoais, sem_cpf_completo]
+  - name: site_licitacoes
+    columns:
+      - name: cnpj_raiz
+        data_tests: [unique]
+
+unit_tests:
+  - name: site_cota_so_do_parlamentar
+    description: >
+      Soma por parlamentar, ano, categoria e fornecedor. Cota de liderança e despesa com data de
+      emissão impossível ficam de fora.
+    model: site_cota
+    given:
+      - input: ref('fct_despesa_cota_parlamentar')
+        rows:
+          - {parlamentar_id: 'camara:1', tipo_beneficiario: parlamentar, ano: 2025, categoria: COMBUSTIVEIS, fornecedor_documento: '11222333000181', fornecedor_nome: POSTO A, fornecedor_cnpj_raiz: '11222333', valor_reembolsado: 100, data_emissao_valida: true}
+          - {parlamentar_id: 'camara:1', tipo_beneficiario: parlamentar, ano: 2025, categoria: COMBUSTIVEIS, fornecedor_documento: '11222333000181', fornecedor_nome: POSTO A, fornecedor_cnpj_raiz: '11222333', valor_reembolsado: 50, data_emissao_valida: true}
+          - {parlamentar_id: null, tipo_beneficiario: lideranca, ano: 2025, categoria: COMBUSTIVEIS, fornecedor_documento: '11222333000181', fornecedor_nome: POSTO A, fornecedor_cnpj_raiz: '11222333', valor_reembolsado: 70, data_emissao_valida: true}
+          - {parlamentar_id: 'camara:1', tipo_beneficiario: parlamentar, ano: 2025, categoria: COMBUSTIVEIS, fornecedor_documento: '11222333000181', fornecedor_nome: POSTO A, fornecedor_cnpj_raiz: '11222333', valor_reembolsado: 999, data_emissao_valida: false}
+    expect:
+      rows:
+        - {parlamentar_id: 'camara:1', ano: 2025, categoria: COMBUSTIVEIS, fornecedor_cnpj_raiz: '11222333', valor: 150, despesas: 2}
+
+  - name: site_emendas_so_pagamento
+    description: >
+      Só a fase de pagamento entra; o parlamentar vem do autor da emenda (autor sem parlamentar
+      fica com parlamentar nulo).
+    model: site_emendas
+    given:
+      - input: ref('fct_emenda_pagamento')
+        rows:
+          - {autor_codigo: '123', fase_despesa: Pagamento, data_documento: '2025-03-01', favorecido_documento: '44555666000110', favorecido_nome: EMPRESA B, favorecido_cnpj_raiz: '44555666', valor_pago: 1000}
+          - {autor_codigo: '123', fase_despesa: Liquidação, data_documento: '2025-02-01', favorecido_documento: '44555666000110', favorecido_nome: EMPRESA B, favorecido_cnpj_raiz: '44555666', valor_pago: 1000}
+          - {autor_codigo: '999', fase_despesa: Pagamento, data_documento: '2025-04-01', favorecido_documento: '44555666000110', favorecido_nome: EMPRESA B, favorecido_cnpj_raiz: '44555666', valor_pago: 500}
+      - input: ref('dim_autor_emenda')
+        rows:
+          - {autor_codigo: '123', autor_nome: JOAO, parlamentar_id: 'senado:2'}
+    expect:
+      rows:
+        - {parlamentar_id: 'senado:2', autor_codigo: '123', autor_nome: JOAO, ano: 2025, pago: 1000}
+        - {parlamentar_id: null, autor_codigo: '999', autor_nome: null, ano: 2025, pago: 500}
+
+  - name: site_contratos_sem_valor_suspeito
+    description: Contrato com valor implausível e fornecedor que não é CNPJ ficam de fora.
+    model: site_contratos
+    given:
+      - input: ref('fct_contrato_federal')
+        rows:
+          - {fornecedor_cnpj_raiz: '11222333', fornecedor_tipo_documento: CNPJ, orgao_nome: MINISTERIO X, valor_final: 100, valor_suspeito: false}
+          - {fornecedor_cnpj_raiz: '11222333', fornecedor_tipo_documento: CNPJ, orgao_nome: MINISTERIO X, valor_final: 58840000000, valor_suspeito: true}
+          - {fornecedor_cnpj_raiz: null, fornecedor_tipo_documento: CPF, orgao_nome: MINISTERIO X, valor_final: 70, valor_suspeito: false}
+    expect:
+      rows:
+        - {cnpj_raiz: '11222333', orgao_nome: MINISTERIO X, valor: 100, contratos: 1}

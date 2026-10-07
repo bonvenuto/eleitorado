@@ -1,0 +1,19 @@
+{
+  "esquema": 1,
+  "prefixo": "emp",
+  "subdividido": false,
+  "empresas": [
+    {
+      "raiz": "44555666",
+      "nome": "EMPREITEIRA MODELO SA",
+      "uf": "SP",
+      "situacao": "ATIVA"
+    },
+    {
+      "raiz": "11222333",
+      "nome": "EMPRESA EXEMPLO LTDA",
+      "uf": "DF",
+      "situacao": "ATIVA"
+    }
+  ]
+}

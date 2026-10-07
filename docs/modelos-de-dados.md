@@ -1117,6 +1117,25 @@ flowchart LR
 | `limite_aviso_horas` | INTEGER | Atraso a partir do qual o teste de atraso avisa (30 h diária, 192 h semanal, 840 h mensal). |
 | `limite_erro_horas` | INTEGER | Atraso a partir do qual o teste de atraso falha o pipeline (54 h, 240 h, 960 h). |
 
+## Arquivos do site (`site/`)
+
+O site público lê arquivos JSON pequenos, gerados todo dia a partir dos marts pelos modelos
+`site_*` (pasta `dbt/models/site/`, que só lê marts e seeds; o `coletor site` os roda depois do
+`dbt build` do pipeline) e gravados pelo `coletor site`.
+Ficam no R2 em `site/`, em gzip (`Content-Encoding: gzip`), fora do `manifesto.json`.
+
+| Caminho | Conteúdo |
+|---|---|
+| `site/resumo.json` | Números da capa, tipos de alerta (texto do seed `site_alerta_tipos`), alertas recentes, situação das fontes |
+| `site/busca/parlamentares.json` | Todos os parlamentares |
+| `site/busca/empresas/p_<abc>.json` | Empresas com uma palavra da razão social começando por `<abc>` (blocos grandes subdivididos em 4 letras) |
+| `site/parlamentar/<casa>-<id>.json` | Cota, emendas e alertas de um parlamentar |
+| `site/empresa/b_<abc>.json` | Empresas cuja raiz do CNPJ começa por `<abc>`: cadastro, o que recebeu, sanções e alertas |
+| `site/alertas/<tipo>/<n>.json` | Alertas de um tipo, 500 por página |
+
+O formato de cada arquivo está nos JSON Schemas de `site/esquemas/`; há exemplos em
+`site/exemplos/`. Desenho em `docs/superpowers/specs/2026-10-07-site-publico-design.md`.
+
 ## Camada intermediate
 
 Tabelas internas (não publicadas). Concentram as regras de negócio e guardam o **documento completo**, necessário para os cruzamentos; por isso nunca vão para o bucket público.

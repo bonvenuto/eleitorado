@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: site_arquivos
+    description: Todos os arquivos do site (caminho relativo a site/ e conteúdo JSON).
+    columns:
+      - name: caminho
+        data_tests: [unique, not_null]
+      - name: conteudo
+        data_tests: [not_null]
+
+unit_tests:
+  - name: site_busca_subdivide_blocos_grandes
+    description: >
+      Palavras comuns (LTDA, EIRELI, SA) e de menos de 3 letras ficam de fora. Com `site_busca_max`
+      = 2, o bloco "con" (3 empresas) é subdividido: as de palavra com 4 letras ou mais vão para
+      "cons", e a de palavra de exatamente 3 letras fica no "con".
+    model: site_arquivos_busca
+    overrides:
+      vars: {site_busca_max: 2}
+    given:
+      - input: ref('dim_empresa')
+        rows:
+          - {cnpj_raiz: '11222333', razao_social: CONSTRUTORA ALFA LTDA, uf_sigla: DF, situacao: ATIVA}
+          - {cnpj_raiz: '44555666', razao_social: CONSULTORIA BETA EIRELI, uf_sigla: SP, situacao: ATIVA}
+          - {cnpj_raiz: '77888999', razao_social: CON ENGENHARIA SA, uf_sigla: RJ, situacao: BAIXADA}
+      - input: ref('dim_parlamentar')
+        rows: []
+    expect:
+      rows:
+        - {caminho: busca/empresas/p_alf.json, subdividido: false, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_bet.json, subdividido: false, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_con.json, subdividido: true, empresas_no_arquivo: 1}
+        - {caminho: busca/empresas/p_cons.json, subdividido: false, empresas_no_arquivo: 2}
+        - {caminho: busca/empresas/p_eng.json, subdividido: false, empresas_no_arquivo: 1}
+        - {caminho: busca/parlamentares.json, subdividido: null, empresas_no_arquivo: 0}
+
+  - name: site_alertas_em_paginas
+    description: Com `site_alertas_por_pagina` = 2, três alertas do mesmo tipo dão duas páginas.
+    model: site_arquivos_alertas
+    overrides:
+      vars: {site_alertas_por_pagina: 2}
+    given:
+      - input: ref('site_alertas')
+        rows:
+          - {alerta_id: a1, tipo: cota_documento_invalido, data_fato: '2026-01-01', descricao: x, correspondencia: forte, regra: r}
+          - {alerta_id: a2, tipo: cota_documento_invalido, data_fato: '2026-01-02', descricao: x, correspondencia: forte, regra: r}
+          - {alerta_id: a3, tipo: cota_documento_invalido, data_fato: '2026-01-03', descricao: x, correspondencia: forte, regra: r}
+    expect:
+      rows:
+        - {caminho: alertas/cota_documento_invalido/1.json}
+        - {caminho: alertas/cota_documento_invalido/2.json}

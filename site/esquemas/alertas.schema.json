@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eleitorado.pages.dev/esquemas/alertas.schema.json",
+  "title": "alertas/<tipo>/<pagina>.json: uma página dos alertas de um tipo",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["esquema", "tipo", "pagina", "paginas", "total", "alertas"],
+  "properties": {
+    "esquema": { "$ref": "comum.schema.json#/$defs/esquema" },
+    "tipo": { "type": "string", "pattern": "^[a-z_]+$" },
+    "pagina": { "type": "integer", "minimum": 1 },
+    "paginas": { "type": "integer", "minimum": 1 },
+    "total": { "$ref": "comum.schema.json#/$defs/inteiro" },
+    "alertas": { "type": "array", "items": { "$ref": "comum.schema.json#/$defs/alerta" } }
+  }
+}

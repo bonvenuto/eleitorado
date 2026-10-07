@@ -106,6 +106,8 @@ atuais:
 
 ## 8. Produto público
 
-Os marts estão publicados no R2 (`manifesto.json` lista os arquivos), mas sem interface. Um site
-com domínio próprio: busca por parlamentar e por empresa, alertas com a regra explicada e
-gráficos. Decidir hospedagem e se lê os Parquet direto (DuckDB-WASM) ou um índice pré-gerado.
+Spec em `docs/superpowers/specs/2026-10-07-site-publico-design.md`. Plano 10 (dados do site:
+modelos `site_*`, `coletor site`, publicação incremental) em
+`docs/superpowers/plans/2026-10-07-plano-10-dados-do-site.md`; plano 11 (frontend em `site/`,
+Cloudflare Pages) a seguir. **Usuário:** criar o projeto no Cloudflare Pages e a regra de CORS
+do bucket R2 (spec, seção 9).

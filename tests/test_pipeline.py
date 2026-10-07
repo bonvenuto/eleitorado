@@ -43,6 +43,19 @@ def test_pipeline_coleta_roda_dbt_e_registra_uma_execucao(respx_mock, deps, ware
     assert execucao["dbt_testes_com_erro"] == 0
 
 
+def test_pipeline_deixa_os_modelos_do_site_para_o_coletor_site(respx_mock, deps):
+    # uma falha nos modelos do site não pode impedir a publicação dos marts
+    _mock_tudo_sem_alteracao(respx_mock)
+    argumentos_vistos = []
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        argumentos_vistos.append(list(argumentos))
+        return ResultadoDbt("sucesso", 0)
+
+    _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt)
+    assert argumentos_vistos == [["--exclude", "path:models/site", "site_alerta_tipos"]]
+
+
 def test_pipeline_com_dbt_falhando_termina_com_erro(respx_mock, deps, warehouse):
     _mock_tudo_sem_alteracao(respx_mock)
     codigo = _rodar(

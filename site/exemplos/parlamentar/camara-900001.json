@@ -1,0 +1,92 @@
+{
+  "esquema": 1,
+  "parlamentar": {
+    "id": "camara:900001",
+    "nome": "ANA EXEMPLO",
+    "casa": "camara",
+    "uf": "DF",
+    "partido": "PEX",
+    "foto": null,
+    "legislaturas": [
+      56,
+      57
+    ],
+    "url_oficial": "https://www.camara.leg.br/deputados/900001"
+  },
+  "cota": {
+    "total": 1500.0,
+    "por_ano": [
+      {
+        "ano": 2025,
+        "valor": 300.0
+      },
+      {
+        "ano": 2026,
+        "valor": 1200.0
+      }
+    ],
+    "por_categoria": [
+      {
+        "categoria": "DIVULGAÇÃO DA ATIVIDADE PARLAMENTAR.",
+        "valor": 1200.0
+      },
+      {
+        "categoria": "COMBUSTÍVEIS E LUBRIFICANTES.",
+        "valor": 300.0
+      }
+    ],
+    "fornecedores": [
+      {
+        "nome": "EMPRESA EXEMPLO LTDA",
+        "documento": "11222333000181",
+        "cnpj_raiz": "11222333",
+        "valor": 1200.0,
+        "despesas": 1
+      },
+      {
+        "nome": "MARIA EXEMPLO",
+        "documento": "***.456.789-**",
+        "cnpj_raiz": null,
+        "valor": 300.0,
+        "despesas": 2
+      }
+    ]
+  },
+  "emendas": {
+    "total_pago": 250000.0,
+    "por_ano": [
+      {
+        "ano": 2025,
+        "pago": 250000.0
+      }
+    ],
+    "favorecidos": [
+      {
+        "nome": "MUNICIPIO DE EXEMPLO",
+        "documento": "99888777000166",
+        "cnpj_raiz": "99888777",
+        "pago": 250000.0
+      }
+    ]
+  },
+  "alertas": {
+    "total": 1,
+    "itens": [
+      {
+        "alerta_id": "7c1e0d2a9f4b4e6a8d3c2b1a0f9e8d7c",
+        "tipo": "cota_fornecedor_sancionado",
+        "data": "2026-08-14",
+        "valor": 1200.0,
+        "parlamentar_id": "camara:900001",
+        "parlamentar_nome": "ANA EXEMPLO",
+        "cnpj_raiz": "11222333",
+        "empresa_nome": "EMPRESA EXEMPLO LTDA",
+        "cnpj_raiz_2": null,
+        "empresa_nome_2": null,
+        "descricao": "Despesa de cota com fornecedor sancionado no CEIS por MINISTERIO EXEMPLO desde 01/03/2025",
+        "correspondencia": "forte",
+        "regra": "Despesa de cota com fornecedor que tinha sanção vigente (CEIS ou CNEP) na data de emissão do documento"
+      }
+    ]
+  }
+}

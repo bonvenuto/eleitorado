@@ -32,6 +32,9 @@ SAIDA_SO_COLETAS_FALHARAM = 3
 # recursos cujos snapshots alimentam os históricos (fonte_snapshot no dbt)
 RECURSOS_HISTORICO = ("cgu.ceis", "cgu.cnep", "camara.deputados", "senado.senadores")
 SELECAO_HISTORICOS = ["+int_cgu__sancoes_eventos+", "+int_parlamentares__eventos+"]
+# modelos do site público: rodam no `coletor site`, fora do dbt build do pipeline, para que uma
+# falha neles não impeça a publicação dos marts
+SELECAO_SITE = ["path:models/site", "site_alerta_tipos"]
 
 
 GRUPOS = ("diario", "receita")
@@ -78,7 +81,12 @@ def _parser() -> argparse.ArgumentParser:
         help="salvar: só envia arquivos novos de raw/ e meta/ (nunca apaga nem sobrescreve)",
     )
 
-    sub.add_parser("publicar", help="gera a linhagem e envia marts e linhagem ao bucket público")
+    site = sub.add_parser("site", help="gera os arquivos do site público a partir do dbt")
+    site.add_argument(
+        "--esquemas", type=Path, default=Path("site/esquemas"), help="JSON Schemas do site"
+    )
+
+    sub.add_parser("publicar", help="gera a linhagem e envia marts, linhagem e site ao R2")
 
     reconstruir = sub.add_parser(
         "reconstruir", help="refaz os históricos a partir dos originais no bucket"
@@ -173,7 +181,9 @@ def _pipeline(
         criadas = garantir_fontes(deps.config.lago, carregar_esquemas(args.dbt_dir))
         if criadas:
             log.warning("fontes ainda sem dados (Parquet vazio criado): %s", ", ".join(criadas))
-        return rodar_dbt_(args.dbt_dir, args.target, deps.config.publico)
+        return rodar_dbt_(
+            args.dbt_dir, args.target, deps.config.publico, ["--exclude", *SELECAO_SITE]
+        )
 
     return _rodar_tarefas(
         tarefas,
@@ -263,6 +273,25 @@ def _publicar(args: argparse.Namespace, deps: Dependencias, env: Mapping[str, st
     return 0
 
 
+def _site(args: argparse.Namespace, env: Mapping[str, str], rodar_dbt_: RodarDbt) -> int:
+    """Roda os modelos do site no dbt e grava `ELEITORADO_PUBLICO/site`; não usa o GCP."""
+    from coletor.site import ErroSite, gerar_site
+
+    lago = Path(env.get("ELEITORADO_LAGO", "dados"))
+    publico = Path(env.get("ELEITORADO_PUBLICO", "dados/publico"))
+    resultado = rodar_dbt_(args.dbt_dir, args.target, publico, ["--select", *SELECAO_SITE])
+    if resultado.status != "sucesso":
+        log.error("dbt dos modelos do site falhou: %s", resultado)
+        return 1
+    try:
+        quantidade = gerar_site(banco_do_target(lago, args.target), publico, args.esquemas)
+    except ErroSite as erro:
+        log.error("site não gerado: %s", erro)
+        return 1
+    log.info("site: %d arquivo(s) em %s", quantidade, publico / "site")
+    return 0
+
+
 def _reconstruir(
     args: argparse.Namespace,
     manifesto: Manifesto,
@@ -340,6 +369,8 @@ def main(
     args = _parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     env = os.environ if env is None else env
+    if args.comando == "site":
+        return _site(args, env, dbt or rodar_dbt)
     deps: Dependencias | None = None
     try:
         config = carregar_config(env)
