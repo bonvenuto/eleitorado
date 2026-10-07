@@ -17,6 +17,7 @@ from coletor.adaptadores.base import ErroColeta, Extracao
 from coletor.conversao import Controle, csv_para_parquet
 from coletor.hashes import json_canonico, sha256_arquivo
 from coletor.manifesto import RecursoCompleto
+from coletor.tse.durabilidade import gravar_json, ler_json_conferido, sincronizar_pasta
 from coletor.tse.modelos import FamiliaTse, VersaoTse
 
 
@@ -103,49 +104,87 @@ def gravar_versao(
                 ):
                     raise ErroColeta("integridade do raw TSE divergente")
             return versao
-        # Falhar antes de converter, inclusive se uma interrupção deixou raw sem descritor.
-        if any((lago / caminho).exists() for caminho in caminhos.values()):
-            raise ErroColeta("colisão de caminho raw TSE sem descritor íntegro")
-        contagens = {}
-        hashes_parquet = {}
-        for familia in familias:
-            parquet = pasta / f"{familia.familia}.parquet"
-            resultado = csv_para_parquet(familia.csv, parquet, recurso.recurso.formato, controle)
-            contagens[familia.familia] = resultado.linhas
-            hashes_parquet[familia.familia] = sha256_arquivo(parquet)
-        dados = {
-            **asdict(versao),
-            "url": extracao.url,
-            "arquivo_original": controle.arquivo_original,
-            "coleta_id": controle.coleta_id,
-            "geracoes": geracoes,
-            "contagens": contagens,
-            "hashes_parquet": hashes_parquet,
-            "membros": {f.familia: f.membro for f in familias},
-        }
-        criados = []
-        try:
-            for familia, caminho in caminhos.items():
-                destino = lago / caminho
-                destino.parent.mkdir(parents=True, exist_ok=True)
-                with destino.open("xb") as saida:
-                    criados.append(destino)
-                    with (pasta / f"{familia}.parquet").open("rb") as origem:
+        tentativa = lago / "estado/tse/tentativas" / versao_id
+        if not tentativa.exists():
+            if any((lago / caminho).exists() for caminho in caminhos.values()):
+                raise ErroColeta("colisão de caminho raw TSE sem tentativa durável")
+            tentativa.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(
+                prefix=".preparacao-", dir=tentativa.parent
+            ) as preparo:
+                duravel = Path(preparo)
+                contagens = {}
+                hashes_parquet = {}
+                for familia in familias:
+                    parquet = duravel / f"{familia.familia}.parquet"
+                    resultado = csv_para_parquet(
+                        familia.csv, parquet, recurso.recurso.formato, controle
+                    )
+                    # Fecha a cópia antes do fsync e antes de tornar a tentativa instalável.
+                    copia = duravel / f"{familia.familia}.copia"
+                    with parquet.open("rb") as origem, copia.open("xb") as saida:
                         shutil.copyfileobj(origem, saida)
-            descritor.parent.mkdir(parents=True, exist_ok=True)
-            # O nome definitivo só aparece após todo o JSON estar pronto e sincronizado.
-            with tempfile.NamedTemporaryFile(dir=descritor.parent, delete=False) as saida:
-                temporario_descritor = Path(saida.name)
-                saida.write(json_canonico(dados).encode("utf-8"))
-                saida.flush()
-                os.fsync(saida.fileno())
-            try:
-                os.link(temporario_descritor, descritor)
-                criados.append(descritor)
-            finally:
-                temporario_descritor.unlink(missing_ok=True)
-        except Exception:
-            for criado in reversed(criados):
-                criado.unlink(missing_ok=True)
-            raise
+                        saida.flush()
+                        os.fsync(saida.fileno())
+                    os.replace(copia, parquet)
+                    contagens[familia.familia] = resultado.linhas
+                    hashes_parquet[familia.familia] = sha256_arquivo(parquet)
+                dados = {
+                    **asdict(versao),
+                    "url": extracao.url,
+                    "arquivo_original": controle.arquivo_original,
+                    "coleta_id": controle.coleta_id,
+                    "geracoes": geracoes,
+                    "contagens": contagens,
+                    "hashes_parquet": hashes_parquet,
+                    "membros": {f.familia: f.membro for f in familias},
+                }
+                controles = {
+                    "coleta_id": controle.coleta_id,
+                    "competencia": controle.competencia,
+                    "competencia_data": controle.competencia_data.isoformat(),
+                    "arquivo_original": controle.arquivo_original,
+                    "carregado_em": controle.carregado_em.isoformat(),
+                }
+                gravar_json(
+                    duravel / "manifesto.json",
+                    {"protocolo": "tse:tentativa:v1", "descritor": dados, "controle": controles},
+                    checksum=True,
+                )
+                sincronizar_pasta(duravel)
+                if tentativa.exists():
+                    raise ErroColeta("colisão de tentativa TSE concorrente")
+                os.rename(duravel, tentativa)
+                sincronizar_pasta(tentativa.parent)
+        manifesto = ler_json_conferido(tentativa / "manifesto.json")
+        dados = manifesto["descritor"]
+        controles = manifesto["controle"]
+        if manifesto["protocolo"] != "tse:tentativa:v1" or any(
+            dados.get(c) != v for c, v in asdict(versao).items()
+        ):
+            raise ErroColeta("colisão no manifesto da tentativa TSE")
+        if (
+            controles["coleta_id"] != dados["coleta_id"]
+            or controles["arquivo_original"] != dados["arquivo_original"]
+            or controles["competencia"] != extracao.competencia.rotulo
+            or controles["competencia_data"] != extracao.competencia.data.isoformat()
+            or controles["arquivo_original"] != controle.arquivo_original
+        ):
+            raise ErroColeta("controles da tentativa TSE divergentes")
+        # Confere todas as fontes e todos os destinos antes de retomar qualquer instalação.
+        for familia, caminho in caminhos.items():
+            preparado = tentativa / f"{familia}.parquet"
+            esperado = dados["hashes_parquet"][familia]
+            if not preparado.is_file() or sha256_arquivo(preparado) != esperado:
+                raise ErroColeta("integridade da preparação durável TSE divergente")
+            destino = lago / caminho
+            if destino.exists() and (not destino.is_file() or sha256_arquivo(destino) != esperado):
+                raise ErroColeta("colisão de raw com tentativa durável TSE")
+        for familia, caminho in caminhos.items():
+            destino = lago / caminho
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            if not destino.exists():
+                os.link(tentativa / f"{familia}.parquet", destino)
+            sincronizar_pasta(destino.parent)
+        gravar_json(descritor, dados)
     return versao

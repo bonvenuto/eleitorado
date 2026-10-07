@@ -16,6 +16,7 @@ from coletor.hashes import json_canonico
 from coletor.http import ErroHttp
 from coletor.manifesto import RecursoCompleto
 from coletor.meta import HistoricoColetas, RegistroColeta
+from coletor.tse.originais import arquivar_original
 from coletor.tse.validacoes import gravar_avaliacao, rejeicoes_pendentes
 from coletor.tse.versoes import gravar_versao, id_versao
 
@@ -49,6 +50,9 @@ def coletar_tse(
             registro.bytes_arquivo = extracao.bytes_arquivo
             registro.sha256_arquivo = extracao.sha256_arquivo
             versao_id = id_versao(recurso, extracao)
+            registro.arquivo_original = arquivar_original(
+                deps.config.lago, recurso, extracao, deps.armazenamento, deps.config.prefixo_gcs
+            )
             contrato = "tse:estrutura:v1"
             entradas_digest = hashlib.sha256(
                 json_canonico(
@@ -78,6 +82,7 @@ def coletar_tse(
                     execucao_id=execucao_id,
                     resultado="rejeitada",
                     motivos=[{"codigo": "zip_layout_invalido", "detalhe": str(erro)}],
+                    evidencia=registro.arquivo_original,
                 )
                 raise
             if rejeicoes_pendentes(
@@ -90,18 +95,6 @@ def coletar_tse(
                 raise ErroColeta("versão possui rejeição estrutural pendente de decisão explícita")
             descritor = deps.config.lago / "estado/tse/versoes" / f"{versao_id}.json"
             repetida = descritor.exists()
-            if repetida:
-                registro.arquivo_original = json.loads(descritor.read_text(encoding="utf-8"))[
-                    "arquivo_original"
-                ]
-            else:
-                caminho = (
-                    f"{deps.config.prefixo_gcs}originais/tse/{recurso.recurso.id}/"
-                    f"{extracao.competencia.rotulo}/{extracao.sha256_arquivo}.zip"
-                )
-                registro.arquivo_original = deps.armazenamento.enviar(
-                    extracao.arquivo_original, caminho
-                )
             controle = Controle(
                 registro.coleta_id,
                 extracao.competencia.rotulo,

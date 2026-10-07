@@ -229,7 +229,7 @@ def test_falha_transitoria_permite_recuperar(tmp_path, deps, respx_mock):
     assert not any(a["resultado"] == "rejeitada" for a in avaliacoes)
 
 
-def test_falha_ao_instalar_raw_remove_so_arquivos_da_tentativa(tmp_path, monkeypatch):
+def test_falha_ao_preparar_tentativa_preserva_raw_e_permite_repetir(tmp_path, monkeypatch):
     from coletor.tse import versoes
 
     lago = tmp_path / "lago"
@@ -249,7 +249,7 @@ def test_falha_ao_instalar_raw_remove_so_arquivos_da_tentativa(tmp_path, monkeyp
     monkeypatch.setattr(versoes.shutil, "copyfileobj", falhar)
     with pytest.raises(OSError, match="disco indisponível"):
         gravar_versao(lago, *args)
-    assert len(list(lago.rglob("*.parquet"))) == 1
+    assert len(list(lago.glob("raw/**/*.parquet"))) == 1
     assert (lago / anterior.familias["bens"]).read_bytes() == preservado
     monkeypatch.setattr(versoes.shutil, "copyfileobj", copiar)
     recuperada = gravar_versao(lago, *args)
@@ -347,3 +347,131 @@ def test_raw_orfao_sem_descritor_falha_preservando_bytes(tmp_path, deps, respx_m
     assert orfao.read_bytes() == b"copia interrompida"
     assert not list(deps.config.lago.glob("estado/tse/versoes/*.json"))
     assert not list(deps.config.lago.glob("estado/tse/validacoes/*.json"))
+
+
+@pytest.mark.parametrize(
+    "momento", ["antes_raw", "entre_familias", "antes_descritor", "depois_descritor"]
+)
+def test_interrupcao_retoma_tentativa_duravel(tmp_path, monkeypatch, momento):
+    from coletor.tse import versoes
+
+    lago = tmp_path / "lago"
+    anterior = gravar_versao(lago, *entrada(tmp_path / "anterior"))
+    preservado = (lago / anterior.familias["bens"]).read_bytes()
+    args = entrada(tmp_path / "entrada", recurso_id="contas")
+    link = versoes.os.link
+    instalados = 0
+
+    class Interrupcao(BaseException):
+        pass
+
+    def interromper(origem, destino):
+        nonlocal instalados
+        destino = str(destino).replace("\\", "/")
+        if "/raw/tse/" in destino:
+            instalados += 1
+            if (momento == "entre_familias" and instalados == 2) or momento == "antes_raw":
+                raise Interrupcao()
+        if "/estado/tse/versoes/" in destino and momento == "antes_descritor":
+            raise Interrupcao()
+        link(origem, destino)
+        if "/estado/tse/versoes/" in destino and momento == "depois_descritor":
+            raise Interrupcao()
+
+    monkeypatch.setattr(versoes.os, "link", interromper)
+    with pytest.raises(Interrupcao):
+        gravar_versao(lago, *args)
+    monkeypatch.setattr(versoes.os, "link", link)
+    recuperada = gravar_versao(lago, *args[:-1], replace(args[-1], coleta_id="retomada"))
+    assert len(recuperada.familias) == 4
+    for caminho in recuperada.familias.values():
+        tabela = pq.read_table(lago / caminho)
+        assert tabela.column("_coleta_id").to_pylist() == ["coleta-1"]
+    assert (lago / anterior.familias["bens"]).read_bytes() == preservado
+    assert len(list(lago.glob("estado/tse/tentativas/*/manifesto.json"))) == 2
+
+
+def test_zip_rejeitado_arquivado_sem_duplicacao(tmp_path, deps, respx_mock):
+    recurso = RecursoCompleto("tse", recurso_tse("bens"))
+    deps.config = replace(deps.config, lago=tmp_path / "lago")
+    corpo = zip_tse({"bem_candidato_2024_BRASIL.csv": b"layout invalido"})
+    respx_mock.get(recurso.recurso.url.format(ano=2024)).mock(
+        return_value=httpx.Response(200, content=corpo)
+    )
+    enviar = deps.armazenamento.enviar
+    chamadas = []
+
+    def contar(origem, caminho):
+        chamadas.append(caminho)
+        return enviar(origem, caminho)
+
+    deps.armazenamento.enviar = contar
+    for execucao in ("exec-1", "exec-2"):
+        registro = coletar(recurso, Competencia.de_ano(2024), HistoricoColetas(), deps, execucao)
+        assert registro.status == "falha"
+        assert registro.arquivo_original.startswith("gs://bucket-teste/")
+    assert len(chamadas) == 1
+    assert len(deps.armazenamento.objetos) == 1
+    assert next(iter(deps.armazenamento.objetos.values())).read_bytes() == corpo
+    assert not list(deps.config.lago.glob("estado/tse/versoes/*.json"))
+    assert not list(deps.config.lago.glob("raw/**/*.parquet"))
+    for caminho in deps.config.lago.glob("estado/tse/validacoes/*.json"):
+        avaliacao = json.loads(caminho.read_text(encoding="utf-8"))
+        assert avaliacao["evidencia"] == registro.arquivo_original
+
+
+@pytest.mark.parametrize("defeito", ["manifesto", "parquet"])
+def test_tentativa_duravel_corrompida_nao_adota_raw(tmp_path, monkeypatch, defeito):
+    from coletor.tse import versoes
+
+    lago = tmp_path / "lago"
+    args = entrada(tmp_path / "entrada", recurso_id="contas")
+    link = versoes.os.link
+
+    class Interrupcao(BaseException):
+        pass
+
+    def interromper(origem, destino):
+        if "/raw/tse/" in str(destino).replace("\\", "/"):
+            raise Interrupcao()
+        link(origem, destino)
+
+    monkeypatch.setattr(versoes.os, "link", interromper)
+    with pytest.raises(Interrupcao):
+        gravar_versao(lago, *args)
+    monkeypatch.setattr(versoes.os, "link", link)
+    tentativa = next((lago / "estado/tse/tentativas").iterdir())
+    if defeito == "manifesto":
+        manifesto = tentativa / "manifesto.json"
+        envelope = json.loads(manifesto.read_text(encoding="utf-8"))
+        envelope["dados"]["controle"]["coleta_id"] = "alheia"
+        manifesto.write_text(json.dumps(envelope), encoding="utf-8")
+    else:
+        next(tentativa.glob("*.parquet")).write_bytes(b"corrompido")
+    with pytest.raises(ErroColeta, match="integridade"):
+        gravar_versao(lago, *args)
+    assert not list(lago.glob("raw/**/*.parquet"))
+    assert not list(lago.glob("estado/tse/versoes/*.json"))
+
+
+def test_interrupcao_apos_instalar_tentativa_retoma(tmp_path, monkeypatch):
+    from coletor.tse import versoes
+
+    lago = tmp_path / "lago"
+    args = entrada(tmp_path / "entrada")
+    renomear = versoes.os.rename
+
+    class Interrupcao(BaseException):
+        pass
+
+    def interromper(origem, destino):
+        renomear(origem, destino)
+        raise Interrupcao()
+
+    monkeypatch.setattr(versoes.os, "rename", interromper)
+    with pytest.raises(Interrupcao):
+        gravar_versao(lago, *args)
+    monkeypatch.setattr(versoes.os, "rename", renomear)
+    assert not list(lago.glob("raw/**/*.parquet"))
+    recuperada = gravar_versao(lago, *args)
+    assert pq.read_table(lago / recuperada.familias["bens"]).num_rows == 1
