@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+
+/*
+ * Tokens de site/DESIGN.md, com as adaptações do topo daquele arquivo. A paleta padrão do
+ * Tailwind sai inteira: só existem as cores abaixo, e nenhuma é vermelha (alerta é indício, não
+ * acusação). O espaçamento é a escala padrão do Tailwind (1 = 4px), igual à do DESIGN.md.
+ */
+@theme {
+  --color-*: initial;
+  --color-void-canvas: #0a0a0a;
+  --color-graphite: #161616;
+  --color-frosted-glass: #d4d4d4;
+  --color-ink-black: #000000;
+  --color-snow-white: #ffffff;
+  --color-bone: #ededed;
+  --color-ash: #c2c2c2;
+  --color-slate: #686868;
+  --color-smoke: #b2b2b2;
+  --color-hairline: #e5e5e5;
+  --color-dusk-violet: #6b62f2;
+  /* única cor de sinalização: selos e marcações pequenas, nunca fundo grande nem texto corrido */
+  --color-alerta: #f2a65a;
+  /* gradiente da capa (âmbar → cobalto), escurecido para o texto branco passar de 4,5:1 */
+  --color-capa-inicio: #6b4423;
+  --color-capa-fim: #1e3a8a;
+
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-geist: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --text-caption: 13px;
+  --text-caption--line-height: 1.5;
+  --text-caption--letter-spacing: 0.33px;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-subheading: 18px;
+  --text-subheading--line-height: 1.5;
+  --text-heading-sm: 24px;
+  --text-heading-sm--line-height: 1.33;
+  --text-heading: 36px;
+  --text-heading--line-height: 1.11;
+  --text-heading-lg: 48px;
+  --text-heading-lg--line-height: 1;
+  --text-display-celular: 40px;
+  --text-display-celular--line-height: 1.05;
+  --text-display-celular--letter-spacing: -0.035em;
+  --text-display: 72px;
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -2.52px;
+
+  --radius-icone: 4px;
+  --radius-ui: 10px;
+  --radius-nav: 19px;
+  --radius-cartao: 24px;
+  --radius-cartao-grande: 40px;
+  --radius-painel: 42px;
+
+  --shadow-sutil: rgba(255, 255, 255, 0.1) 0px 0px 0px 1px inset;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-void-canvas);
+    color: var(--color-bone);
+    font-family: var(--font-sans);
+    color-scheme: dark;
+  }
+
+  a {
+    text-decoration-line: underline;
+    text-underline-offset: 3px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-snow-white);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+/* selo de alerta: a única marcação em âmbar */
+@utility selo-alerta {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-alerta);
+  border-radius: 9999px;
+  color: var(--color-alerta);
+  padding: 2px 10px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  letter-spacing: 0.33px;
+}
