@@ -101,3 +101,18 @@
   {%- endif -%}
   {{- saida ~ '/' ~ nome ~ '.parquet' -}}
 {%- endmacro -%}
+
+{# Identidade exclusivamente privada: inclui atributos sensíveis de negócio.
+   JSON distingue NULL, vazio e delimitadores. Ocorrências idênticas são intercambiáveis;
+   a sequência 1..N é estável dentro da exportação, sem ordenar por coleta ou geração.
+   A origem particiona a ocorrência, mas não entra no hash: cópias têm os mesmos IDs. #}
+{% macro tse_linha_id(familia, chaves, campos_negocio) -%}
+  {% set valores = ["'" ~ familia.replace("'", "''") ~ "'"] %}
+  {% for campo in chaves + campos_negocio %}
+    {% do valores.append('cast(' ~ campo ~ ' as varchar)') %}
+  {% endfor %}
+  {% set conteudo = 'to_json(list_value(' ~ valores | join(', ') ~ '))' %}
+  md5({{ conteudo }}) || '-' || cast(
+    row_number() over (partition by {{ conteudo }}, ano_arquivo, versao_id) as varchar
+  )
+{%- endmacro %}
