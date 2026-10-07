@@ -1,6 +1,6 @@
 # Site público
 
-Frontend estático do eleitorado (Vite + React + TypeScript), publicado pelo Cloudflare Pages a
+Frontend estático do eleitorado (Vite + React + TypeScript), publicado pela Cloudflare (Workers com assets, ver `wrangler.jsonc`) a
 cada push na `main`. Ele só lê os arquivos JSON que o pipeline publica em `site/` no R2.
 
 - Desenho: `docs/superpowers/specs/2026-10-07-site-publico-design.md`.
