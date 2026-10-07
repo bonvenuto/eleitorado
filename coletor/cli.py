@@ -72,6 +72,11 @@ def _parser() -> argparse.ArgumentParser:
 
     estado = sub.add_parser("estado", help="sincroniza o lago local com o bucket privado")
     estado.add_argument("acao", choices=["restaurar", "salvar"])
+    estado.add_argument(
+        "--aditivo",
+        action="store_true",
+        help="salvar: só envia arquivos novos de raw/ e meta/ (nunca apaga nem sobrescreve)",
+    )
 
     sub.add_parser("publicar", help="gera a linhagem e envia marts e linhagem ao bucket público")
 
@@ -234,7 +239,9 @@ def _estado(args: argparse.Namespace, deps: Dependencias) -> int:
     if args.acao == "restaurar":
         estado.restaurar(deps.armazenamento, config.prefixo_gcs, config.lago, banco)
     else:
-        estado.salvar(deps.armazenamento, config.prefixo_gcs, config.lago, banco)
+        estado.salvar(
+            deps.armazenamento, config.prefixo_gcs, config.lago, banco, aditivo=args.aditivo
+        )
     return 0
 
 

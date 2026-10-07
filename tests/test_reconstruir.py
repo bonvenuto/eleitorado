@@ -157,6 +157,20 @@ def test_estado_pela_cli_usa_o_prefixo_do_ambiente(deps_lago, armazenamento):
     assert arquivo.read_bytes() == b"x"
 
 
+def test_estado_salvar_aditivo_pela_cli_nao_apaga_o_que_o_lago_nao_tem(
+    deps_lago, armazenamento, tmp_path
+):
+    outro = tmp_path / "outro.parquet"
+    outro.write_bytes(b"do pipeline")
+    armazenamento.substituir(outro, "dev/raw/cgu/cnep/20261001/p.parquet")
+    arquivo = deps_lago.config.lago / "raw" / "rfb" / "empresas" / "202609" / "r.parquet"
+    arquivo.parent.mkdir(parents=True)
+    arquivo.write_bytes(b"x")
+    assert _rodar(["estado", "salvar", "--aditivo"], deps_lago) == 0
+    assert "dev/raw/rfb/empresas/202609/r.parquet" in armazenamento.objetos
+    assert "dev/raw/cgu/cnep/20261001/p.parquet" in armazenamento.objetos
+
+
 def test_publicar_sem_credenciais_do_r2_falha_antes_de_tudo(deps_lago, capsys):
     assert _rodar(["publicar"], deps_lago) == 2
     assert "R2_CONTA" in capsys.readouterr().err
