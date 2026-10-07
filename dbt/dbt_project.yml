@@ -22,6 +22,20 @@ models:
       +materialized: external
       +options:
         compression: zstd
+    # site público: arquivos JSON montados no SQL (coletor site), só a partir de marts e seeds
+    site:
+      +schema: site
+      +materialized: table
+
+seeds:
+  eleitorado:
+    +schema: site
+
+vars:
+  site_max_alertas: 200 # alertas por parlamentar ou empresa no arquivo (o total vai junto)
+  site_top: 20 # itens das listas de maiores fornecedores, favorecidos, autores e órgãos
+  site_busca_max: 5000 # empresas num bloco de busca antes de subdividir em 4 letras
+  site_alertas_por_pagina: 500
 
 flags:
   send_anonymous_usage_stats: false
