@@ -38,7 +38,9 @@ def tarefas_pendentes(
             if _vencida(historico.ultima_data_sucesso(rc.id), hoje, regra.cadencia.corrente):
                 tarefas.append(tarefa_snapshot(rc, hoje))
             continue
-        assert regra.competencia.inicio is not None and regra.cadencia.anteriores is not None
+        assert (
+            regra.competencia.inicio is not None or regra.competencia.anos is not None
+        ) and regra.cadencia.anteriores is not None
         do_recurso: list[Tarefa] = []
         if regra.competencia.tipo == "dia":
             ontem = hoje - timedelta(days=1)
@@ -66,7 +68,12 @@ def tarefas_pendentes(
                 ):
                     do_recurso.append(Tarefa(rc, competencia))
         else:
-            for ano in anos(regra.competencia.inicio, hoje):
+            anos_do_recurso = (
+                regra.competencia.anos
+                if regra.competencia.anos is not None
+                else anos(regra.competencia.inicio, hoje)
+            )
+            for ano in anos_do_recurso:
                 cadencia = (
                     regra.cadencia.corrente if ano == hoje.year else regra.cadencia.anteriores
                 )
