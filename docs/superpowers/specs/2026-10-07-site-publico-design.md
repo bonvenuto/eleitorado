@@ -1,7 +1,7 @@
 # Site público: design
 
 Data: 2026-10-07
-Status: em revisão
+Status: aprovado (com os ajustes do protótipo, seção 11)
 
 ## 1. Objetivo
 
@@ -62,9 +62,9 @@ flowchart LR
 Links oficiais:
 - Deputado: `https://www.camara.leg.br/deputados/<id>`.
 - Senador: `https://www25.senado.leg.br/web/senadores/senador/-/perfil/<id>`.
-- Empresa: Portal da Transparência (`https://portaldatransparencia.gov.br/pessoa-juridica/<cnpj da matriz>`).
+- Empresa: busca do Portal da Transparência (`https://portaldatransparencia.gov.br/busca?termo=<cnpj da matriz>`).
 
-O protótipo confirma os três formatos.
+Os dois primeiros foram confirmados no protótipo. O Portal recusa clientes que não são navegador (405), então o link da empresa é conferido no navegador durante o plano 11.
 
 ## 4. Dados do site
 
@@ -101,11 +101,12 @@ Regras de agregação:
 
 ### 4.2 Arquivos
 
-Todo arquivo tem `"esquema": 1` e `"gerado_em"` (ISO 8601).
+Todo arquivo tem `"esquema": 1`. Só o `resumo.json` tem `"gerado_em"` (ISO 8601): com a data
+em todo arquivo, todos mudariam todo dia e o envio incremental não serviria (protótipo).
 
 | Caminho | Conteúdo | Quantidade estimada |
 |---|---|---|
-| `resumo.json` | `dados_ate` (última data de cada fonte), `totais`, `alerta_tipos` (do seed, com a quantidade de cada um), `alertas_recentes` (20), `fontes` (`monitor_fontes`), `fontes_reduzidas` (`alerta_fonte_reduzida`) | 1 |
+| `resumo.json` | `gerado_em`, `dados_ate` (última data de cada fonte), `totais`, `alerta_tipos` (do seed, com a quantidade de cada um), `alertas_recentes` (20), `fontes` (`monitor_fontes`), `fontes_reduzidas` (`alerta_fonte_reduzida`) | 1 |
 | `busca/parlamentares.json` | `parlamentares`: `id`, `nome`, `casa`, `uf`, `partido`, `foto`, `legislaturas` | 1 |
 | `busca/empresas/<abc>.json` | `prefixo`, `empresas`: `raiz`, `nome`, `uf`, `situacao` das empresas com alguma palavra da razão social começando por `<abc>` (3 primeiros caracteres, sem acento, minúsculos) | alguns milhares |
 | `parlamentar/<casa>-<id>.json` | `parlamentar` (de `dim_parlamentar` + `url_oficial`), `cota` (`total`, `por_ano`, `por_categoria`, `fornecedores`), `emendas` (`total_pago`, `por_ano`, `favorecidos`), `alertas` | ~2.500 |
@@ -114,11 +115,13 @@ Todo arquivo tem `"esquema": 1` e `"gerado_em"` (ISO 8601).
 
 Busca de empresa:
 - Palavras ignoradas no índice: `ltda`, `me`, `epp`, `eireli`, `sa`, `s/a`, `cia`, `de`, `da`, `do`, `das`, `dos`, `e`, `comercio`, `servicos`, `industria`.
-- O site baixa o bloco das 3 primeiras letras da primeira palavra digitada que não está na lista e filtra no navegador pelas demais palavras (prefixo, sem acento).
+- Só palavras com 3 caracteres ou mais entram no índice.
+- O site baixa o bloco das 3 primeiras letras da primeira palavra digitada (com 3 ou mais caracteres e fora da lista) e filtra no navegador por todas as palavras digitadas (prefixo, sem acento).
+- Bloco com mais de 5.000 empresas é subdividido: o arquivo de 3 caracteres traz só `"subdividido": true`, e as empresas vão para blocos de 4 caracteres (`busca/empresas/<abcd>.json`); o site então usa as 4 primeiras letras (com 3 letras digitadas, pede mais uma).
 - Consulta com 8 ou 14 caracteres de CNPJ (com ou sem pontuação) vai direto para `/empresa/<raiz>`.
 
-Limites de tamanho (verificados no protótipo):
-- Nenhum arquivo passa de 1 MB.
+Limites de tamanho (seção 11):
+- Nenhum arquivo passa de 2 MB descomprimido nem de 500 KB em gzip.
 - Se um parlamentar ou uma empresa tiver alertas demais, o arquivo traz os 200 mais recentes e o `total`; o resto fica em `/alertas`.
 
 ### 4.3 Formato comum de alerta
@@ -150,7 +153,8 @@ Cada item de `alertas` (em qualquer arquivo):
 ## 5. Pipeline e publicação
 
 - **`coletor site`:**
-  - lê `site_arquivos` do DuckDB e grava cada linha em `<ELEITORADO_PUBLICO>/site/<caminho>`, em UTF-8;
+  - lê `site_arquivos` do DuckDB e grava cada linha em `<ELEITORADO_PUBLICO>/site/<caminho>`, em UTF-8 comprimido com gzip (`mtime=0`);
+  - falha se algum arquivo passar dos limites da seção 4.2;
   - antes, apaga `site/` inteira, para que um arquivo que deixou de existir não fique para trás;
   - recusa caminhos com `..` ou absolutos.
 - **`pipeline.yml`:** os modelos `site_*` rodam no mesmo `dbt build`. O `coletor site` roda logo depois, só se o dbt passou (inclusive na saída 3, em que os marts são publicados).
@@ -158,7 +162,8 @@ Cada item de `alertas` (em qualquer arquivo):
   - `PERMITIDOS` ganha `site/`;
   - o `manifesto.json` continua listando só `marts/` e `linhagem/`;
   - o envio passa a ser **incremental**: compara o MD5 local com o ETag do objeto no R2 (uploads simples, sem multipart, têm ETag = MD5) e só envia o que mudou. Isso vale para todos os arquivos e evita reenviar milhares de JSON por dia.
-  - arquivos de `site/` saem com `Cache-Control: public, max-age=600`.
+  - arquivos de `site/` saem com `Cache-Control: public, max-age=600`;
+  - os JSON de `site/` são gravados já em gzip, de forma determinística (`mtime=0`), e enviados com `Content-Encoding: gzip`. O `r2.dev` não comprime sozinho (verificado), e o navegador descomprime de forma transparente. O ETag é então o MD5 dos bytes comprimidos, que é o que o envio incremental compara.
 - **CORS no bucket R2** (configuração única do usuário, no painel da Cloudflare): `GET` e `HEAD` para `https://eleitorado.pages.dev`, `https://*.eleitorado.pages.dev` (prévias) e `http://localhost:5173`.
 
 ## 6. Frontend
@@ -254,9 +259,33 @@ Cada item de `alertas` (em qualquer arquivo):
    - tudo em `site/`, desenvolvido contra `site/exemplos/`;
    - executado por uma sessão do Claude Code na nuvem, com PR e CI verde; o merge é do usuário.
 
-## 11. Protótipo
+## 11. Protótipo (2026-10-07)
 
-Preenchida com as medições do protótipo, antes do plano 10 (como na onda C1).
+Consultas no formato da seção 4 em DuckDB, sobre os marts públicos baixados do R2 (manifesto de
+2026-10-06 21:08 UTC). Os marts da C1 ainda não estavam publicados: as empresas vieram do raw
+local da Receita (competência 2026-09, aproximação de `dim_empresa`) e os quatro alertas da C1
+ficaram de fora, então os arquivos de empresa vão crescer um pouco.
+
+| Grupo | Arquivos | Total | Mediana | Maior (descomprimido / gzip) |
+|---|---|---|---|---|
+| `parlamentar/` | 2.495 | 17,7 MB | 4,7 KB | 134 KB / 9 KB |
+| `empresa/` (blocos de 3 caracteres da raiz) | 985 | 165,7 MB | 110 KB | 1,04 MB / 117 KB (bloco `113`, 1.268 empresas) |
+| `busca/empresas/` (3 caracteres) | 10.403 | 73,7 MB | 0,3 KB | 1,93 MB / 339 KB (`com`, 20.331 empresas) |
+| `busca/parlamentares.json` | 1 | 0,44 MB | — | 441 KB / 54 KB |
+| `alertas/` (500 por página) | 72 | 20,1 MB | 294 KB | 315 KB / 19 KB |
+
+- **Total:** 13.956 arquivos, 277 MB descomprimidos e 43 MB em gzip. Tudo gerado em 46 s (4 threads, limite de 3 GB).
+- **Ajustes que entraram na spec:**
+  - JSON em gzip com `Content-Encoding`, porque o `r2.dev` não comprime;
+  - `gerado_em` só no `resumo.json`;
+  - limites de 2 MB descomprimido e 500 KB em gzip;
+  - subdivisão dos blocos de busca com mais de 5.000 empresas (`com`, `pos`, `mun`, `con`, `ass`, `aut`, `pro`, `fun` passam de 10 mil);
+  - só palavras com 3 ou mais caracteres no índice.
+- **Maior empresa:** 136 KB (MANUPA, 964 alertas antes do corte em 200). Com o corte, nenhuma passa de ~60 KB.
+- **ETag do R2 = MD5 do conteúdo:** confirmado no `manifesto.json`.
+- **`r2.dev` responde 403 ao `urllib` do Python** sem `User-Agent`. Isso não afeta navegadores, mas scripts e testes de integração precisam enviar um `User-Agent`.
+- **`data_emissao_valida`** não existe nos marts publicados em 2026-10-06 (eles são anteriores ao PR #30). Os modelos `site_*` usam a coluna normalmente, porque o lago atual a tem.
+- **Links oficiais:** Câmara e Senado responderam 200. O Portal da Transparência responde 405 a clientes que não são navegador, então o link da empresa usa a busca do Portal.
 
 ## 12. Riscos
 
