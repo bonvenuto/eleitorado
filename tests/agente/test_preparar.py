@@ -589,3 +589,91 @@ def test_teste_generico_privacidade_alterado_refaz_c2(c2):
     regra.write_text("regra alterada")
     assert preparar(config, {}, construtor_c2(config, chamadas), lambda: AGORA).dbt_rodou
     assert len(chamadas) == 2
+
+
+def test_sync_diretorio_apos_replace_antes_build_e_liberacao(c2, monkeypatch):
+    import agente.preparar as modulo
+
+    config, _ = c2
+    eventos = []
+    original_replace = modulo.os.replace
+    original_unlink = Path.unlink
+
+    def substituir(origem, destino):
+        original_replace(origem, destino)
+        if Path(destino).name in ("preparo-c2-pendente.json", "preparo.json"):
+            eventos.append(("replace", Path(destino).name))
+
+    def sincronizar(pasta):
+        assert pasta == config.lago
+        eventos.append(("sync", "lago"))
+
+    def remover(caminho, *args, **kwargs):
+        if caminho.name == "preparo-c2-pendente.json":
+            eventos.append(("unlink", caminho.name))
+        return original_unlink(caminho, *args, **kwargs)
+
+    construtor = construtor_c2(config, [])
+
+    def rodar(comando, env, cwd):
+        if "build" in comando:
+            eventos.append(("build", "agente"))
+        return construtor(comando, env, cwd)
+
+    monkeypatch.setattr(modulo.os, "replace", substituir)
+    monkeypatch.setattr(modulo, "sincronizar_pasta", sincronizar, raising=False)
+    monkeypatch.setattr(Path, "unlink", remover)
+    preparar(config, {}, rodar, lambda: AGORA)
+    assert eventos == [
+        ("replace", "preparo-c2-pendente.json"),
+        ("sync", "lago"),
+        ("build", "agente"),
+        ("replace", "preparo.json"),
+        ("sync", "lago"),
+        ("unlink", "preparo-c2-pendente.json"),
+    ]
+
+
+@pytest.mark.parametrize("etapa", ["pendencia", "marca"])
+def test_falha_sync_diretorio_bloqueia_build_ou_liberacao(c2, monkeypatch, etapa):
+    import json
+
+    import agente.preparar as modulo
+    from agente.controlador import Controlador, Dependencias
+    from tests.agente.test_controlador import ExecutorFalso
+
+    config, _ = c2
+    marca = config.lago / "preparo.json"
+    antiga = b'{"impressao":"anterior"}'
+    marca.write_bytes(antiga)
+    sincronizacoes = []
+
+    def falhar(pasta):
+        sincronizacoes.append(pasta)
+        if len(sincronizacoes) == (1 if etapa == "pendencia" else 2):
+            raise OSError("falha sync " + etapa)
+
+    monkeypatch.setattr(modulo, "sincronizar_pasta", falhar, raising=False)
+    chamadas = []
+    executor = ExecutorFalso(config, {})
+    deps = Dependencias(
+        config,
+        executor,
+        lambda: preparar(config, {}, construtor_c2(config, chamadas)),
+        lambda: AGORA,
+    )
+    controlador = Controlador(deps)
+    with pytest.raises(ErroPreparo, match="falha sync " + etapa):
+        controlador.executar(controlador.nova(None))
+    assert executor.pedidos == []
+    assert (config.lago / "preparo-c2-pendente.json").exists()
+    with pytest.raises(ValueError, match="pendente"):
+        config.diretorios_permitidos()
+    if etapa == "pendencia":
+        assert chamadas == []
+        assert marca.read_bytes() == antiga
+    else:
+        assert len(chamadas) == 1
+        # Rename já ocorreu: nova marca visível não prova persistência após falha de fsync.
+        assert marca.read_bytes() != antiga
+        assert json.loads(marca.read_bytes())["dbt"] == "sucesso"

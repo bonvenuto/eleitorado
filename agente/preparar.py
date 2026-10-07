@@ -27,6 +27,7 @@ from agente.consulta import ErroConsulta, abrir, executar
 from agente.diario import Diario
 from coletor.esquemas import ARQUIVO_ESQUEMAS, carregar_esquemas, garantir_fontes
 from coletor.hashes import json_canonico, sha256_arquivo
+from coletor.tse.durabilidade import sincronizar_pasta
 from coletor.tse.estado import validar_estado_tse
 from coletor.tse.evidencias import inventario_saida
 from coletor.tse.execucao import preparar_execucao_tse
@@ -306,6 +307,7 @@ def _gravar_marca(marca: Path, dados: dict) -> None:
             arquivo.flush()
             os.fsync(arquivo.fileno())
         os.replace(temporario, marca)
+        sincronizar_pasta(marca.parent)
     finally:
         if temporario is not None:
             temporario.unlink(missing_ok=True)
