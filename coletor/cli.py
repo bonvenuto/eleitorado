@@ -92,6 +92,11 @@ def _parser() -> argparse.ArgumentParser:
 
     publicar = sub.add_parser("publicar", help="gera linhagem e publica dados validados")
     publicar.add_argument("--execucao-tse", help="ID explicito do build C2 aprovado")
+    publicar.add_argument(
+        "--permitir-remocoes",
+        action="store_true",
+        help="aceita apagar do bucket mais marts que o limite (remoção intencional de modelos)",
+    )
 
     reconstruir = sub.add_parser(
         "reconstruir", help="refaz os históricos a partir dos originais no bucket"
@@ -198,6 +203,19 @@ def _pipeline(
     log.info("%d tarefa(s) pendente(s)", len(tarefas))
 
     def dbt() -> ResultadoDbt:
+        from coletor.publicacao import gravar_selo, remover_selo
+
+        # o selo só volta se este build passar: um build interrompido nunca é publicado
+        remover_selo(deps.config.publico)
+        resultado = _dbt()
+        if resultado.status == "sucesso":
+            gravar_selo(
+                deps.config.publico,
+                {"gravado_em": deps.agora().isoformat(), "versao": deps.config.versao},
+            )
+        return resultado
+
+    def _dbt() -> ResultadoDbt:
         from coletor.esquemas import carregar_esquemas, garantir_fontes
 
         criadas = garantir_fontes(deps.config.lago, carregar_esquemas(args.dbt_dir))
@@ -331,7 +349,13 @@ def _publicar(args: argparse.Namespace, deps: Dependencias, env: Mapping[str, st
     publicador = R2Publicador(
         env["R2_CONTA"], env["R2_CHAVE_ID"], env["R2_SEGREDO"], env["R2_BUCKET"]
     )
-    publicar(publicador, deps.config.publico, deps.agora(), deps.config.versao)
+    publicar(
+        publicador,
+        deps.config.publico,
+        deps.agora(),
+        deps.config.versao,
+        permitir_remocoes=args.permitir_remocoes,
+    )
     if recibo is not None:
         publicar_tse(publicador, preparada, selecao, deps.agora(), deps.config.versao, recibo)
     return 0

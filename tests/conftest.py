@@ -12,8 +12,10 @@ from tests.fakes import FakeArmazenamento, FakeWarehouse
 
 
 @pytest.fixture
-def config() -> Config:
+def config(tmp_path: Path) -> Config:
     return Config(
+        # o pipeline grava o selo do dbt em `publico`: fora da árvore do repositório
+        publico=tmp_path / "publico",
         projeto="projeto-teste",
         bucket="bucket-teste",
         regiao="southamerica-east1",

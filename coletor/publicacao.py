@@ -28,6 +28,11 @@ TIPOS = {
 CACHE_SITE = "public, max-age=600"
 # envios simultâneos: o site tem milhares de arquivos pequenos (o cliente do boto3 é thread-safe)
 TRABALHADORES = 16
+# Gravado pelo `coletor pipeline` só quando o dbt build passou; sem ele nada é publicado. Em
+# 31/10/2026 o runner perdeu o passo do dbt (disco cheio) e o publicar subiu um build incompleto.
+SELO = ".dbt-aprovado.json"
+# Mais remoções que isso em marts/ indica build incompleto (naquele dia, 48 marts apagados).
+LIMITE_REMOCOES_MARTS = 5
 
 
 class ErroPublicacao(Exception):
@@ -84,11 +89,22 @@ def _linhas(caminho: Path) -> int | None:
     return pq.ParquetFile(caminho).metadata.num_rows
 
 
+def remover_selo(publico: Path) -> None:
+    (publico / SELO).unlink(missing_ok=True)
+
+
+def gravar_selo(publico: Path, conteudo: Mapping[str, Any]) -> None:
+    publico.mkdir(parents=True, exist_ok=True)
+    (publico / SELO).write_text(json.dumps(dict(conteudo), ensure_ascii=False), encoding="utf-8")
+
+
 def arquivos_publicos(publico: Path) -> dict[str, Path]:
     arquivos = {
         caminho.relative_to(publico).as_posix(): caminho
         for caminho in publico.rglob("*")
-        if caminho.is_file() and not caminho.relative_to(publico).as_posix().startswith(PREFIXO_C2)
+        if caminho.is_file()
+        and not caminho.relative_to(publico).as_posix().startswith(PREFIXO_C2)
+        and caminho.relative_to(publico).as_posix() != SELO
     }
     proibidos = sorted(chave for chave in arquivos if not chave.startswith(PERMITIDOS))
     if proibidos:
@@ -119,15 +135,37 @@ def montar_manifesto(
 
 
 def publicar(
-    publicador: Publicador, publico: Path, gerado_em: datetime, versao: str
+    publicador: Publicador,
+    publico: Path,
+    gerado_em: datetime,
+    versao: str,
+    permitir_remocoes: bool = False,
 ) -> ResumoPublicacao:
     """Envia o que mudou, depois o manifesto, e só então apaga o que deixou de existir.
 
     Só envia o arquivo cujo MD5 difere do ETag no bucket. Sem `site/` local (o `coletor site`
-    falhou ou não rodou), o `site/` do bucket fica como está, com os dados anteriores.
+    falhou ou não rodou), o `site/` do bucket fica como está, com os dados anteriores. Sem o selo
+    do dbt aprovado, ou com mais de `LIMITE_REMOCOES_MARTS` marts a apagar, nada é enviado.
     """
     arquivos = arquivos_publicos(publico)
+    if not (publico / SELO).is_file():
+        raise ErroPublicacao(
+            f"sem o selo do dbt aprovado ({publico / SELO}): o último dbt build não terminou bem"
+        )
     anteriores = publicador.listar()
+    tem_site = any(chave.startswith(SITE) for chave in arquivos)
+    sobrando = sorted(
+        chave
+        for chave in set(anteriores) - set(arquivos) - {MANIFESTO}
+        if not chave.startswith(PREFIXO_C2) and (tem_site or not chave.startswith(SITE))
+    )
+    marts_sumidos = [chave for chave in sobrando if chave.startswith("marts/")]
+    if len(marts_sumidos) > LIMITE_REMOCOES_MARTS and not permitir_remocoes:
+        raise ErroPublicacao(
+            f"{len(marts_sumidos)} arquivo(s) de marts sumiriam do bucket (limite "
+            f"{LIMITE_REMOCOES_MARTS}): build incompleto? Se for intencional, use "
+            f"--permitir-remocoes. Primeiros: {', '.join(marts_sumidos[:5])}"
+        )
     pendentes = [
         (chave, caminho)
         for chave, caminho in sorted(arquivos.items())
@@ -150,12 +188,6 @@ def publicar(
         destino = Path(pasta) / MANIFESTO
         destino.write_text(json.dumps(manifesto, ensure_ascii=False, indent=1), encoding="utf-8")
         publicador.enviar(destino, MANIFESTO, TIPOS[".json"])
-    tem_site = any(chave.startswith(SITE) for chave in arquivos)
-    sobrando = sorted(
-        chave
-        for chave in set(anteriores) - set(arquivos) - {MANIFESTO}
-        if not chave.startswith(PREFIXO_C2) and (tem_site or not chave.startswith(SITE))
-    )
     for chave in sobrando:
         publicador.apagar(chave)
     inalterados = len(arquivos) - enviados

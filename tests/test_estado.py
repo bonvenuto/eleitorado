@@ -129,3 +129,75 @@ def test_salvar_aditivo_so_envia_o_que_nao_existe_e_nunca_apaga(tmp_path, gcs):
     assert gcs.objetos["estado/historicos/x.parquet"].read_bytes() == b"x"
     assert "raw/rfb/empresas/202609/r1.parquet" in gcs.objetos
     assert "meta/coletas/2026-10-07/m.parquet" in gcs.objetos
+
+
+def _meta_coletas(lago, nome, coletas):
+    """`coletas`: (coleta_id, status, finalizada_em) como o meta grava."""
+    from datetime import datetime
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    caminho = lago / "meta/coletas/2026-10-31" / f"{nome}.parquet"
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(
+        pa.table(
+            {
+                "coleta_id": [c for c, _, _ in coletas],
+                "status": [s for _, s, _ in coletas],
+                "destino": ["raw"] * len(coletas),
+                "finalizada_em": [datetime.fromisoformat(f) for _, _, f in coletas],
+            }
+        ),
+        caminho,
+    )
+
+
+def test_restaurar_deixa_so_a_coleta_mais_recente_na_particao(tmp_path, gcs):
+    # 31/10/2026: o `estado salvar` falhou depois de recoletar o CEIS de 20261030. O bucket ficou
+    # com a coleta antiga, o cache com a nova, e o restaurar juntou as duas na mesma partição.
+    banco = tmp_path / "banco.duckdb"
+    bucket = tmp_path / "bucket"
+    _arquivo(bucket, "raw/cgu/ceis/20261030/antiga.parquet", b"a")
+    _arquivo(bucket, "raw/cgu/ceis/20261029/outra.parquet", b"o")
+    _meta_coletas(bucket, "m1", [("antiga", "carregada", "2026-10-30T17:00:00")])
+    estado.salvar(gcs, PREFIXO, bucket, banco)
+    cache = tmp_path / "cache"
+    _arquivo(cache, "raw/cgu/ceis/20261030/nova.parquet", b"n")
+    _meta_coletas(cache, "m2", [("nova", "carregada", "2026-10-31T16:00:00")])
+
+    resumo = estado.restaurar(gcs, PREFIXO, cache, banco)
+
+    assert sorted(p.name for p in (cache / "raw/cgu/ceis/20261030").iterdir()) == ["nova.parquet"]
+    assert (cache / "raw/cgu/ceis/20261029/outra.parquet").exists()
+    assert resumo.consolidados == 1
+
+
+def test_restaurar_vale_a_recarga_mais_recente_e_ignora_falhas(tmp_path, gcs):
+    banco = tmp_path / "banco.duckdb"
+    lago = tmp_path / "lago"
+    _arquivo(lago, "raw/cgu/cnep/20261030/a.parquet")
+    _arquivo(lago, "raw/cgu/cnep/20261030/b.parquet")
+    _meta_coletas(
+        lago,
+        "m",
+        [
+            ("a", "recarregada", "2026-10-31T10:00:00"),
+            ("b", "carregada", "2026-10-30T10:00:00"),
+            ("b", "falha", "2026-11-01T10:00:00"),  # tentativa que falhou não vale
+        ],
+    )
+    estado.restaurar(gcs, PREFIXO, lago, banco)
+    assert [p.name for p in (lago / "raw/cgu/cnep/20261030").iterdir()] == ["a.parquet"]
+
+
+def test_restaurar_nao_escolhe_quando_o_meta_nao_conhece_a_coleta(tmp_path, gcs, caplog):
+    banco = tmp_path / "banco.duckdb"
+    lago = tmp_path / "lago"
+    _arquivo(lago, "raw/cgu/ceis/20261030/conhecida.parquet")
+    _arquivo(lago, "raw/cgu/ceis/20261030/orfa.parquet")
+    _meta_coletas(lago, "m", [("conhecida", "carregada", "2026-10-30T10:00:00")])
+    resumo = estado.restaurar(gcs, PREFIXO, lago, banco)
+    assert len(list((lago / "raw/cgu/ceis/20261030").iterdir())) == 2
+    assert resumo.consolidados == 0
+    assert "orfa" in caplog.text

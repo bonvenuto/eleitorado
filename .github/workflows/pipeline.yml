@@ -33,6 +33,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      # O spill do DuckDB nos modelos de licitação encheu o disco do runner (desde 18/10/2026);
+      # num desses dias o runner perdeu o passo do dbt. Os SDKs abaixo não são usados aqui.
+      - name: liberar disco
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift
+          sudo docker image prune --all --force > /dev/null || true
+          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - run: uv sync --frozen --no-dev
@@ -76,6 +85,11 @@ jobs:
           codigo=$?
           echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
           exit $codigo
+      - name: uso do disco
+        if: always()
+        run: |
+          df -h /
+          du -sh dados/* 2>/dev/null | sort -h | tail -8 || true
       - name: reconstruir históricos
         if: inputs.reconstruir
         run: uv run coletor reconstruir --origem-prefixo ""
@@ -92,7 +106,10 @@ jobs:
           set -o pipefail
           test -n "$LAGO_CHAVE" || { echo "::error::secret LAGO_CHAVE ausente"; exit 1; }
           mkdir -p dados/raw dados/meta dados/estado
-          tar -cf - dados/raw dados/meta dados/estado \
+          # Cada pipeline/site/publicar daqui é privado-legado e cria uma pasta nova em
+          # preparadas/ (dbt-target e marts que ninguém relê); no cache elas só se acumulavam.
+          tar -cf - --exclude=dados/estado/tse/publicacoes/preparadas \
+              dados/raw dados/meta dados/estado \
             | gpg --batch --quiet --yes --pinentry-mode loopback --passphrase-fd 3 \
                 --symmetric --cipher-algo AES256 --compress-algo none -o lago.tar.gpg 3<<<"$LAGO_CHAVE"
       - name: guardar cache do lago (cifrado)

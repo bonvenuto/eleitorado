@@ -58,3 +58,30 @@ unit_tests:
         - {autor_codigo: '1', tipo_autor: parlamentar, parlamentar_id: 'camara:10', parlamentares_com_o_nome: 1}
         - {autor_codigo: '2', tipo_autor: parlamentar, parlamentar_id: null, parlamentares_com_o_nome: 2}
         - {autor_codigo: '3', tipo_autor: bancada, parlamentar_id: null, parlamentares_com_o_nome: 0}
+
+  - name: pagamento_mascara_cpf_nos_nomes
+    description: >
+      CPF colado ou no meio de um nome de texto livre sai mascarado; código de 6 dígitos e
+      nome sem CPF ficam como vieram.
+    model: fct_emenda_pagamento
+    given:
+      - input: ref('int_cgu__emendas_pagamentos')
+        rows:
+          - {pagamento_linha_id: a, _competencia: '2026', ug_codigo: '111111',
+             ug_nome: '52998224725UNIDADE GESTORA DE TESTE',
+             orgao_nome: 'Fundo 529.982.247-25', orgao_superior_nome: 'MINISTERIO',
+             localidade: 'LOCAL 52998224725', favorecido_municipio: '52998224725'}
+          - {pagamento_linha_id: b, _competencia: '2026', ug_codigo: '222222',
+             ug_nome: 'SEC.DE ADM.UNIDADE GESTORA DE TESTE',
+             orgao_nome: 'UG 222222', orgao_superior_nome: 'PROCESSO 123456789012',
+             localidade: 'BRASILIA', favorecido_municipio: 'BRASILIA'}
+    expect:
+      rows:
+        - {pagamento_linha_id: a, ug_codigo: '111111',
+           ug_nome: '***.982.247-**UNIDADE GESTORA DE TESTE',
+           orgao_nome: 'Fundo ***.982.247-**', orgao_superior_nome: 'MINISTERIO',
+           localidade: 'LOCAL ***.982.247-**', favorecido_municipio: '***.982.247-**'}
+        - {pagamento_linha_id: b, ug_codigo: '222222',
+           ug_nome: 'SEC.DE ADM.UNIDADE GESTORA DE TESTE',
+           orgao_nome: 'UG 222222', orgao_superior_nome: 'PROCESSO 123456789012',
+           localidade: 'BRASILIA', favorecido_municipio: 'BRASILIA'}

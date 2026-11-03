@@ -1,7 +1,11 @@
+import json
+
 import httpx
+import pytest
 
 from coletor.cli import main
 from coletor.dbt import ResultadoDbt
+from coletor.publicacao import SELO
 from tests.amostras import CNEP_CSV, PAGINA_CGU, RAIZ, zip_com
 
 PAGINA = "https://portaldatransparencia.gov.br/download-de-dados/cnep"
@@ -37,7 +41,7 @@ def test_pipeline_coleta_roda_dbt_e_registra_uma_execucao(respx_mock, deps, ware
 
     codigo = _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt)
     assert codigo == 0
-    assert chamadas == [("dbt", "prod", "dados/publico")]
+    assert chamadas == [("dbt", "prod", deps.config.publico.as_posix())]
     [execucao] = warehouse.linhas["meta/execucoes"]
     assert (execucao["status"], execucao["dbt_status"]) == ("sucesso", "sucesso")
     assert execucao["dbt_testes_com_erro"] == 0
@@ -57,6 +61,36 @@ def test_pipeline_deixa_os_modelos_do_site_para_o_coletor_site(respx_mock, deps)
     assert argumentos[:3] == ["--exclude", "path:models/site", "site_alerta_tipos"]
     assert argumentos[3] == "--vars"
     assert argumentos[5] == "--target-path"
+
+
+def test_pipeline_com_dbt_aprovado_grava_o_selo_da_publicacao(respx_mock, deps):
+    _mock_tudo_sem_alteracao(respx_mock)
+    selo = deps.config.publico / SELO
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        assert not selo.exists()  # o selo anterior sai antes do build
+        return ResultadoDbt("sucesso", 0)
+
+    selo.parent.mkdir(parents=True)
+    selo.write_text("{}")
+    assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 0
+    assert json.loads(selo.read_text())["versao"] == "teste"
+
+
+@pytest.mark.parametrize("quebra", ["falha", "excecao"])
+def test_pipeline_com_dbt_que_nao_passa_apaga_o_selo(respx_mock, deps, quebra):
+    _mock_tudo_sem_alteracao(respx_mock)
+    selo = deps.config.publico / SELO
+    selo.parent.mkdir(parents=True)
+    selo.write_text("{}")
+
+    def dbt(diretorio, target, publico, argumentos=()):
+        if quebra == "excecao":
+            raise OSError(28, "No space left on device")
+        return ResultadoDbt("falha", 1)
+
+    assert _rodar(["pipeline", "--recursos", "cgu.cnep"], deps, dbt) == 1
+    assert not selo.exists()
 
 
 def test_pipeline_com_dbt_falhando_termina_com_erro(respx_mock, deps, warehouse):
