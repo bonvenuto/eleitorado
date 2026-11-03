@@ -7,7 +7,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from coletor.publicacao import CACHE_SITE, ErroPublicacao, publicar
+from coletor.publicacao import (
+    CACHE_SITE,
+    LIMITE_REMOCOES_MARTS,
+    SELO,
+    ErroPublicacao,
+    gravar_selo,
+    publicar,
+    remover_selo,
+)
 
 AGORA = datetime(2026, 10, 4, 10, tzinfo=UTC)
 
@@ -48,6 +56,7 @@ def publico(tmp_path):
     pq.write_table(pa.table({"a": [1]}), raiz / "marts" / "fct" / "casa=camara" / "d.parquet")
     (raiz / "linhagem").mkdir()
     (raiz / "linhagem" / "index.html").write_text("<html></html>")
+    gravar_selo(raiz, {"versao": "teste"})
     return raiz
 
 
@@ -241,3 +250,49 @@ def test_legado_preserva_c2_que_nao_existe_localmente(publico, com_site):
     ]
     assert removidos_c2 == []
     assert protegidos <= remoto.chaves
+
+
+def test_sem_selo_do_dbt_nada_e_publicado(publico):
+    # 31/10/2026: o runner perdeu o passo do dbt e o publicar subiu um build incompleto
+    remover_selo(publico)
+    publicador = FakePublicador({"marts/dim_uf.parquet": b"x"})
+    with pytest.raises(ErroPublicacao, match="selo"):
+        publicar(publicador, publico, AGORA, "v")
+    assert publicador.ordem == []
+
+
+def test_selo_nao_vai_para_o_bucket(publico):
+    publicador = FakePublicador()
+    publicar(publicador, publico, AGORA, "v")
+    assert SELO not in publicador.chaves
+    assert not any(SELO in a["caminho"] for a in publicador.manifesto["arquivos"])
+
+
+def test_muitas_remocoes_de_marts_impedem_a_publicacao(publico):
+    sumidos = {f"marts/alerta_{i}.parquet": b"x" for i in range(LIMITE_REMOCOES_MARTS + 1)}
+    publicador = FakePublicador(sumidos)
+    with pytest.raises(ErroPublicacao, match="--permitir-remocoes"):
+        publicar(publicador, publico, AGORA, "v")
+    assert publicador.ordem == []
+
+
+def test_remocoes_no_limite_seguem(publico):
+    sumidos = {f"marts/alerta_{i}.parquet": b"x" for i in range(LIMITE_REMOCOES_MARTS)}
+    publicador = FakePublicador(sumidos)
+    resumo = publicar(publicador, publico, AGORA, "v")
+    assert resumo.apagados == LIMITE_REMOCOES_MARTS
+
+
+def test_remocoes_em_massa_com_permissao_explicita(publico):
+    sumidos = {f"marts/alerta_{i}.parquet": b"x" for i in range(LIMITE_REMOCOES_MARTS + 1)}
+    publicador = FakePublicador(sumidos)
+    resumo = publicar(publicador, publico, AGORA, "v", permitir_remocoes=True)
+    assert resumo.apagados == LIMITE_REMOCOES_MARTS + 1
+
+
+def test_remocoes_do_site_nao_contam_no_limite(publico):
+    _site(publico, {"resumo.json": b"gzip"})
+    sumidos = {f"site/p_{i}.json": b"x" for i in range(LIMITE_REMOCOES_MARTS * 10)}
+    publicador = FakePublicador(sumidos)
+    resumo = publicar(publicador, publico, AGORA, "v")
+    assert resumo.apagados == LIMITE_REMOCOES_MARTS * 10

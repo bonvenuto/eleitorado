@@ -155,7 +155,7 @@ def test_publicar_sem_flag_tse_somente_legado(deps, tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "gerar_linhagem", docs)
     monkeypatch.setattr(publicacao, "R2Publicador", lambda *a: object())
-    monkeypatch.setattr(publicacao, "publicar", lambda *a: vistos.append("legado"))
+    monkeypatch.setattr(publicacao, "publicar", lambda *a, **k: vistos.append("legado"))
     monkeypatch.setattr(c2, "publicar_tse", lambda *a: pytest.fail("C2 sem flag"))
     env = {**ENV, **dict.fromkeys(["R2_CONTA", "R2_CHAVE_ID", "R2_SEGREDO", "R2_BUCKET"], "teste")}
     assert (
@@ -201,7 +201,7 @@ def test_publicar_execucao_explicita_mesmas_vars_e_saida(deps, tmp_path, monkeyp
 
     monkeypatch.setattr(cli, "gerar_linhagem", docs)
     monkeypatch.setattr(publicacao, "R2Publicador", lambda *a: object())
-    monkeypatch.setattr(publicacao, "publicar", lambda *a: vistos.append("legado"))
+    monkeypatch.setattr(publicacao, "publicar", lambda *a, **k: vistos.append("legado"))
     monkeypatch.setattr(c2, "publicar_tse", publicar_c2)
     env = {**ENV, **dict.fromkeys(["R2_CONTA", "R2_CHAVE_ID", "R2_SEGREDO", "R2_BUCKET"], "teste")}
     assert (
