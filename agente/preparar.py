@@ -133,7 +133,8 @@ def _contar(conexao: duckdb.DuckDBPyConnection, tabela: str, segundos: float) ->
     temporizador = threading.Timer(segundos, conexao.interrupt)
     temporizador.start()
     try:
-        return f"{conexao.sql(f'select count(*) from {tabela}').fetchone()[0]:,}".replace(",", ".")
+        total = conexao.sql(f"select count(*) from {tabela}").limit(1).fetchall()[0][0]
+        return f"{total:,}".replace(",", ".")
     except duckdb.Error:
         return "—"
     finally:

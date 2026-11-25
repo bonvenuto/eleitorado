@@ -171,6 +171,7 @@
   "recurso_id": "VARCHAR",
   "orgao": "VARCHAR",
   "recurso": "VARCHAR",
+  "grupo": "VARCHAR",
   "descricao": "VARCHAR",
   "fonte_oficial": "VARCHAR",
   "condicoes_uso": "VARCHAR",

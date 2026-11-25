@@ -1107,6 +1107,7 @@ flowchart LR
 | Coluna | Tipo | Descrição |
 |---|---|---|
 | `recurso_id` | VARCHAR | Recurso do coletor (`<órgão>.<recurso>`, ex.: `cgu.ceis`). |
+| `grupo` | VARCHAR | Grupo de execução do recurso (`diario`, `receita` ou `tse`). |
 | `cadencia_corrente` | VARCHAR | Cadência de coleta do recurso: `diaria`, `semanal` ou `mensal`. |
 | `ultima_coleta` | TIMESTAMP WITH TIME ZONE | Início da última coleta (UTC). |
 | `ultimo_sucesso` | TIMESTAMP WITH TIME ZONE | Fim da última coleta bem-sucedida (`carregada` ou `sem_alteracao`). |
@@ -1524,7 +1525,7 @@ Views sobre o raw (uma por recurso), que só convertem tipos, padronizam nomes e
 | `stg_ibge__municipios` | Municípios com a hierarquia territorial (snapshot do mais recente). | 12 |
 | `stg_pncp__contratos` | Contratos do PNCP extraídos do JSON (publicação diária e atualizações), com a coluna `origem`. | 31 |
 | `stg_meta__coletas` | Registro de cada coleta do coletor (status, linhas, mudança de esquema). | 11 |
-| `stg_meta__fontes` | Catálogo de recursos do coletor (cadência, tipo de publicação). | 3 |
+| `stg_meta__fontes` | Catálogo de recursos do coletor (grupo, cadência, tipo de publicação). | 4 |
 
 <details><summary><code>stg_camara__ceap</code></summary>
 
@@ -1926,6 +1927,7 @@ Views sobre o raw (uma por recurso), que só convertem tipos, padronizam nomes e
 | Coluna | Tipo |
 |---|---|
 | `recurso_id` | VARCHAR |
+| `grupo` | VARCHAR |
 | `publicacao` | VARCHAR |
 | `cadencia_corrente` | VARCHAR |
 
@@ -1943,8 +1945,8 @@ Toda execução roda os testes do dbt **antes** de publicar; um teste com erro i
 | `sem_cpf_completo` | Nenhuma coluna de texto do mart contém CPF sem máscara (LGPD). | erro |
 | `cota_reconciliacao` | O fato da cota tem as mesmas linhas e o mesmo valor reembolsado da fonte, por casa e ano. | erro |
 | `documentos_macros` / `documentos_fonte` | Validação de CPF/CNPJ (inclusive alfanumérico) e leitura dos códigos da fonte. | erro |
-| `fontes_em_atraso_erro` | Recurso sem sucesso além do limite de erro da cadência. | erro |
-| `fontes_em_atraso_aviso` | Recurso sem sucesso além do limite de aviso. | aviso |
+| `fontes_em_atraso_erro` | Recurso do grupo `diario` sem sucesso além do limite de erro da cadência. | erro |
+| `fontes_em_atraso_aviso` | Qualquer recurso (inclusive `receita` e `tse`) sem sucesso além do limite de aviso. | aviso |
 | `fontes_reduzidas_recentes` | Fonte que encolheu nos últimos 7 dias (ver `alerta_fonte_reduzida`). | aviso |
 | `contratos_pareamento` | Menos da metade dos contratos federais do PNCP (2022 em diante) pareia com o Portal. | aviso |
 | testes unitários | Regras de negócio com dados fictícios (pareamento de contratos, versão vigente, alertas, histórico). | erro |

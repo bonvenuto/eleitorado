@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
+import threading
 from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -20,8 +22,51 @@ class ResultadoDbt:
     testes_com_erro: int | None  # None quando o dbt não chegou a gravar run_results.json
 
 
+def _encerrar_processo(processo: subprocess.Popen[bytes], espera_s: float = 15.0) -> None:
+    """Encerra o filho dbt e aguarda para não deixar lock aberto no arquivo .duckdb."""
+    if processo.poll() is not None:
+        return
+    processo.terminate()
+    try:
+        processo.wait(timeout=espera_s)
+    except subprocess.TimeoutExpired:
+        processo.kill()
+        processo.wait()
+
+
 def _executar_subprocesso(comando: list[str]) -> int:
-    return subprocess.run(comando, check=False).returncode
+    processo = subprocess.Popen(comando)
+    sinais_anteriores: dict[int, object] = {}
+    sinal_recebido: int | None = None
+    if threading.current_thread() is threading.main_thread():
+        sinais = [signal.SIGINT]
+        if hasattr(signal, "SIGTERM"):
+            sinais.append(signal.SIGTERM)
+
+        def _propagar(numero: int, _frame: object) -> None:
+            nonlocal sinal_recebido
+            sinal_recebido = numero
+            # Não chamar processo.wait() aqui: o wait() da thread principal segura _waitpid_lock.
+            if processo.poll() is None:
+                processo.terminate()
+
+        for sig in sinais:
+            sinais_anteriores[sig] = signal.getsignal(sig)
+            signal.signal(sig, _propagar)
+    try:
+        while True:
+            try:
+                codigo = processo.wait(timeout=15.0 if sinal_recebido is not None else None)
+                break
+            except subprocess.TimeoutExpired:
+                processo.kill()
+        if sinal_recebido is not None and codigo >= 0:
+            return 128 + sinal_recebido
+        return codigo
+    finally:
+        _encerrar_processo(processo)
+        for sig, anterior in sinais_anteriores.items():
+            signal.signal(sig, anterior)
 
 
 def _testes_com_erro(caminho: Path) -> int | None:

@@ -114,3 +114,15 @@ def test_recarga_no_replay_nao_afeta_a_deduplicacao():
     recarga.sha256_conteudo = "antigo"
     historico.registrar(recarga.finalizar("recarregada", _instante(HOJE)))
     assert historico.ultimo_sha("camara.ceap", "2026") == "novo"
+
+
+def test_publicar_fontes_registra_grupo(warehouse):
+    from coletor.manifesto import carregar_manifesto
+    from tests.amostras import RAIZ
+
+    manifesto = carregar_manifesto(RAIZ / "fontes")
+    RepositorioMeta(warehouse).publicar_fontes(manifesto, _instante(HOJE))
+    por_id = {linha["recurso_id"]: linha["grupo"] for linha in warehouse.linhas["meta/fontes"]}
+    assert por_id["cgu.ceis"] == "diario"
+    assert por_id["rfb.empresas"] == "receita"
+    assert por_id["tse.candidaturas"] == "tse"

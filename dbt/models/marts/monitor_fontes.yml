@@ -21,9 +21,11 @@ unit_tests:
           - {recurso_id: cgu.ceis, destino: replay, status: recarregada, iniciada_em: '2026-10-04 11:00:00', finalizada_em: '2026-10-04 11:01:00'}
       - input: ref('stg_meta__fontes')
         rows:
-          - {recurso_id: cgu.ceis, cadencia_corrente: diaria}
-          - {recurso_id: cgu.cnep, cadencia_corrente: semanal}
+          - {recurso_id: cgu.ceis, grupo: diario, cadencia_corrente: diaria}
+          - {recurso_id: cgu.cnep, grupo: diario, cadencia_corrente: semanal}
+          - {recurso_id: rfb.empresas, grupo: receita, cadencia_corrente: mensal}
     expect:
       rows:
-        - {recurso_id: cgu.ceis, ultima_coleta: '2026-10-04 10:00:00', ultimo_sucesso: '2026-10-03 10:01:00', status_ultima_coleta: falha, limite_aviso_horas: 30, limite_erro_horas: 54}
-        - {recurso_id: cgu.cnep, ultima_coleta: null, ultimo_sucesso: null, status_ultima_coleta: null, limite_aviso_horas: 192, limite_erro_horas: 240}
+        - {recurso_id: cgu.ceis, grupo: diario, ultima_coleta: '2026-10-04 10:00:00', ultimo_sucesso: '2026-10-03 10:01:00', status_ultima_coleta: falha, limite_aviso_horas: 30, limite_erro_horas: 54}
+        - {recurso_id: cgu.cnep, grupo: diario, ultima_coleta: null, ultimo_sucesso: null, status_ultima_coleta: null, limite_aviso_horas: 192, limite_erro_horas: 240}
+        - {recurso_id: rfb.empresas, grupo: receita, ultima_coleta: null, ultimo_sucesso: null, status_ultima_coleta: null, limite_aviso_horas: 840, limite_erro_horas: 960}

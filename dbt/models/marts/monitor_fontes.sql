@@ -27,6 +27,7 @@ resumo as (
 
 select
     f.recurso_id,
+    f.grupo,
     f.cadencia_corrente,
     r.ultima_coleta,
     r.ultimo_sucesso,

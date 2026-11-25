@@ -5,8 +5,8 @@ description = "Ingestão de dados públicos em DuckDB e Parquet"
 requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.43.108",
-    "dbt-duckdb>=1.11.0",
-    "duckdb>=1.5.6",
+    "dbt-duckdb>=1.11.1",
+    "duckdb>=2.0.1",
     "google-cloud-storage>=2.18",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",

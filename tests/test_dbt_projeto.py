@@ -95,3 +95,47 @@ def test_targets_usam_duckdb_com_arquivos_separados():
         "ci": "duckdb",
     }
     assert len({saida["path"] for saida in saidas.values()}) == 4
+
+
+def test_target_prod_parametriza_memoria_threads_e_desativa_insertion_order():
+    import yaml
+
+    perfil = yaml.safe_load((RAIZ / "dbt" / "profiles.yml").read_text(encoding="utf-8"))
+    prod = perfil["eleitorado"]["outputs"]["prod"]
+    assert "ELEITORADO_DUCKDB_THREADS" in str(prod["threads"])
+    assert "ELEITORADO_DUCKDB_MEMORIA" in str(prod["settings"]["memory_limit"])
+    assert prod["settings"]["preserve_insertion_order"] is False
+
+
+def test_fontes_em_atraso_erro_so_falha_grupo_diario():
+    import re
+
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute(
+        """
+        create table monitor_fontes as
+        select * from (values
+            ('cgu.ceis', 'diario', 'diaria', timestamp '2026-10-01 00:00:00', 100, 30, 54),
+            ('cgu.cnep', 'diario', 'diaria', timestamp '2026-11-24 00:00:00', 10, 30, 54),
+            ('rfb.empresas', 'receita', 'mensal', timestamp '2026-10-01 00:00:00', 1200, 840, 960),
+            ('tse.bens', 'tse', 'mensal', null, null, 840, 960)
+        ) t(recurso_id, grupo, cadencia_corrente, ultimo_sucesso, atraso_horas,
+            limite_aviso_horas, limite_erro_horas)
+        """
+    )
+
+    def _rodar(caminho):
+        sql = (RAIZ / caminho).read_text(encoding="utf-8")
+        sql = re.sub(r"\{\{\s*config\([^)]*\)\s*\}\}", "", sql)
+        sql = re.sub(r"\{\{\s*ref\('monitor_fontes'\)\s*\}\}", "monitor_fontes", sql)
+        return [linha[0] for linha in con.execute(sql).fetchall()]
+
+    assert _rodar("dbt/tests/fontes_em_atraso_erro.sql") == ["cgu.ceis"]
+    assert set(_rodar("dbt/tests/fontes_em_atraso_aviso.sql")) == {
+        "cgu.ceis",
+        "rfb.empresas",
+        "tse.bens",
+    }
+    con.close()
