@@ -48,17 +48,17 @@ def test_lago_de_avaliacao_tem_os_casos_plantados(tmp_path):
     maior = conexao.sql(
         "select fornecedor_nome from marts.fct_despesa_cota_parlamentar "
         "order by valor_reembolsado desc limit 1"
-    ).fetchone()
-    assert maior == (DELTA[1],)
+    ).fetchall()
+    assert maior == [(DELTA[1],)]
     genericos = conexao.sql(
         "select count(*) from marts.fct_despesa_cota_parlamentar "
         "where regexp_matches(fornecedor_nome, 'FORNECEDOR')"
-    ).fetchone()
-    assert genericos == (0,)  # nomes plausíveis: o agente não deve tomar a base por teste
+    ).fetchall()
+    assert genericos == [(0,)]  # nomes plausíveis: o agente não deve tomar a base por teste
     homonimos = conexao.sql(
         "select count(*) from marts.dim_parlamentar where nome = 'JOSE DA SILVA'"
-    ).fetchone()
-    assert homonimos == (2,)
+    ).fetchall()
+    assert homonimos == [(2,)]
     baixada = conexao.sql(
         "select razao_social, count(*) from marts.alerta_pagamento_empresa_irregular group by 1"
     ).fetchall()

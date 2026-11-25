@@ -27,6 +27,8 @@ env:
   ELEITORADO_PUBLICO: dados/publico
   ELEITORADO_VERSAO: ${{ github.sha }}
   ELEITORADO_ORIGEM: ${{ github.event_name == 'schedule' && 'agendada' || 'manual' }}
+  ELEITORADO_DUCKDB_MEMORIA: 10GB
+  ELEITORADO_DUCKDB_THREADS: 2
 
 jobs:
   pipeline:

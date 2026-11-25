@@ -95,7 +95,7 @@ def test_preparar_cria_parquet_vazio_para_fonte_ainda_sem_coleta(config):
     esquemas.write_text('{"raw/rfb/empresas": {"cnpj_basico": "VARCHAR"}}', encoding="utf-8")
     preparar(config, {}, construtor_c2(config, []), lambda: AGORA)
     vazio = config.lago / "raw" / "rfb" / "empresas" / "vazio" / "vazio.parquet"
-    assert duckdb.sql(f"select count(*) from '{vazio.as_posix()}'").fetchone() == (0,)
+    assert duckdb.sql(f"select count(*) from '{vazio.as_posix()}'").fetchall() == [(0,)]
 
 
 def test_preparar_falha_se_o_restaurar_falha(config):
@@ -384,7 +384,7 @@ def test_consulta_c2_permitida_irma_e_recibo_negados(c2):
                 conexao.sql(f"select * from '{arquivo.as_posix()}'").fetchall()
         for caminhos in marca["tse"]["vars"]["tse_fontes"].values():
             # A seleção C2 real usa raw, que já era permitido.
-            assert conexao.sql(f"select count(*) from '{caminhos[0]}'").fetchone()[0] >= 0
+            assert conexao.sql(f"select count(*) from '{caminhos[0]}'").fetchall()[0][0] >= 0
     finally:
         conexao.close()
 
@@ -400,7 +400,7 @@ def test_bootstrap_consulta_vazios_e_saida_com_cache(config):
     conexao = abrir(config.banco, config.diretorios_permitidos())
     try:
         for caminhos in marca["tse"]["vars"]["tse_fontes"].values():
-            assert conexao.sql(f"select count(*) from '{caminhos[0]}'").fetchone() == (0,)
+            assert conexao.sql(f"select count(*) from '{caminhos[0]}'").fetchall() == [(0,)]
         assert conexao.sql("select valor from marts.c2").fetchall() == [(7,)]
     finally:
         conexao.close()

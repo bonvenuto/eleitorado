@@ -24,6 +24,7 @@ def conexao(lago):
         "load httpfs",
         "copy marts.tabela to 'x.csv'",
         "pragma enable_profiling",
+        "pragma version",
         "set enable_external_access = true",
         "select 1; select 2",
         "call duckdb_settings()",
@@ -36,7 +37,7 @@ def test_recusa_o_que_nao_e_uma_unica_leitura(sql):
 
 def test_aceita_select_e_with():
     assert validar_sql("select 1;") == "select 1"
-    assert validar_sql("pragma version").startswith("SELECT")  # pragma de tabela é leitura
+    assert validar_sql("select * from pragma_version()").startswith("select")
     assert validar_sql("with a as (select 1 as x) select * from a").startswith("with")
 
 

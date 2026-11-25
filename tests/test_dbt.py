@@ -147,3 +147,45 @@ def test_ambiente_dbt_absoluto_e_restaurado_na_falha(tmp_path, monkeypatch):
         raise RuntimeError("falha operacional")
     assert os.environ["ELEITORADO_LAGO"] == "relativo-anterior"
     assert "ELEITORADO_PUBLICO" not in os.environ
+
+
+def test_executar_subprocesso_encerra_filho_ao_receber_sigterm(tmp_path):
+    import os
+    import signal
+    import sys
+    import threading
+    import time
+
+    from coletor.dbt import _executar_subprocesso
+
+    if not hasattr(signal, "SIGTERM"):
+        return
+    pronto = tmp_path / "pronto"
+    pid_arquivo = tmp_path / "filho.pid"
+    script = (
+        f"import os, pathlib, time; "
+        f"pathlib.Path({str(pid_arquivo)!r}).write_text(str(os.getpid())); "
+        f"pathlib.Path({str(pronto)!r}).write_text('ok'); "
+        f"time.sleep(30)"
+    )
+
+    def _sinalizar():
+        for _ in range(100):
+            if pronto.exists():
+                break
+            time.sleep(0.05)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    t = threading.Thread(target=_sinalizar, daemon=True)
+    t.start()
+    codigo = _executar_subprocesso([sys.executable, "-c", script])
+    t.join(timeout=5)
+
+    assert codigo != 0
+    filho_pid = int(pid_arquivo.read_text())
+    try:
+        os.kill(filho_pid, 0)
+    except ProcessLookupError:
+        pass
+    else:
+        raise AssertionError(f"processo filho {filho_pid} continuou vivo após SIGTERM")

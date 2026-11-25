@@ -19,7 +19,7 @@ def test_cria_parquet_vazio_so_para_fonte_sem_dados(tmp_path):
 
     assert criadas == ["raw/cgu/licitacoes"]
     vazio = tmp_path / "raw/cgu/licitacoes/vazio/vazio.parquet"
-    assert duckdb.sql(f"select count(*) from '{vazio.as_posix()}'").fetchone() == (0,)
+    assert duckdb.sql(f"select count(*) from '{vazio.as_posix()}'").fetchall() == [(0,)]
     colunas = [c[0] for c in duckdb.sql(f"describe select * from '{vazio.as_posix()}'").fetchall()]
     assert colunas == ["numero_licitacao", "_competencia"]
     assert not (tmp_path / "raw/cgu/contratos/vazio").exists()
