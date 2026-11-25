@@ -45,7 +45,7 @@ flowchart LR
 | intermediate | tabelas no DuckDB | privada | Regras de negócio, deduplicação, históricos; **contém documento completo** (usado nos cruzamentos). |
 | marts | Parquet no R2 | **pública** | Dimensões, fatos, alertas e monitoramento; CPF sempre mascarado. |
 
-O pipeline roda todo dia às 07:30 (Brasília) no GitHub Actions: coleta o que venceu, roda o dbt com todos os testes e só então publica.
+O pipeline roda todo dia às 07:30 (Brasília) no GitHub Actions: coleta o que venceu, roda o dbt com todos os testes e só então publica. O `coletor publicar` só envia com o selo que o `coletor pipeline` grava quando o dbt build passa (`<publico>/.dbt-aprovado.json`) e recusa apagar do bucket mais de 5 arquivos de `marts/` sem `--permitir-remocoes`.
 
 ## Como acessar os dados
 
@@ -545,7 +545,7 @@ flowchart LR
 | `fase_despesa` | VARCHAR | `Empenho`, `Liquidação` ou `Pagamento`. |
 | `valor_empenhado` | DECIMAL(38,2) | Valor empenhado (R$). |
 | `valor_pago` | DECIMAL(38,2) | Valor pago (R$). |
-| `localidade` | VARCHAR | Localidade de aplicação do recurso (município, UF, `Nacional`, `MÚLTIPLO`...). |
+| `localidade` | VARCHAR | Localidade de aplicação do recurso (município, UF, `Nacional`, `MÚLTIPLO`...; CPFs no texto mascarados). |
 | `uf_sigla` | VARCHAR | Sigla da UF. |
 | `municipio_id` | VARCHAR | Código IBGE do município (7 dígitos). |
 | `favorecido_documento` | VARCHAR | Documento do favorecido (CPF sempre mascarado). |
@@ -554,13 +554,13 @@ flowchart LR
 | `favorecido_nome` | VARCHAR | Nome do favorecido (CPFs no texto mascarados). |
 | `tipo_favorecido` | VARCHAR | Tipo do favorecido como publicado. |
 | `favorecido_uf` | VARCHAR | UF do favorecido. |
-| `favorecido_municipio` | VARCHAR | Município do favorecido. |
+| `favorecido_municipio` | VARCHAR | Município do favorecido (CPFs no texto mascarados). |
 | `ug_codigo` | VARCHAR | Código da unidade gestora (UG) do SIAFI; no PNCP, código da unidade do órgão. |
-| `ug_nome` | VARCHAR | Nome da unidade gestora. |
+| `ug_nome` | VARCHAR | Nome da unidade gestora (CPFs no texto mascarados). |
 | `orgao_codigo` | VARCHAR | Código do órgão. |
-| `orgao_nome` | VARCHAR | Nome do órgão. |
+| `orgao_nome` | VARCHAR | Nome do órgão (CPFs no texto mascarados). |
 | `orgao_superior_codigo` | VARCHAR | Código do órgão superior. |
-| `orgao_superior_nome` | VARCHAR | Nome do órgão superior. |
+| `orgao_superior_nome` | VARCHAR | Nome do órgão superior (CPFs no texto mascarados). |
 | `grupo_despesa` | VARCHAR | Grupo de natureza de despesa. |
 | `elemento_despesa` | VARCHAR | Elemento de despesa. |
 | `modalidade_aplicacao` | VARCHAR | Modalidade de aplicação da despesa. |

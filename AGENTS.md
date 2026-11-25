@@ -133,12 +133,20 @@ Se o PR mexe em `site/`, também (em `site/`): `npm ci`, `npm run lint`, `npm ru
 
 - **Pipeline diário** (`pipeline.yml`, 10:30 UTC, mas o GitHub costuma atrasar; limite de 120 min):
   saída **3** = só coletas falharam e o dbt passou, então os marts são publicados mesmo assim (o
-  job fica vermelho de propósito).
+  job fica vermelho de propósito). O `coletor publicar` ainda exige o selo
+  `<publico>/.dbt-aprovado.json`, que o `coletor pipeline` apaga antes do dbt e só regrava com o
+  build verde, e recusa apagar mais de 5 arquivos de `marts/` sem `--permitir-remocoes`: em
+  31/10/2026 o disco do runner encheu, o runner perdeu o passo do dbt e o `publicar` subiu um
+  build incompleto e apagou 48 marts do bucket.
+- **Disco do runner:** o spill do DuckDB nos modelos de licitação enche o disco; o pipeline
+  libera os SDKs que não usa antes de começar e registra `df -h` depois do dbt.
 - **Lago no cache do Actions** sempre cifrado com GPG (secret `LAGO_CHAVE`): workflows de PR,
   inclusive de forks, conseguem ler caches da `main`.
 - **Estado:** o lago local espelha `raw/`, `meta/` e `estado/` do bucket
   (`coletor estado restaurar|salvar`); o `.duckdb` é descartável. Os históricos por eventos
-  (sanções, parlamentares) são o único estado que não se recalcula do raw.
+  (sanções, parlamentares) são o único estado que não se recalcula do raw. Cada partição do raw
+  tem um arquivo só; o `restaurar`, que só acrescenta, deixa a carga mais recente do meta quando
+  bucket e cache divergem (partição com arquivo que o meta não conhece fica, com aviso).
 - **CI:** às vezes um PR não dispara o check `testes`; feche e reabra o PR.
 - **Fonte com defeito conhecido:** o ZIP de licitações da CGU de 2018-12 vem truncado na própria
   fonte e falha todo dia (ver o roteiro).

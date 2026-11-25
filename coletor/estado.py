@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from coletor.armazenamento import Armazenamento
@@ -34,6 +35,7 @@ class Resumo:
     baixados: int = 0
     enviados: int = 0
     apagados: int = 0
+    consolidados: int = 0
 
 
 def md5_arquivo(caminho: Path) -> str:
@@ -70,9 +72,74 @@ def restaurar(armazenamento: Armazenamento, prefixo: str, lago: Path, banco: Pat
             local.parent.mkdir(parents=True, exist_ok=True)
             armazenamento.baixar(caminho, local)
             resumo.baixados += 1
+    resumo.consolidados = consolidar_particoes(lago)
     carregar_historicos(lago / "estado" / "historicos", banco)
-    log.info("estado restaurado: %d arquivo(s) baixado(s)", resumo.baixados)
+    log.info(
+        "estado restaurado: %d arquivo(s) baixado(s), %d partição(ões) consolidada(s)",
+        resumo.baixados,
+        resumo.consolidados,
+    )
     return resumo
+
+
+def consolidar_particoes(lago: Path) -> int:
+    """Deixa em cada partição do raw só o arquivo da carga mais recente; devolve quantas mudaram.
+
+    A carga substitui a partição inteira (`<coleta_id>.parquet`), mas o restaurar só acrescenta:
+    se o `estado salvar` falhou depois de uma recoleta, o bucket guarda a coleta antiga e o cache
+    a nova, e as duas se juntariam (31/10/2026: sanções em dobro). Vale a carga mais recente do
+    meta; partição com arquivo que o meta não conhece fica como está, com um aviso.
+    """
+    raiz = lago / "raw"
+    if not raiz.exists():
+        return 0
+    repetidas = {
+        pasta: arquivos
+        for pasta in raiz.glob("*/*/*")
+        if pasta.is_dir()
+        and not pasta.relative_to(lago).as_posix().startswith(PREFIXOS_TSE)
+        and len(arquivos := sorted(pasta.glob("*.parquet"))) > 1
+    }
+    if not repetidas:
+        return 0
+    cargas = _cargas_no_meta(lago)
+    consolidadas = 0
+    for pasta, arquivos in sorted(repetidas.items()):
+        desconhecidos = [a.stem for a in arquivos if a.stem not in cargas]
+        if desconhecidos:
+            log.warning(
+                "%s tem %d arquivos e o meta não conhece %s: nada apagado",
+                pasta.relative_to(lago).as_posix(),
+                len(arquivos),
+                ", ".join(desconhecidos),
+            )
+            continue
+        vigente = max(arquivos, key=lambda arquivo: cargas[arquivo.stem])
+        for arquivo in arquivos:
+            if arquivo != vigente:
+                log.warning("%s: substituído por %s", arquivo.relative_to(lago), vigente.name)
+                arquivo.unlink()
+        consolidadas += 1
+    return consolidadas
+
+
+def _cargas_no_meta(lago: Path) -> dict[str, datetime]:
+    """coleta_id → fim da carga, das coletas que gravaram no raw."""
+    import duckdb
+
+    arquivos = (lago / "meta" / "coletas").as_posix() + "/*/*.parquet"
+    conexao = duckdb.connect()
+    try:
+        linhas = conexao.execute(
+            f"select coleta_id, max(finalizada_em) from read_parquet('{arquivos}', "
+            "union_by_name = true) where status in ('carregada', 'recarregada') "
+            "and destino = 'raw' group by coleta_id"
+        ).fetchall()
+    except duckdb.IOException:  # meta vazio
+        return {}
+    finally:
+        conexao.close()
+    return dict(linhas)
 
 
 def carregar_historicos(pasta: Path, banco: Path) -> list[str]:
